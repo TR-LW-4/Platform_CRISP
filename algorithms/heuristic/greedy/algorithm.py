@@ -11,6 +11,7 @@ Useful as a baseline to compare RL and GA results against.
 
 from __future__ import annotations
 
+import copy
 import multiprocessing as mp
 from typing import Callable, Dict, List, Optional
 
@@ -23,9 +24,17 @@ class GreedyHeuristic(BaseAlgorithm):
 
     name        = "Greedy Heuristic"
     category    = "Heuristic"
-    description = ("Greedy baseline: always picks the action with the lowest "
+    description = ("[general]  "
+                   "Greedy baseline: always picks the action with the lowest "
                    "immediate relocation cost (depth-1 look-ahead).")
-    compatible_problems: List[str] = []
+    compatible_problems = [
+        "BRP-Fixed",
+        "CRP-Time",
+        "BRP-NonFixed",
+        "Pre-Marshalling",
+        "CSPP",
+        "CSPP-Constrained",
+    ]
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -71,11 +80,10 @@ class GreedyHeuristic(BaseAlgorithm):
 
             primary = -total_reward
             if primary < best_metric:
-                best_metric    = primary
-                best_sol       = solution[:]
+                best_metric         = primary
+                best_sol            = solution[:]
                 self._best_solution = best_sol
 
-            # ── Report ─────────────────────────────────────────── #
             self._push(
                 result_queue,
                 step     = seed + 1,
@@ -85,7 +93,6 @@ class GreedyHeuristic(BaseAlgorithm):
                 snapshot = env.get_state_snapshot(),
             )
 
-        # Summary
         if all_metrics:
             agg = {
                 k: float(np.mean([m[k] for m in all_metrics if k in m]))
@@ -110,15 +117,10 @@ class GreedyHeuristic(BaseAlgorithm):
         mask: Optional[np.ndarray],
     ) -> int:
         """
-        Choose the valid action that minimises immediate reward penalty
-        (i.e. maximises immediate reward).
-
-        If the environment supports look-ahead via clone, try each valid
-        action on a copy; otherwise fall back to the first valid action.
+        Choose the valid action that minimises immediate reward penalty.
+        Tries each valid action on a deep copy; falls back to first valid.
         """
-        import copy
-
-        n = env.action_space.n
+        n     = env.action_space.n
         valid = list(range(n)) if mask is None else list(np.where(mask)[0])
 
         if not valid:
@@ -147,9 +149,13 @@ class GreedyHeuristic(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         return {
-            "num_eval_seeds": {"type": "int", "default": 10, "min": 1, "max": 100,
-                               "label": "Evaluation seeds (num_eval_seeds)",
-                               "help": "Number of random initial states to evaluate."},
-            "seed":           {"type": "int", "default": 0,  "min": 0, "max": 9999,
-                               "label": "Random seed"},
+            "num_eval_seeds": {
+                "type": "int", "default": 10, "min": 1, "max": 100,
+                "label": "Evaluation seeds",
+                "help": "Number of random initial states to evaluate.",
+            },
+            "seed": {
+                "type": "int", "default": 0, "min": 0, "max": 9999,
+                "label": "Random seed",
+            },
         }

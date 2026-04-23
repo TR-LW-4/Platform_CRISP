@@ -94,6 +94,7 @@ python main.py run --problem "BRP-Fixed" --algo REINFORCE --iterations 500
 | 问题名 | 说明 | 主要指标 |
 |--------|------|----------|
 | **BRP-Fixed** | 固定顺序取箱，必须按优先级 1→2→…→N 取出 | relocations |
+| **CRP-Time** | 与 BRP-Fixed 规则相同，主目标为场桥总作业时间（秒） | time / crane_time（兼看 relocations） |
 | **BRP-NonFixed** | 自由选择取箱顺序，优化总搬移次数 | relocations |
 | **Pre-Marshalling** | 开船前重排堆场，使所有栈有序 | moves |
 | **CSPP** | 堆场→船舶配载，考虑分组约束（你的核心问题） | shifters |
@@ -103,12 +104,29 @@ python main.py run --problem "BRP-Fixed" --algo REINFORCE --iterations 500
 
 ## 算法说明
 
-| 算法 | 类型 | 说明 |
-|------|------|------|
-| **REINFORCE** | 强化学习 | 策略梯度 + 贪心基线，适合所有问题 |
-| **PPO** | 强化学习 | Actor-Critic + GAE，更稳定 |
-| **Genetic Algorithm** | 进化算法 | 染色体=动作序列，均匀交叉+随机变异 |
-| **Greedy Heuristic** | 启发式 | 深度1贪心基线，用于对比 |
+| 算法 | 类型 | 适用问题 | 说明 |
+|------|------|---------|------|
+| **REINFORCE** | 强化学习 | 全部 | 策略梯度 + 贪心基线，适合所有问题 |
+| **PPO** | 强化学习 | 全部 | Actor-Critic + GAE，更稳定 |
+| **Genetic Algorithm** | 进化算法 | 全部 | 染色体=动作序列，均匀交叉+随机变异 |
+| **Greedy Heuristic** | 启发式 | 全部 | 深度-1 贪心基线，用于对比 |
+| **Kim–Hong (2006) ENAR** | 启发式 | BRP-Fixed, CRP-Time | Kim & Hong 2006, COR 33 – 经典单贝翻箱规则 |
+| **Caserta (2012) HEUR** | 启发式 | BRP-Fixed, CRP-Time | Caserta, Schwarze & Voß 2012, EJOR – min-priority 目的栈规则 |
+| **Jin (2015) GLAH** | 启发式 | BRP-Fixed | Jin, Zhu & Lim 2015, EJOR – 三层贪婪 + look-ahead 树搜索 |
+| **LA-N Look-Ahead** | 启发式 | BRP-Fixed, CRP-Time | Petering & Hussein 2013, EJOR – N 步 look-ahead + cleaning moves |
+| **Lee–Lee (2010) Retrieval** | 启发式 | BRP-Fixed, CRP-Time | Lee & Lee 2010, COR – 三阶段 IP/MIP 启发式 |
+| **Lin–Lee–Lee (2015) Rule** | 启发式 | **CRP-Time**, BRP-Fixed | Lin, Lee & Lee 2015, TRC – 位置优先级规则：`P_b·(not-well-placed) + P_r·severity + carry-time`；默认 `P_r=30, P_b=300`（Shin 2026 参数）|
+| **Cifuentes–Riff (2020) G-CREM** | 启发式 / GRASP | **CRP-Time**, BRP-Fixed | Cifuentes & Riff 2020, ASOC – 多贝 GRASP：构造用 myopic `H−N_j` + size-adaptive RCL，局部搜索以 RIL 修复（Wu & Ting 2010）；目标 `α·moves + β·crane_time`，默认 `α=0.3, β=0.005, k=3` |
+| **Ðurasević–Ðumić (2024) GP** | 启发式 / GP hyper-heuristic | **CRP-Time**, BRP-Fixed | Ðurasević & Ðumić 2024, ASOC – 用 Genetic Programming **自动进化** Priority Function（表达式树），配合 restricted RS；terminals = `SH/EMP/CUR/RI/AVG/DIFF (+ DIS/DUR)`；**第一阶段部署：多贝 distinct + restricted RS**（unrestricted 与 container-groups 留给未来 `CRP-Groups` 问题类）|
+| **Ðurasević–Ðumić–Gil-Gala (2025) MGP** | 启发式 / Multitask GP | **CRP-Time**, BRP-Fixed | Ðurasević, Ðumić & Gil-Gala 2025, EAAI – **多任务 GP**：同时进化 `S_P` 个子种群（每个子种群对应一个 CRP 任务），通过 cross-subpop crossover / ring-topology migration 共享知识；scenarios = `max_tiers` / `objective`（论文 Table 7 红利）/ `layout` / `load`；复用 2024 GP 的 `gp_core / terminals / rs_restricted` |
+
+> **Baseline 部署约定**：同一问题族共享一套 `ProblemConfig` 变量（`num_bays, num_rows, max_tiers, num_containers` 等）与统一指标（`crane_time` / `relocations` / `lb_ratio`）。新增论文的算法仅放入 `algorithms/<category>/<paper_key>/`，通过 `compatible_problems` 声明挂到哪些问题上，**问题定义与目标保持不动**，变的只有方法。
+>
+> **「单贝 / 多贝」不是两个问题**，只是 `num_bays` 参数的取值。`BRP-Fixed` 与 `CRP-Time` 的区别在 **目标函数**（最少翻箱 vs 最短场桥时间），几何都通用。因此所有固定顺序启发式同时挂到两个问题下，描述前缀用如下 tag 标注其 **原文适用范围**，不影响可运行性：
+>
+> - `[native multi-bay]` — 原文本身就是多贝 CRP（Lee–Lee 2010 / Lin 2015 / G-CREM 2020）；`CRP-Time` 的推荐主力。
+> - `[single-bay origin]` — 原文只做单贝 BRP（Kim–Hong 2006 / Caserta 2012 / LA-N 2013 / GLAH 2015）；在 `CRP-Time`（多贝）上可跑，作为 **退化 baseline** 用，时间目标通常次优。
+> - `[general]` — 问题无关的通用求解器（Greedy / GA / REINFORCE / PPO）。
 
 ---
 

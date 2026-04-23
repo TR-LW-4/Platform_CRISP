@@ -17,6 +17,17 @@ Action      : destination stack index (bay×row, flattened) for the
               environment retrieves automatically with no action needed.
 Reward      : 0 at each step; −1 terminal penalty per relocation.
              (dense variant: −1 every relocation during episode)
+
+Plan interface (for batch planning algorithms, e.g. Lee & Lee 2010)
+--------------------------------------------------------------------
+evaluate_plan(plan: RelocationPlan) → metrics dict
+  Simulates a complete RelocationPlan on a fresh episode and returns
+  relocations, crane_time (if kinematics configured), and other metrics.
+  Kinematics parameters are read from ProblemConfig.extra:
+    gantry_s_per_bay  (default 3.5 s)
+    trolley_s_per_row (default 1.2 s)
+    gantry_accel_s    (default 40 s)
+    spreader_s        (default 30 s)
 """
 
 from __future__ import annotations
@@ -30,6 +41,8 @@ import gymnasium as gym
 from core.base_problem import BaseProblem, ProblemConfig
 from core.container import Container, make_containers
 from core.yard import Yard
+from core.plan import RelocationPlan, simulate_plan
+from core.objectives import KinematicsModel, compute_crane_time, lower_bound_relocations
 
 
 class BRPFixed(BaseProblem):
@@ -50,6 +63,24 @@ class BRPFixed(BaseProblem):
         self._total_relocations: int       = 0
         self._total_steps: int             = 0
         self._done: bool                   = False
+
+    # ---------------------------------------------------------------- #
+    # Episode hooks (override in subclasses, e.g. CRP-Time)              #
+    # ---------------------------------------------------------------- #
+
+    def _hooks_clear_episode(self) -> None:
+        """Called in reset() after yard.clear(), before _build_episode()."""
+
+    def _hook_after_relocate(
+        self,
+        src: Tuple[int, int],
+        dst: Tuple[int, int],
+        container_id: int,
+    ) -> None:
+        """Called after a successful blocker relocation in step()."""
+
+    def _hook_after_retrieve(self, bay: int, row: int, container_id: int) -> None:
+        """Called after each automatic retrieval in _advance_auto_retrievals()."""
 
     # ---------------------------------------------------------------- #
     # Spaces                                                             #
@@ -85,6 +116,7 @@ class BRPFixed(BaseProblem):
         self._total_relocations = 0
         self._total_steps       = 0
         self._done              = False
+        self._hooks_clear_episode()
 
         self._build_episode()
 
@@ -142,6 +174,7 @@ class BRPFixed(BaseProblem):
                 return
             if stack.top == target:
                 stack.pop()
+                self._hook_after_retrieve(stack.bay, stack.row, target.id)
                 self.yard.total_retrievals += 1
                 self._current_target_priority += 1
             else:
@@ -186,7 +219,9 @@ class BRPFixed(BaseProblem):
             # Invalid action → penalise slightly
             reward = -0.5
         else:
+            blocker = src_stack.top
             self.yard.relocate(src, dst)
+            self._hook_after_relocate(src, dst, blocker.id)
             self._total_relocations += 1
             reward = -1.0
 
@@ -270,7 +305,76 @@ class BRPFixed(BaseProblem):
                 mask[i] = True
         return mask
 
+    # ---------------------------------------------------------------- #
+    # Plan-based evaluation (for batch planning algorithms)             #
+    # ---------------------------------------------------------------- #
+
+    def evaluate_plan(self, plan: RelocationPlan) -> Dict[str, float]:
+        """
+        Evaluate a complete RelocationPlan on a fresh episode.
+
+        Unlike evaluate() which takes a step-wise action-index list,
+        this method accepts a RelocationPlan (container_id + positions)
+        as produced by planning algorithms such as Lee & Lee (2010).
+
+        Kinematics (crane working time) are computed when RMGC parameters
+        are present in ProblemConfig.extra; otherwise crane_time = relocations.
+
+        Returns
+        -------
+        dict with keys: relocations, crane_time, total_moves, lower_bound,
+                        lb_ratio, steps, feasible
+        """
+        self.reset()
+        kin    = KinematicsModel.from_config_extra(self.config.extra)
+        result = simulate_plan(self.yard, plan, self.config.max_tiers)
+        lb     = lower_bound_relocations(self.yard)
+
+        if result.feasible:
+            crane_time = compute_crane_time(plan, kin)
+        else:
+            crane_time = float("inf")
+
+        return {
+            "relocations": float(result.num_relocations),
+            "crane_time":  crane_time,
+            "total_moves": float(result.num_moves),
+            "lower_bound": float(lb),
+            "lb_ratio":    float(result.num_relocations / max(lb, 1)),
+            "steps":       float(result.num_moves),
+            "feasible":    float(result.feasible),
+            "time":        crane_time,
+        }
+
+    # ---------------------------------------------------------------- #
+    # Config schema                                                      #
+    # ---------------------------------------------------------------- #
+
     @classmethod
     def config_schema(cls) -> Dict:
         schema = super().config_schema()
+        # Kinematics parameters for RMGC time model (Lee & Lee 2010 defaults).
+        # Keys not in ProblemConfig are automatically stored in config.extra by GUI.
+        schema.update({
+            "gantry_s_per_bay": {
+                "type": "float", "default": 3.5, "min": 0.5, "max": 20.0,
+                "label": "Gantry speed (s/bay)",
+                "help": "Gantry travel time per bay (Lee & Lee default: 3.5 s).",
+            },
+            "trolley_s_per_row": {
+                "type": "float", "default": 1.2, "min": 0.1, "max": 10.0,
+                "label": "Trolley speed (s/row)",
+                "help": "Trolley travel time per container width (default: 1.2 s).",
+            },
+            "gantry_accel_s": {
+                "type": "float", "default": 40.0, "min": 0.0, "max": 120.0,
+                "label": "Gantry accel overhead (s)",
+                "help": "Combined acceleration + deceleration when gantry moves (default: 40 s).",
+            },
+            "spreader_s": {
+                "type": "float", "default": 30.0, "min": 5.0, "max": 120.0,
+                "label": "Spreader time (s)",
+                "help": "Combined pickup + place-down time (default: 30 s).",
+            },
+        })
         return schema

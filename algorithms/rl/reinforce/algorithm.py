@@ -1,15 +1,7 @@
 """
-REINFORCE with Greedy Baseline (Policy Gradient).
+REINFORCE with greedy baseline (policy gradient) for container relocation.
 
-Adapted from the existing spp-main_CSPP/cleanrl/train_RF.py.
-
-Architecture
-------------
-PolicyNetwork: MLP → softmax over valid actions (action mask applied)
-Baseline     : running mean of episode returns (greedy baseline)
-
-Updates the policy with REINFORCE gradient:
-  ∇ log π(a|s) · (G_t − baseline)
+Network architecture is defined in network.py (PolicyNet).
 """
 
 from __future__ import annotations
@@ -26,16 +18,20 @@ class REINFORCE(BaseAlgorithm):
 
     name        = "REINFORCE"
     category    = "RL"
-    description = ("REINFORCE policy gradient with greedy baseline. "
+    description = ("[general]  "
+                   "REINFORCE policy gradient with greedy baseline. "
                    "Works with any problem that exposes an action mask.")
-    compatible_problems: List[str] = []
+    compatible_problems = [
+        "BRP-Fixed",
+        "CRP-Time",
+        "BRP-NonFixed",
+        "Pre-Marshalling",
+        "CSPP",
+        "CSPP-Constrained",
+    ]
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
-
-    # ---------------------------------------------------------------- #
-    # Train                                                              #
-    # ---------------------------------------------------------------- #
 
     def train(
         self,
@@ -45,48 +41,26 @@ class REINFORCE(BaseAlgorithm):
     ) -> None:
         try:
             import torch
-            import torch.nn as nn
             import torch.optim as optim
         except ImportError:
             raise RuntimeError("PyTorch is required for RL algorithms. pip install torch")
+
+        from .network import PolicyNet
 
         cfg = self.config
         torch.manual_seed(cfg.seed)
         np.random.seed(cfg.seed)
 
-        # ── Build environment ────────────────────────────────────── #
         env = problem_factory()
         obs, info = env.reset()
         obs_dim   = int(np.prod(obs.shape))
         n_actions = env.action_space.n
 
-        # ── Policy network ───────────────────────────────────────── #
-        hidden = cfg.hidden_dim
-
-        class PolicyNet(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.net = nn.Sequential(
-                    nn.Linear(obs_dim, hidden),
-                    nn.ReLU(),
-                    nn.Linear(hidden, hidden),
-                    nn.ReLU(),
-                    nn.Linear(hidden, n_actions),
-                )
-
-            def forward(self, x, mask=None):
-                logits = self.net(x)
-                if mask is not None:
-                    logits = logits + (mask.float() - 1) * 1e9  # mask invalid
-                return torch.distributions.Categorical(logits=logits)
-
-        policy    = PolicyNet()
+        policy    = PolicyNet(obs_dim, n_actions, cfg.hidden_dim)
         optimizer = optim.Adam(policy.parameters(), lr=cfg.learning_rate)
 
-        # ── Greedy baseline ──────────────────────────────────────── #
         baseline        = 0.0
         baseline_alpha  = 0.05
-        # Support both schema key names
         num_iterations  = cfg.extra.get("num_episodes", cfg.max_iterations)
         cfg.report_interval = cfg.extra.get("report_every", cfg.report_interval)
         best_return     = float("-inf")
@@ -99,13 +73,14 @@ class REINFORCE(BaseAlgorithm):
             # ── Collect one episode ──────────────────────────────── #
             obs_t, info_t = env.reset()
             done   = False
-            log_probs: List[torch.Tensor] = []
-            rewards:   List[float]        = []
-            actions:   List[int]          = []
+            log_probs: List = []
+            rewards:   List[float] = []
+            actions:   List[int]   = []
 
             while not done:
-                obs_tensor = torch.FloatTensor(obs_t).unsqueeze(0)
-                mask_np    = info_t.get("action_mask", None)
+                import torch
+                obs_tensor  = torch.FloatTensor(obs_t).unsqueeze(0)
+                mask_np     = info_t.get("action_mask", None)
                 mask_tensor = (
                     torch.BoolTensor(mask_np).unsqueeze(0)
                     if mask_np is not None else None
@@ -121,18 +96,18 @@ class REINFORCE(BaseAlgorithm):
                 actions.append(int(action.item()))
 
             # ── Compute returns ──────────────────────────────────── #
-            G     = 0.0
+            import torch
+            G       = 0.0
             returns: List[float] = []
             for r in reversed(rewards):
                 G = r + cfg.gamma * G
                 returns.insert(0, G)
             episode_return = returns[0] if returns else 0.0
 
-            # Update greedy baseline
             baseline += baseline_alpha * (episode_return - baseline)
             if episode_return > best_return:
-                best_return    = episode_return
-                best_solution  = actions[:]
+                best_return         = episode_return
+                best_solution       = actions[:]
                 self._best_solution = best_solution
 
             # ── Policy gradient update ───────────────────────────── #
@@ -162,24 +137,20 @@ class REINFORCE(BaseAlgorithm):
                     snapshot = env.get_state_snapshot(),
                 )
 
-        # Final policy save (in-memory)
         self._policy = policy
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
 
-    # Human-readable label shown in the GUI progress bar
     step_label = "Episode"
 
     @classmethod
     def config_schema(cls) -> Dict:
         return {
             "num_episodes":  {"type": "int",   "default": 500,   "min": 10,   "max": 10_000,
-                              "label": "Episodes (num_episodes)",
-                              "help": "Total number of full episodes to train."},
+                              "label": "Episodes"},
             "report_every":  {"type": "int",   "default": 10,    "min": 1,    "max": 200,
-                              "label": "Report every N episodes",
-                              "help": "How often to push progress to the GUI."},
+                              "label": "Report every N episodes"},
             "learning_rate": {"type": "float", "default": 3e-4,  "min": 1e-5, "max": 1e-2,
                               "label": "Learning rate"},
             "gamma":         {"type": "float", "default": 0.99,  "min": 0.8,  "max": 1.0,

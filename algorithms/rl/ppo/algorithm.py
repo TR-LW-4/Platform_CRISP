@@ -1,7 +1,8 @@
 """
 PPO (Proximal Policy Optimization) for container relocation problems.
 
-Based on cleanrl's PPO implementation, adapted to the platform interface.
+Based on CleanRL's PPO implementation, adapted to the platform interface.
+Network architecture is defined in network.py (ActorCritic).
 """
 
 from __future__ import annotations
@@ -18,9 +19,17 @@ class PPO(BaseAlgorithm):
 
     name        = "PPO"
     category    = "RL"
-    description = ("Proximal Policy Optimization (clipped objective). "
+    description = ("[general]  "
+                   "Proximal Policy Optimization (clipped objective). "
                    "Actor-critic architecture with GAE advantage estimation.")
-    compatible_problems: List[str] = []
+    compatible_problems = [
+        "BRP-Fixed",
+        "CRP-Time",
+        "BRP-NonFixed",
+        "Pre-Marshalling",
+        "CSPP",
+        "CSPP-Constrained",
+    ]
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -38,6 +47,8 @@ class PPO(BaseAlgorithm):
         except ImportError:
             raise RuntimeError("PyTorch is required. pip install torch")
 
+        from .network import ActorCritic
+
         cfg = self.config
         torch.manual_seed(cfg.seed)
 
@@ -47,29 +58,7 @@ class PPO(BaseAlgorithm):
         n_act   = env.action_space.n
         hidden  = cfg.hidden_dim
 
-        # ── Actor-Critic network ─────────────────────────────────── #
-        class ActorCritic(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.shared = nn.Sequential(
-                    nn.Linear(obs_dim, hidden), nn.ReLU(),
-                    nn.Linear(hidden, hidden),  nn.ReLU(),
-                )
-                self.actor  = nn.Linear(hidden, n_act)
-                self.critic = nn.Linear(hidden, 1)
-
-            def forward(self, x):
-                h = self.shared(x)
-                return self.actor(h), self.critic(h)
-
-            def get_dist(self, x, mask=None):
-                logits, value = self(x)
-                if mask is not None:
-                    logits = logits + (mask.float() - 1) * 1e9
-                dist = torch.distributions.Categorical(logits=logits)
-                return dist, value.squeeze(-1)
-
-        ac        = ActorCritic()
+        ac        = ActorCritic(obs_dim, n_act, hidden)
         optimizer = optim.Adam(ac.parameters(), lr=cfg.learning_rate, eps=1e-5)
 
         num_steps    = cfg.num_steps
@@ -83,13 +72,13 @@ class PPO(BaseAlgorithm):
         n_epochs     = cfg.extra.get("n_epochs", 4)
         minibatch    = cfg.batch_size
 
-        obs_buf     = torch.zeros(num_steps, obs_dim)
-        act_buf     = torch.zeros(num_steps, dtype=torch.long)
-        rew_buf     = torch.zeros(num_steps)
-        done_buf    = torch.zeros(num_steps)
-        logp_buf    = torch.zeros(num_steps)
-        val_buf     = torch.zeros(num_steps)
-        mask_buf    = torch.zeros(num_steps, n_act, dtype=torch.bool)
+        obs_buf  = torch.zeros(num_steps, obs_dim)
+        act_buf  = torch.zeros(num_steps, dtype=torch.long)
+        rew_buf  = torch.zeros(num_steps)
+        done_buf = torch.zeros(num_steps)
+        logp_buf = torch.zeros(num_steps)
+        val_buf  = torch.zeros(num_steps)
+        mask_buf = torch.zeros(num_steps, n_act, dtype=torch.bool)
 
         global_step = 0
         obs_t, info = env.reset()
@@ -139,12 +128,12 @@ class PPO(BaseAlgorithm):
                 _, next_val = ac.get_dist(ot_next)
                 next_val = next_val.item()
 
-            adv_buf   = torch.zeros(num_steps)
-            last_gae  = 0.0
+            adv_buf  = torch.zeros(num_steps)
+            last_gae = 0.0
             for t in reversed(range(num_steps)):
-                nv      = next_val if t == num_steps - 1 else val_buf[t + 1].item()
-                nd      = 1.0 - done_buf[t].item()
-                delta   = rew_buf[t].item() + gamma * nv * nd - val_buf[t].item()
+                nv       = next_val if t == num_steps - 1 else val_buf[t + 1].item()
+                nd       = 1.0 - done_buf[t].item()
+                delta    = rew_buf[t].item() + gamma * nv * nd - val_buf[t].item()
                 last_gae = delta + gamma * gae_lambda * nd * last_gae
                 adv_buf[t] = last_gae
             ret_buf = adv_buf + val_buf
@@ -154,20 +143,20 @@ class PPO(BaseAlgorithm):
             for _ in range(n_epochs):
                 np.random.shuffle(idx)
                 for start in range(0, num_steps, minibatch):
-                    mb = idx[start: start + minibatch]
-                    o_mb  = obs_buf[mb]
-                    a_mb  = act_buf[mb]
-                    lp_mb = logp_buf[mb]
-                    adv_mb = adv_buf[mb]
-                    ret_mb = ret_buf[mb]
-                    mk_mb  = mask_buf[mb]
+                    mb      = idx[start: start + minibatch]
+                    o_mb    = obs_buf[mb]
+                    a_mb    = act_buf[mb]
+                    lp_mb   = logp_buf[mb]
+                    adv_mb  = adv_buf[mb]
+                    ret_mb  = ret_buf[mb]
+                    mk_mb   = mask_buf[mb]
 
                     adv_mb = (adv_mb - adv_mb.mean()) / (adv_mb.std() + 1e-8)
 
                     dist_mb, val_mb = ac.get_dist(o_mb, mk_mb)
-                    new_lp  = dist_mb.log_prob(a_mb)
-                    entropy = dist_mb.entropy().mean()
-                    ratio   = (new_lp - lp_mb).exp()
+                    new_lp   = dist_mb.log_prob(a_mb)
+                    entropy  = dist_mb.entropy().mean()
+                    ratio    = (new_lp - lp_mb).exp()
 
                     pg_loss = torch.max(
                         -adv_mb * ratio,
@@ -189,10 +178,10 @@ class PPO(BaseAlgorithm):
                     step     = global_step,
                     metric   = -mean_ret,
                     metrics  = {
-                        "mean_return":   mean_ret,
-                        "best_return":   best_ret,
-                        "policy_loss":   float(pg_loss.item()),
-                        "value_loss":    float(vf_loss.item()),
+                        "mean_return": mean_ret,
+                        "best_return": best_ret,
+                        "policy_loss": float(pg_loss.item()),
+                        "value_loss":  float(vf_loss.item()),
                     },
                     progress = iteration / num_iters,
                     snapshot = env.get_state_snapshot(),
@@ -208,22 +197,20 @@ class PPO(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         return {
-            "num_updates":   {"type": "int",   "default": 500,    "min": 10,    "max": 10_000,
-                              "label": "Policy updates (num_updates)",
-                              "help": "Total number of PPO update iterations."},
-            "report_every":  {"type": "int",   "default": 10,     "min": 1,     "max": 100,
+            "num_updates":   {"type": "int",   "default": 500,    "min": 10,   "max": 10_000,
+                              "label": "Policy updates"},
+            "report_every":  {"type": "int",   "default": 10,     "min": 1,    "max": 100,
                               "label": "Report every N updates"},
-            "num_steps":     {"type": "int",   "default": 256,    "min": 32,    "max": 2048,
-                              "label": "Steps per rollout",
-                              "help": "Environment steps collected before each update."},
-            "learning_rate": {"type": "float", "default": 2.5e-4, "min": 1e-5,  "max": 1e-2,
+            "num_steps":     {"type": "int",   "default": 256,    "min": 32,   "max": 2048,
+                              "label": "Steps per rollout"},
+            "learning_rate": {"type": "float", "default": 2.5e-4, "min": 1e-5, "max": 1e-2,
                               "label": "Learning rate"},
-            "gamma":         {"type": "float", "default": 0.99,   "min": 0.8,   "max": 1.0,
+            "gamma":         {"type": "float", "default": 0.99,   "min": 0.8,  "max": 1.0,
                               "label": "Discount factor γ"},
-            "batch_size":    {"type": "int",   "default": 64,     "min": 16,    "max": 512,
+            "batch_size":    {"type": "int",   "default": 64,     "min": 16,   "max": 512,
                               "label": "Minibatch size"},
-            "hidden_dim":    {"type": "int",   "default": 128,    "min": 32,    "max": 512,
+            "hidden_dim":    {"type": "int",   "default": 128,    "min": 32,   "max": 512,
                               "label": "Hidden layer size"},
-            "seed":          {"type": "int",   "default": 0,      "min": 0,     "max": 9999,
+            "seed":          {"type": "int",   "default": 0,      "min": 0,    "max": 9999,
                               "label": "Random seed"},
         }
