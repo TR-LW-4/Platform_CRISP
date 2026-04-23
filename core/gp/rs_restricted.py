@@ -23,7 +23,7 @@ from typing import Callable, Dict, List
 from core.objectives import KinematicsModel
 from core.plan       import Movement, RelocationPlan
 
-from .gp_core import Node
+from .engine import Node
 
 
 def build_plan_restricted(

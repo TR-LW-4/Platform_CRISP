@@ -54,9 +54,9 @@ from core.objectives     import (
 )
 from core.plan           import RelocationPlan
 
-from .gp_core         import Node, evolve_gp
-from .rs_restricted   import build_plan_restricted
-from .terminals       import build_terminal_table, terminal_names
+from core.gp.engine        import Node, evolve_gp
+from core.gp.rs_restricted import build_plan_restricted
+from core.gp.terminals     import build_terminal_table, terminal_names
 
 
 # ================================================================ #

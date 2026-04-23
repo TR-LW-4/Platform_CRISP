@@ -56,12 +56,12 @@ from core.objectives     import (
 )
 from core.plan           import RelocationPlan
 
-from algorithms.heuristic.durasevic_2024.gp_core       import Node
-from algorithms.heuristic.durasevic_2024.terminals     import (
+from core.gp.engine        import Node
+from core.gp.terminals     import (
     build_terminal_table,
     terminal_names,
 )
-from algorithms.heuristic.durasevic_2024.rs_restricted import (
+from core.gp.rs_restricted import (
     build_plan_restricted,
 )
 

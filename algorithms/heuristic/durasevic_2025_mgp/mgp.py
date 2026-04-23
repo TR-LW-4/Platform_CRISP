@@ -44,7 +44,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
-from algorithms.heuristic.durasevic_2024.gp_core import (
+from core.gp.engine import (
     Node,
     init_population_rhh,
     subtree_crossover,
