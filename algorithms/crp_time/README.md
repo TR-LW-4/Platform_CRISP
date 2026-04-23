@@ -22,6 +22,7 @@ Multi-bay yard, fixed retrieval order, Lee–Lee (2010) RMGC kinematics
 | `evolutionary/genetic/` | GA | — | symlink (`_shared/`) |
 | `rl/ppo/` | RL | Schulman et al. 2017 | symlink (`_shared/`) |
 | `rl/reinforce/` | RL | Williams 1992 | symlink (`_shared/`) |
+| `rl/shin_2026/` | Scale-Diverse DRL | **Shin, Choi, Cho & Kim 2026, TRC** | **native** (multi-bay CRP-Time; pretrained model included) |
 
 Symlinked `brp_fixed` papers are usable as degenerate baselines here
 (their scoring ignores `γ_bay`/`γ_acc`, so they are generally suboptimal
