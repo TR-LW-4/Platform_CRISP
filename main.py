@@ -44,7 +44,7 @@ def cmd_test():
     """Quick smoke-test: greedy on every problem."""
     from core.registry        import list_problems, get_problem_class
     from core.base_problem    import ProblemConfig
-    from algorithms.heuristic.greedy import GreedyHeuristic
+    from algorithms._shared.heuristic.greedy import GreedyHeuristic
     from core.base_algorithm  import AlgorithmConfig
     import multiprocessing as mp
 
