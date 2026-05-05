@@ -56,7 +56,7 @@ class ProblemConfig:
     num_cranes:  int   = 1
     crane_speed: float = 1.0   # "bays per time-unit"
 
-    # ── Vessel (CSPP variants only) ───────────────────────────────── #
+    # ── Vessel (CRP-Stow variants only) ───────────────────────────────── #
     vessel_bays:  int = 2
     vessel_rows:  int = 2
     vessel_tiers: int = 3

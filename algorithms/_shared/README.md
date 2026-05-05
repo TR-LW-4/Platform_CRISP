@@ -1,8 +1,8 @@
 # _shared
 
 Universal / problem-agnostic algorithms.  Each is the **physical home**;
-every problem directory (`brp_fixed/`, `crp_time/`, `brp_nonfixed/`,
-`premarshalling/`, `cspp/`, `cspp_constrained/`) contains symlinks to
+every problem directory (`CRP_R/`, `CRP_Time/`, `brp_nonfixed/`,
+`CRP_Prem/`, `CRP_Stow/`) contains symlinks to
 these so the user sees them from any problem view.
 
 ## Algorithms

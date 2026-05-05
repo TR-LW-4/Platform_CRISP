@@ -9,7 +9,7 @@ The Compare tab can load any combination of saved files and overlay them.
 File format
 -----------
 {
-  "problem":    "CSPP",
+  "problem":    "CRP-Stow",
   "algorithm":  "REINFORCE",
   "category":   "RL",
   "seed":       0,

@@ -20,7 +20,7 @@ import time
 import threading
 import queue as stdlib_queue
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Make sure project root is on the path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -38,6 +38,24 @@ from core.registry import (
 from core.base_problem   import ProblemConfig
 from core.base_algorithm import AlgorithmConfig, TrainingSession
 from core.result_store   import save_run, list_saved_runs, load_runs_for_compare, delete_run
+from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
+from core.layout_trace   import trace_layout
+from core.caserta_benchmark import (
+    CASERTA_HEIGHT_WHITELIST,
+    collect_paths_from_hw_queue,
+    index_ws_by_height,
+    merge_hw_queue_item,
+    parse_caserta_filename,
+    problem_config_for_caserta_dat,
+)
+from core.zhu_benchmark import (
+    ZHU_HEIGHT_WHITELIST,
+    collect_paths_from_zhu_queue,
+    index_sn_pairs_by_height,
+    merge_zhu_queue_item,
+    parse_zhu_folder_name,
+    problem_config_for_zhu_txt,
+)
 
 # ── Visualisation ─────────────────────────────────────────────────── #
 from visualization.bay_renderer import yard_figure, vessel_figure, metrics_figure
@@ -84,12 +102,227 @@ def _init_state():
         "last_saved_path": None,   # path of most recent auto-saved result
         "train_start":     None,       # time.time() when training started
         "step_label":      "Iteration", # semantic label for one step
+        "caserta_instance_queue": [],  # list[{"h": int, "ws": [int, ...]}] for Test tab
+        "zhu_instance_queue": [],  # list[{"h": int, "sn_pairs": [[s,n], ...]}]
+        "bench_pause_waiting": False,
+        "bench_pause_payload": None,  # dict: paths, next_idx, run_zhu, problem, algorithm, params…
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
 _init_state()
+
+# Caserta filename scan: height list + w values per height
+@st.cache_data(show_spinner=False)
+def _caserta_ws_map_cached(root_str: str) -> Tuple[List[int], Dict[int, List[int]]]:
+    m = index_ws_by_height(Path(root_str))
+    return sorted(m.keys()), m
+
+
+@st.cache_data(show_spinner=False)
+def _zhu_sn_map_cached(root_str: str) -> Tuple[List[int], Dict[int, List[Tuple[int, int]]]]:
+    m = index_sn_pairs_by_height(Path(root_str))
+    return sorted(m.keys()), m
+
+
+def _schema_defaults(prob_schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Default problem parameter dict from ``config_schema()`` (no widgets)."""
+    d: Dict[str, Any] = {}
+    for pname, spec in prob_schema.items():
+        t = spec.get("type", "int")
+        if t == "int":
+            d[pname] = int(spec["default"])
+        elif t == "float":
+            d[pname] = float(spec["default"])
+        elif t == "bool":
+            d[pname] = bool(spec["default"])
+        else:
+            d[pname] = spec["default"]
+    return d
+
+
+BENCH_RANDOM = "随机布局（schema 默认参数）"
+BENCH_CASERTA = "Caserta benchmark（按文件名：单选 H、多选 w、加入列表）"
+BENCH_ZHU = "Zhu benchmark（子目录 H-S-N：单选 H、多选规模、加入列表）"
+
+_BASE_ALGO_KEYS = frozenset({
+    "max_iterations", "seed", "report_interval", "num_eval_seeds",
+    "total_timesteps", "learning_rate", "gamma", "num_envs",
+    "num_steps", "batch_size", "hidden_dim",
+    "population_size", "crossover_rate", "mutation_rate",
+    "tournament_size", "elite_count",
+})
+
+
+def _algorithm_config_from_gui_params(algo_params: Dict[str, Any]) -> AlgorithmConfig:
+    base_kwargs = {k: v for k, v in algo_params.items() if k in _BASE_ALGO_KEYS}
+    algo_cfg = AlgorithmConfig(**base_kwargs)
+    for k, v in algo_params.items():
+        algo_cfg.extra[k] = v
+    return algo_cfg
+
+
+def _benchmark_shape_messages(
+    prob_cfg: ProblemConfig,
+    fpath: Path,
+    run_zhu_batch: bool,
+) -> Tuple[str, str]:
+    """Return (stderr line, markdown block) describing layout size / shape."""
+    nb, nr, mt = prob_cfg.num_bays, prob_cfg.num_rows, prob_cfg.max_tiers
+    nc = prob_cfg.num_containers
+    rel = fpath.parent.name + "/" + fpath.name if run_zhu_batch else fpath.name
+    meta_plain = ""
+    meta_md = ""
+    if run_zhu_batch:
+        z = parse_zhu_folder_name(fpath.parent.name)
+        if z:
+            h_, s_, n_ = z
+            meta_plain = f"H-S-N folder=({h_},{s_},{n_}) "
+            meta_md = f"子目录 **H-S-N** = ({h_}, {s_}, {n_})（规模标签）；"
+    else:
+        c = parse_caserta_filename(fpath)
+        if c:
+            h_, w_, id_ = c
+            meta_plain = f"filename H,w,id=({h_},{w_},{id_}) "
+            meta_md = f"文件名 **H, w, id** = ({h_}, {w_}, {id_})；"
+    stderr_line = (
+        f"[CRP Platform] instance {rel}: {meta_plain}"
+        f"bays×rows×tiers={nb}×{nr}×{mt}, containers={nc}"
+    )
+    md = (
+        f"**文件** `{rel}`\n\n"
+        f"{meta_md}\n"
+        f"- **网格**：{nb} bays × {nr} rows，层高 **max_tiers = {mt}**\n"
+        f"- **箱数 N** = **{nc}**\n"
+    )
+    return stderr_line, md
+
+
+def _run_one_benchmark_file(
+    *,
+    fpath: Path,
+    run_zhu_batch: bool,
+    selected_problem: str,
+    selected_algo: str,
+    algo_params: Dict[str, Any],
+    prob_params: Dict[str, Any],
+    prob_cls,
+    algo_cls,
+    algo_cat: str,
+    batch_index: int,
+    batch_total: int,
+    progress_bar,
+    status_txt,
+    src_tag: str,
+    show_completion_banner: bool = True,
+    terminal_detail: bool = False,
+) -> None:
+    """Train on one layout file, append progress, save_run — mirrors batch loop body."""
+    import multiprocessing as mp
+
+    rel = fpath.parent.name + "/" + fpath.name if run_zhu_batch else fpath.name
+    status_txt.caption(f"运行 {batch_index + 1}/{batch_total}：`{rel}` …")
+    if terminal_detail:
+        print(
+            "\n[CRP Platform] ========== 仅第 1 个实例（列表首项，人工检查） ==========",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(f"  path: {fpath.resolve()}", file=sys.stderr, flush=True)
+        print(f"  rel:  {rel}", file=sys.stderr, flush=True)
+    trace_layout(
+        f"gui benchmark outer loop: instance {batch_index + 1}/{batch_total} "
+        f"(each iteration builds **one** ProblemConfig for **one** layout file, "
+        f"then starts **one** subprocess train(); list comes from collect_paths, "
+        f"not stored — recomputed from your queue each run)"
+    )
+    trace_layout(f"gui benchmark current file: {fpath.resolve()}")
+    if run_zhu_batch:
+        prob_cfg = problem_config_for_zhu_txt(fpath, {})
+    else:
+        prob_cfg = problem_config_for_caserta_dat(fpath, {})
+
+    stderr_line, md_shape = _benchmark_shape_messages(prob_cfg, fpath, run_zhu_batch)
+    print(stderr_line, file=sys.stderr, flush=True)
+
+    algo_cfg = _algorithm_config_from_gui_params(algo_params)
+    algo_inst = algo_cls(config=algo_cfg)
+
+    def _pf(_pc=prob_cfg):
+        return prob_cls(config=_pc)
+
+    JOIN_T = 900
+    q = mp.Queue()
+    ev = mp.Event()
+    proc = mp.Process(
+        target=algo_inst.train,
+        args=(_pf, q, ev),
+        daemon=True,
+    )
+    proc.start()
+    proc.join(timeout=JOIN_T)
+    ev.set()
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=3)
+
+    all_records = []
+    while not q.empty():
+        all_records.append(q.get_nowait())
+
+    if all_records:
+        final = all_records[-1]
+        history = [
+            {"step": r.step, "metric": r.metric, "metrics": r.metrics}
+            for r in all_records
+        ]
+        prob_save = {
+            **prob_params,
+            LAYOUT_FILE_EXTRA_KEY: str(fpath),
+            "source": src_tag,
+        }
+        save_run(
+            problem=selected_problem,
+            algorithm=selected_algo,
+            category=algo_cat,
+            seed=abs(hash(fpath.name)) % 2_000_000_000,
+            prob_config=prob_save,
+            algo_config=algo_params,
+            metrics=final.metrics,
+            history=history,
+        )
+        if terminal_detail:
+            print(
+                "[CRP Platform] ---------- 处理结果（最终一步） ----------",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                f"  step={final.step}  metric={final.metric:.6f}  "
+                f"best_metric={final.best_metric:.6f}  progress={final.progress:.4f}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(f"  metrics: {final.metrics}", file=sys.stderr, flush=True)
+            print(
+                "[CRP Platform] ---------- 结束（未继续后续文件） ----------\n",
+                file=sys.stderr,
+                flush=True,
+            )
+    elif terminal_detail:
+        print(
+            "[CRP Platform] 警告: 未收到任何训练进度（子进程未向队列写入结果）。",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    progress_bar.progress((batch_index + 1) / batch_total)
+    if show_completion_banner:
+        st.success(
+            f"✅ 已完成 **{batch_index + 1}/{batch_total}** — `{rel}`\n\n{md_shape}"
+        )
+
 
 # ================================================================ #
 #  Sidebar                                                           #
@@ -110,9 +343,19 @@ with st.sidebar:
         st.error("No algorithms found. Check `algorithms/` folder.")
         st.stop()
 
+    # Stable key + drop stale value (e.g. after removing a problem from ``list_problems()``)
+    _problem_pick_key = "sidebar_selected_problem"
+    if _problem_pick_key in st.session_state and st.session_state[_problem_pick_key] not in problems:
+        del st.session_state[_problem_pick_key]
+
     # ── Step 1: Problem ──────────────────────────────────────────── #
     st.markdown("**① Problem**")
-    selected_problem = st.selectbox("Select Problem", problems, label_visibility="collapsed")
+    selected_problem = st.selectbox(
+        "Select Problem",
+        problems,
+        label_visibility="collapsed",
+        key=_problem_pick_key,
+    )
 
     prob_tags = get_problem_class(selected_problem).tags if get_problem_class(selected_problem) else []
     if prob_tags:
@@ -195,42 +438,180 @@ tab_test, tab_exp, tab_compare, tab_about = st.tabs(
 with tab_test:
     st.header(f"{selected_problem}  ×  {selected_algo}")
 
+    prob_cls    = get_problem_class(selected_problem)
+    prob_schema = prob_cls.config_schema() if prob_cls else {}
+    algo_cls    = get_algorithm_class(selected_algo)
+    algo_schema = algo_cls.config_schema() if algo_cls else {}
+    _step_label = getattr(algo_cls, "step_label", "Iteration") if algo_cls else "Iteration"
+
+    caserta_root = Path(__file__).resolve().parent.parent / "benchmark" / "Caserta_dataset"
+    zhu_root = Path(__file__).resolve().parent.parent / "benchmark" / "Zhu_dataset"
+
+    ws_by_height: Dict[int, List[int]] = {}
+    if caserta_root.is_dir():
+        _, ws_by_height = _caserta_ws_map_cached(str(caserta_root))
+
+    zhu_sn_by_height: Dict[int, List[Tuple[int, int]]] = {}
+    if zhu_root.is_dir():
+        _, zhu_sn_by_height = _zhu_sn_map_cached(str(zhu_root))
+
+    height_options_caserta = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
+    height_options_zhu = [h for h in ZHU_HEIGHT_WHITELIST if h in zhu_sn_by_height]
+
+    bench_opts: List[str] = [BENCH_RANDOM]
+    if ws_by_height:
+        bench_opts.append(BENCH_CASERTA)
+    if height_options_zhu:
+        bench_opts.append(BENCH_ZHU)
+
+    prob_params = _schema_defaults(prob_schema)
+
     col_left, col_right = st.columns([1, 2])
 
-    # ── Left: parameter config ────────────────────────────────────── #
+    bench_source = BENCH_RANDOM
+    all_caserta_paths: List[Path] = []
+    all_zhu_paths: List[Path] = []
+
+    # ── Right: benchmark + placeholders ───────────────────────────── #
+    with col_right:
+        st.subheader("Benchmark")
+        if selected_problem == "CRP-R" and len(bench_opts) > 1:
+            if not os.environ.get("CRISP_TRACE_LAYOUT"):
+                st.caption(
+                    "终端看不到 `[CRISP_TRACE_LAYOUT]` 日志时：请在**启动 Streamlit 的那个终端**里先执行 "
+                    "`export CRISP_TRACE_LAYOUT=1`，再运行 `streamlit run gui/app.py`（需重启进程）；"
+                    "日志在 **stderr**，不会出现在浏览器页面。"
+                )
+        if selected_problem == "CRP-R" and len(bench_opts) > 1:
+            bench_source = st.radio(
+                "实例来源",
+                bench_opts,
+                horizontal=False,
+                key=f"bench_src_{selected_problem}",
+            )
+        elif selected_problem != "CRP-R":
+            st.caption("Caserta / Zhu 筛选目前仅支持 **CRP-R**；请在侧栏选择 CRP-R。")
+        elif len(bench_opts) == 1:
+            st.caption("未找到 Caserta（`dataH-w-id.dat`）或 Zhu（`H-S-N/*.txt`）基准数据。")
+
+        if selected_problem == "CRP-R" and bench_source == BENCH_CASERTA and ws_by_height:
+            st.caption(
+                "文件名：`data[H]-[w]-[编号].dat`。先 **单选高度 H**（白名单 3,4,5,6,10 与数据集的交集），"
+                "再 **多选垛数 w**；点「加入实例列表」累积。可换高度继续添加。"
+                "**第三段编号不筛选**，选中 (H,w) 后包含该组全部文件。"
+            )
+            if not height_options_caserta:
+                st.warning("标准高度 {3,4,5,6,10} 在 Caserta 数据集中无匹配文件。")
+            else:
+                cur_h = st.selectbox(
+                    "高度 H（单选）",
+                    options=height_options_caserta,
+                    format_func=lambda x: f"H = {x}",
+                    key=f"cb_H_single_{selected_problem}",
+                )
+                w_opts = ws_by_height.get(cur_h, [])
+                sel_ws_str = st.multiselect(
+                    f"垛数 w（当前 H={cur_h}，可多选）",
+                    options=[str(w) for w in w_opts],
+                    format_func=lambda x: f"w = {x}",
+                    key=f"cb_ws_pick_{selected_problem}_{cur_h}",
+                )
+                sel_ws = [int(x) for x in sel_ws_str]
+
+                b_add, b_clr = st.columns(2)
+                with b_add:
+                    add_clicked = st.button("➕ 添加到实例列表", key=f"add_hw_{selected_problem}")
+                with b_clr:
+                    clr_clicked = st.button("🗑 清空实例列表", key=f"clr_hw_{selected_problem}")
+
+                if clr_clicked:
+                    st.session_state.caserta_instance_queue = []
+                    st.rerun()
+                if add_clicked:
+                    if not sel_ws:
+                        st.warning("请至少勾选一个垛数 w。")
+                    else:
+                        merge_hw_queue_item(st.session_state.caserta_instance_queue, cur_h, sel_ws)
+                        st.rerun()
+
+            q_c = st.session_state.caserta_instance_queue
+            if q_c:
+                st.markdown("**当前实例列表（Caserta）**")
+                for idx, block in enumerate(q_c):
+                    st.write(
+                        f"{idx + 1}. **H = {block['h']}**，"
+                        f"w ∈ {{{', '.join(str(w) for w in block['ws'])}}}"
+                    )
+
+            all_caserta_paths = collect_paths_from_hw_queue(caserta_root, q_c)
+            st.info(f"Caserta 列表合并后共 **{len(all_caserta_paths)}** 个 `.dat`（将依次运行）。")
+
+        elif selected_problem == "CRP-R" and bench_source == BENCH_ZHU and height_options_zhu:
+            st.caption(
+                "子目录名：**`H-S-N`**（H 为层数标签，S 为垛数，N 为箱数）。"
+                "先 **单选 H**（Zhu 白名单 **3,4,5,6,7,10** 与数据集的交集），再 **多选 (S,N) 规模**；"
+                "每个规模文件夹下通常有 **100** 个 `.txt` 实例，加入列表后**会全部纳入**。"
+            )
+            cur_hz = st.selectbox(
+                "高度 H（单选）",
+                options=height_options_zhu,
+                format_func=lambda x: f"H = {x}",
+                key=f"zhu_H_single_{selected_problem}",
+            )
+            sn_list = zhu_sn_by_height.get(cur_hz, [])
+            sn_labels = [f"{s}-{n}" for s, n in sn_list]
+            sel_sn_str = st.multiselect(
+                f"规模 S-N（当前 H={cur_hz}，S=垛数、N=箱数；可多选）",
+                options=sn_labels,
+                format_func=lambda lab: f"S={lab.split('-')[0]}, N={lab.split('-')[1]}",
+                key=f"zhu_sn_pick_{selected_problem}_{cur_hz}",
+            )
+            sel_pairs: List[Tuple[int, int]] = []
+            for lab in sel_sn_str:
+                a, _, b = lab.partition("-")
+                if a and b:
+                    sel_pairs.append((int(a), int(b)))
+
+            zb_add, zb_clr = st.columns(2)
+            with zb_add:
+                zhu_add = st.button("➕ 添加到实例列表", key=f"add_zhu_hw_{selected_problem}")
+            with zb_clr:
+                zhu_clr = st.button("🗑 清空实例列表", key=f"clr_zhu_hw_{selected_problem}")
+
+            if zhu_clr:
+                st.session_state.zhu_instance_queue = []
+                st.rerun()
+            if zhu_add:
+                if not sel_pairs:
+                    st.warning("请至少勾选一个规模 (S, N)。")
+                else:
+                    merge_zhu_queue_item(st.session_state.zhu_instance_queue, cur_hz, sel_pairs)
+                    st.rerun()
+
+            q_z = st.session_state.zhu_instance_queue
+            if q_z:
+                st.markdown("**当前实例列表（Zhu）**")
+                for idx, block in enumerate(q_z):
+                    pairs_s = ", ".join(f"({p[0]},{p[1]})" for p in block["sn_pairs"])
+                    st.write(f"{idx + 1}. **H = {block['h']}**：{pairs_s}")
+
+            all_zhu_paths = collect_paths_from_zhu_queue(zhu_root, q_z)
+            st.info(
+                f"Zhu 列表合并后共 **{len(all_zhu_paths)}** 个 `.txt`（将依次运行；"
+                f"每个所选 `H-S-N` 文件夹内全部实例）。"
+            )
+
+        st.markdown("---")
+        st.subheader("Yard Visualisation")
+        status_placeholder  = st.empty()
+        yard_placeholder    = st.empty()
+        metric_placeholder  = st.empty()
+        chart_placeholder   = st.empty()
+
+    # ── Left: algorithm only（Problem Config 已隐藏）────────────────── #
     with col_left:
-        st.subheader("Problem Config")
-        prob_cls    = get_problem_class(selected_problem)
-        prob_schema = prob_cls.config_schema() if prob_cls else {}
-
-        prob_params: Dict[str, Any] = {}
-        for pname, spec in prob_schema.items():
-            label = spec.get("label", pname)
-            help_ = spec.get("help", "")
-            t     = spec["type"]
-            if t == "int":
-                prob_params[pname] = st.number_input(
-                    label, value=spec["default"],
-                    min_value=spec.get("min"), max_value=spec.get("max"),
-                    step=1, key=f"p_{pname}", help=help_,
-                )
-            elif t == "float":
-                prob_params[pname] = st.number_input(
-                    label, value=float(spec["default"]),
-                    min_value=float(spec.get("min", 0)),
-                    max_value=float(spec.get("max", 1e6)),
-                    format="%.4f", key=f"p_{pname}", help=help_,
-                )
-            elif t == "bool":
-                prob_params[pname] = st.checkbox(
-                    label, value=spec["default"], key=f"p_{pname}", help=help_,
-                )
-
+        st.caption("Problem 参数使用各类 **config_schema 默认值**（未展示表单）。")
         st.subheader("Algorithm Config")
-        algo_cls    = get_algorithm_class(selected_algo)
-        algo_schema = algo_cls.config_schema() if algo_cls else {}
-        # Step label: semantic name for one "iteration" (Episode / Generation / Seed / Update)
-        _step_label = getattr(algo_cls, "step_label", "Iteration") if algo_cls else "Iteration"
 
         algo_params: Dict[str, Any] = {}
         for aname, spec in algo_schema.items():
@@ -255,26 +636,268 @@ with tab_test:
                     label, value=spec["default"], key=f"a_{aname}", help=help_,
                 )
 
+        show_pause_opt = (
+            selected_problem == "CRP-R"
+            and (len(all_caserta_paths) > 0 or len(all_zhu_paths) > 0)
+        )
+        first_instance_only = False
+        pause_each_file = False
+        if show_pause_opt:
+            first_instance_only = st.checkbox(
+                "仅运行列表 **第 1 个**实例：在 **终端（stderr）** 打印规模与结果后 **停止**（不跑其余文件）",
+                key=f"bench_first_only_{selected_problem}",
+                help="适合肉眼核对首个实例；勾选后忽略下面的「每文件暂停」。",
+            )
+            pause_each_file = st.checkbox(
+                "每完成 **1 个布局文件**后暂停，并在页面输出该实例规模（文件名 / H-S-N、网格、层高、箱数）",
+                key=f"bench_pause_each_{selected_problem}",
+                help="仅当实例来源为 Caserta/Zhu 且 Start 跑批量时生效；与「仅第 1 个」同时勾选时以前者为准。",
+                disabled=first_instance_only,
+            )
+
         # ── Control buttons ───────────────────────────────────────── #
         btn_col1, btn_col2 = st.columns(2)
         start_btn = btn_col1.button("▶ Start", type="primary",  use_container_width=True)
         stop_btn  = btn_col2.button("⏹ Stop",  type="secondary", use_container_width=True)
 
-    # ── Right: live visualisation ─────────────────────────────────── #
-    with col_right:
-        st.subheader("Yard Visualisation")
-        status_placeholder  = st.empty()   # step / time / progress bar
-        yard_placeholder    = st.empty()
-        metric_placeholder  = st.empty()
-        chart_placeholder   = st.empty()
+    bench_pause_cont = False
+    bench_pause_cancel = False
+    if st.session_state.get("bench_pause_waiting"):
+        pay_b = st.session_state.get("bench_pause_payload") or {}
+        paths_bn = len(pay_b.get("paths", []))
+        next_i = int(pay_b.get("next_idx", 0))
+        done_n = min(next_i, paths_bn)
+        st.info(
+            f"**单步批量**：已完成 **{done_n} / {paths_bn}** 个布局文件；"
+            f"下一待跑为列表第 **{next_i + 1}** 个（索引 {next_i}）。"
+        )
+        bp1, bp2 = st.columns(2)
+        with bp1:
+            bench_pause_cont = st.button(
+                "▶ 继续下一个布局文件", key="bench_pause_continue", type="primary"
+            )
+        with bp2:
+            bench_pause_cancel = st.button("取消单步批量", key="bench_pause_cancel")
 
     # ── Button handlers ───────────────────────────────────────────── #
     prob_cfg = None   # defined below when Start is clicked
+
+    if bench_pause_cancel:
+        st.session_state.bench_pause_waiting = False
+        st.session_state.bench_pause_payload = None
+        st.warning("已取消单步批量（实例队列保留，可重新 Start）。")
+        st.rerun()
+
+    if bench_pause_cont and st.session_state.get("bench_pause_payload"):
+        pay = st.session_state["bench_pause_payload"]
+        paths_bp = [Path(p) for p in pay["paths"]]
+        idx = int(pay["next_idx"])
+        if idx >= len(paths_bp):
+            st.session_state.bench_pause_waiting = False
+            st.session_state.bench_pause_payload = None
+            st.rerun()
+        sp = pay["problem"]
+        sa = pay["algorithm"]
+        prob_cls_p = get_problem_class(sp)
+        algo_cls_p = get_algorithm_class(sa)
+        algo_params_p: Dict[str, Any] = pay["algo_params"]
+        prob_params_p: Dict[str, Any] = pay["prob_params"]
+        run_zhu_p = bool(pay["run_zhu"])
+        algo_cat_p = algo_info.get(sa, {}).get("category", "")
+        src_tag_p = "zhu_batch" if run_zhu_p else "caserta_batch"
+        batch_label_p = "Zhu" if run_zhu_p else "Caserta"
+        progress_bar_p = st.progress(idx / max(len(paths_bp), 1))
+        status_txt_p = st.empty()
+        _run_one_benchmark_file(
+            fpath=paths_bp[idx],
+            run_zhu_batch=run_zhu_p,
+            selected_problem=sp,
+            selected_algo=sa,
+            algo_params=algo_params_p,
+            prob_params=prob_params_p,
+            prob_cls=prob_cls_p,
+            algo_cls=algo_cls_p,
+            algo_cat=algo_cat_p,
+            batch_index=idx,
+            batch_total=len(paths_bp),
+            progress_bar=progress_bar_p,
+            status_txt=status_txt_p,
+            src_tag=src_tag_p,
+            show_completion_banner=True,
+        )
+        pay["next_idx"] = idx + 1
+        if pay["next_idx"] >= len(paths_bp):
+            st.session_state.bench_pause_waiting = False
+            st.session_state.bench_pause_payload = None
+            status_txt_p.empty()
+            progress_bar_p.empty()
+            st.success(
+                f"✅ {batch_label_p} 批次完成：共 **{len(paths_bp)}** 个实例；结果已写入 `results/`。"
+            )
+        else:
+            st.session_state.bench_pause_waiting = True
+            st.session_state.bench_pause_payload = pay
+        st.rerun()
+
     if start_btn:
         if st.session_state.session and st.session_state.training:
             st.session_state.session.stop()
 
-        # Build problem factory
+        run_caserta_batch = (
+            bench_source == BENCH_CASERTA
+            and selected_problem == "CRP-R"
+            and len(all_caserta_paths) > 0
+        )
+        run_zhu_batch = (
+            bench_source == BENCH_ZHU
+            and selected_problem == "CRP-R"
+            and len(all_zhu_paths) > 0
+        )
+
+        if bench_source == BENCH_CASERTA and selected_problem != "CRP-R":
+            st.error("Caserta benchmark 仅支持 **CRP-R**；请在侧栏切换问题。")
+            st.stop()
+        if bench_source == BENCH_ZHU and selected_problem != "CRP-R":
+            st.error("Zhu benchmark 仅支持 **CRP-R**；请在侧栏切换问题。")
+            st.stop()
+        if bench_source == BENCH_CASERTA and selected_problem == "CRP-R" and not all_caserta_paths:
+            st.error("请先在「实例列表」中添加：**单选高度 H + 多选垛数 w**（点「添加到实例列表」）。")
+            st.stop()
+        if bench_source == BENCH_ZHU and selected_problem == "CRP-R" and not all_zhu_paths:
+            st.error(
+                "请先在「实例列表」中添加：**单选高度 H + 多选规模 (S,N)**（点「添加到实例列表」）。"
+            )
+            st.stop()
+
+        algo_cfg = _algorithm_config_from_gui_params(algo_params)
+
+        if run_caserta_batch or run_zhu_batch:
+            if not pause_each_file:
+                st.session_state.bench_pause_waiting = False
+                st.session_state.bench_pause_payload = None
+
+            batch_paths = all_caserta_paths if run_caserta_batch else all_zhu_paths
+            src_tag = "caserta_batch" if run_caserta_batch else "zhu_batch"
+            batch_label = "Caserta" if run_caserta_batch else "Zhu"
+
+            algo_cat = algo_info.get(selected_algo, {}).get("category", "")
+
+            if first_instance_only:
+                st.session_state.bench_pause_waiting = False
+                st.session_state.bench_pause_payload = None
+                first_path = batch_paths[0]
+                print(
+                    "\n[CRP Platform] mode=first_instance_only — "
+                    f"队列共 {len(batch_paths)} 个文件，仅运行第 1 个；其余跳过。\n",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                progress_bar_f = st.progress(0)
+                status_txt_f = st.empty()
+                _run_one_benchmark_file(
+                    fpath=first_path,
+                    run_zhu_batch=run_zhu_batch,
+                    selected_problem=selected_problem,
+                    selected_algo=selected_algo,
+                    algo_params=algo_params,
+                    prob_params=prob_params,
+                    prob_cls=prob_cls,
+                    algo_cls=algo_cls,
+                    algo_cat=algo_cat,
+                    batch_index=0,
+                    batch_total=1,
+                    progress_bar=progress_bar_f,
+                    status_txt=status_txt_f,
+                    src_tag=src_tag,
+                    show_completion_banner=False,
+                    terminal_detail=True,
+                )
+                status_txt_f.empty()
+                progress_bar_f.empty()
+                st.info(
+                    "已在启动 Streamlit 的 **终端** 输出：实例路径、规模行、`处理结果` 指标。"
+                    "页面此处不再重复；未继续队列中其余文件。"
+                )
+                st.rerun()
+
+            print(
+                f"[CRP Platform] benchmark batch started: {len(batch_paths)} instance(s). "
+                "Per-file layout trace (problem_config / reset / yard load) requires starting "
+                "the app with: CRISP_TRACE_LAYOUT=1 streamlit run gui/app.py — watch this terminal.",
+                file=sys.stderr,
+                flush=True,
+            )
+
+            if pause_each_file:
+                pay_new: Dict[str, Any] = {
+                    "paths": [str(p) for p in batch_paths],
+                    "next_idx": 0,
+                    "run_zhu": run_zhu_batch,
+                    "problem": selected_problem,
+                    "algorithm": selected_algo,
+                    "algo_params": dict(algo_params),
+                    "prob_params": dict(prob_params),
+                }
+                progress_bar_s = st.progress(0)
+                status_txt_s = st.empty()
+                _run_one_benchmark_file(
+                    fpath=batch_paths[0],
+                    run_zhu_batch=run_zhu_batch,
+                    selected_problem=selected_problem,
+                    selected_algo=selected_algo,
+                    algo_params=algo_params,
+                    prob_params=prob_params,
+                    prob_cls=prob_cls,
+                    algo_cls=algo_cls,
+                    algo_cat=algo_cat,
+                    batch_index=0,
+                    batch_total=len(batch_paths),
+                    progress_bar=progress_bar_s,
+                    status_txt=status_txt_s,
+                    src_tag=src_tag,
+                    show_completion_banner=True,
+                )
+                pay_new["next_idx"] = 1
+                if len(batch_paths) <= 1:
+                    st.session_state.bench_pause_waiting = False
+                    st.session_state.bench_pause_payload = None
+                    status_txt_s.empty()
+                    progress_bar_s.empty()
+                else:
+                    st.session_state.bench_pause_waiting = True
+                    st.session_state.bench_pause_payload = pay_new
+                st.rerun()
+
+            else:
+                progress_bar = st.progress(0)
+                status_txt = st.empty()
+                for i, fpath in enumerate(batch_paths):
+                    _run_one_benchmark_file(
+                        fpath=fpath,
+                        run_zhu_batch=run_zhu_batch,
+                        selected_problem=selected_problem,
+                        selected_algo=selected_algo,
+                        algo_params=algo_params,
+                        prob_params=prob_params,
+                        prob_cls=prob_cls,
+                        algo_cls=algo_cls,
+                        algo_cat=algo_cat,
+                        batch_index=i,
+                        batch_total=len(batch_paths),
+                        progress_bar=progress_bar,
+                        status_txt=status_txt,
+                        src_tag=src_tag,
+                        show_completion_banner=False,
+                    )
+
+                status_txt.empty()
+                progress_bar.empty()
+                st.success(
+                    f"✅ {batch_label} 批次完成：共 **{len(batch_paths)}** 个实例；结果已写入 `results/`。"
+                )
+                st.rerun()
+
+        # ── Random layout: single live TrainingSession ───────────────── #
         prob_cfg = ProblemConfig(**{
             k: v for k, v in prob_params.items()
             if hasattr(ProblemConfig, k) or k in ("num_bays", "num_rows", "max_tiers",
@@ -282,9 +905,6 @@ with tab_test:
                 "vessel_bays", "vessel_rows", "vessel_tiers",
                 "enable_weight", "enable_size", "enable_type", "seed")
         })
-        # Extra keys
-        extra_keys = set(prob_params) - {f.name for f in ProblemConfig.__dataclass_fields__.values()} \
-                     if hasattr(ProblemConfig, '__dataclass_fields__') else set()
         for k in prob_params:
             try:
                 getattr(prob_cfg, k)
@@ -294,29 +914,18 @@ with tab_test:
         def problem_factory(_cfg=prob_cfg, _cls=prob_cls):
             return _cls(config=_cfg)
 
-        # Build algorithm – put ALL schema keys into extra so train() can read them
-        _BASE_KEYS = {
-            "max_iterations", "seed", "report_interval", "num_eval_seeds",
-            "total_timesteps", "learning_rate", "gamma", "num_envs",
-            "num_steps", "batch_size", "hidden_dim",
-            "population_size", "crossover_rate", "mutation_rate",
-            "tournament_size", "elite_count",
-        }
-        base_kwargs = {k: v for k, v in algo_params.items() if k in _BASE_KEYS}
-        algo_cfg    = AlgorithmConfig(**base_kwargs)
-        # All schema-specific keys (num_episodes, max_generations, …) → extra dict
-        for k, v in algo_params.items():
-            algo_cfg.extra[k] = v
-
         algo_inst = algo_cls(config=algo_cfg)
-        session   = TrainingSession(algo_inst, problem_factory)
+        session = TrainingSession(algo_inst, problem_factory)
+
+        st.session_state.test_prob_effective = dict(prob_params)
+
         session.start()
 
-        st.session_state.session     = session
-        st.session_state.progress    = []
-        st.session_state.training    = True
+        st.session_state.session = session
+        st.session_state.progress = []
+        st.session_state.training = True
         st.session_state.train_start = time.time()
-        st.session_state.step_label  = _step_label   # ← store for progress display
+        st.session_state.step_label = _step_label
         st.rerun()
 
     if stop_btn and st.session_state.session:
@@ -376,9 +985,10 @@ with tab_test:
             snap = latest.yard_snapshot
             if snap and "yard" in snap:
                 yard_snap  = snap["yard"]
-                n_bays  = int(prob_params.get("num_bays",  4))
-                n_rows  = int(prob_params.get("num_rows",  2))
-                n_tiers = int(prob_params.get("max_tiers", 3))
+                _eff = st.session_state.get("test_prob_effective") or prob_params
+                n_bays  = int(_eff.get("num_bays",  4))
+                n_rows  = int(_eff.get("num_rows",  2))
+                n_tiers = int(_eff.get("max_tiers", 3))
                 yard_fig = yard_figure(
                     yard_snap, n_bays, n_rows, n_tiers,
                     title=f"Step {latest.step} | Best: {latest.best_metric:.2f}",
@@ -637,10 +1247,11 @@ with tab_about:
     | Name | Description |
     |---|---|
     | **BRP-Fixed** | Block Relocation Problem – fixed retrieval order |
-    | **BRP-NonFixed** | BRP – free retrieval order optimised by agent |
-    | **Pre-Marshalling** | Rearrange yard before ship arrival (sorting) |
-    | **CSPP** | Container Stowage Planning – yard → vessel loading |
-    | **CSPP-Constrained** | CSPP + weight limits, reefer slots, hazmat segregation |
+    | **CRP-Prem** | Pre-marshalling: rearrange yard before ship arrival (sorting) |
+    | **CRP-Stow** | Container stowage planning – yard → vessel loading |
+    | **CRP-Stoch** | Stochastic CRP (extends CRP-Time scaffold) |
+    | **CRP-U** | Unrestricted retrieval order (free choice of next retrieval) |
+    | **CRP-D** | Duplicate-group stowage (extends CRP-Stow scaffold) |
 
     ### Algorithms
     | Name | Category | Description |
@@ -649,6 +1260,11 @@ with tab_about:
     | **PPO** | RL | Proximal Policy Optimization (Actor-Critic) |
     | **Genetic Algorithm** | Evolutionary | Chromosome = action sequence, uniform crossover |
     | **Greedy Heuristic** | Heuristic | Depth-1 look-ahead baseline |
+
+    ### Debugging (Caserta / Zhu layout call chain)
+    Set environment variable **`CRISP_TRACE_LAYOUT=1`** before launching (`streamlit run gui/app.py`).
+    Each instance prints to the terminal: `problem_config_for_caserta_dat` → `CRP_R._build_episode` → `apply_caserta_file_to_yard` (layout path is stored as **`layout_file_path`** in ``ProblemConfig.extra``).
+    See `core/layout_trace.py`.
 
     ### Extending the Platform
     **Add a new problem:**

@@ -4,3 +4,9 @@ __pycache__/
 results/
 .env
 wandb/
+
+# Local benchmark datasets (large; keep out of git — obtain separately)
+benchmark/
+
+# macOS
+.DS_Store

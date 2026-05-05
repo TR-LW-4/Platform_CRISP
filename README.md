@@ -48,7 +48,7 @@ python main.py list
 python main.py test
 
 # 运行单个实验
-python main.py run --problem CSPP --algo "Genetic Algorithm" --iterations 200
+python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 200
 python main.py run --problem "BRP-Fixed" --algo REINFORCE --iterations 500
 ```
 
@@ -96,9 +96,11 @@ python main.py run --problem "BRP-Fixed" --algo REINFORCE --iterations 500
 | **BRP-Fixed** | 固定顺序取箱，必须按优先级 1→2→…→N 取出 | relocations |
 | **CRP-Time** | 与 BRP-Fixed 规则相同，主目标为场桥总作业时间（秒） | time / crane_time（兼看 relocations） |
 | **BRP-NonFixed** | 自由选择取箱顺序，优化总搬移次数 | relocations |
-| **Pre-Marshalling** | 开船前重排堆场，使所有栈有序 | moves |
-| **CSPP** | 堆场→船舶配载，考虑分组约束（你的核心问题） | shifters |
-| **CSPP-Constrained** | CSPP + 重量限制 + 冷藏箱约束 + 危险品约束 | shifters + violations |
+| **CRP-Prem** | 开船前重排堆场，使所有栈有序 | moves |
+| **CRP-Stow** | 堆场→船舶配载，考虑分组约束 | shifters |
+| **CRP-Stoch** | 随机型 CRP（当前与 CRP-Time 同构，可扩展随机性） | time / crane_time |
+| **CRP-U** | 无固定取箱顺序（与 BRP-NonFixed 同构） | relocations |
+| **CRP-D** | 重复箱组配载（当前与 CRP-Stow 同构，可扩展生成） | shifters |
 
 ---
 
@@ -253,7 +255,7 @@ A: 手动在浏览器访问 `http://localhost:8501`
 A: 减小 `max_iterations`，或用 `Greedy Heuristic` 先测试
 
 **Q: 如何用你现有的 spp-main 代码？**  
-A: `problems/cspp.py` 已经基于你的原始 `stowage_gym.py` 逻辑重构，逻辑完全一致
+A: `problems/CRP_Stow.py` 已经基于你的原始 `stowage_gym.py` 逻辑重构，逻辑完全一致
 
 **Q: 如何保存训练结果？**  
 A: Experiment Tab 的结果会显示在表格中，后续可加 CSV 导出功能

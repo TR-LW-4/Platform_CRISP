@@ -61,6 +61,11 @@ def _discover_subclasses(
 _PROBLEM_REGISTRY: Dict[str, type] = {}
 
 
+def _problem_shown_in_picker(cls: type) -> bool:
+    """If False, problem is registered but excluded from ``list_problems()`` / ``get_problem_info()``."""
+    return not getattr(cls, "hide_from_problem_list", False)
+
+
 def register_problem(cls: type) -> type:
     """Decorator: manually register a problem class."""
     from core.base_problem import BaseProblem
@@ -76,7 +81,9 @@ def get_problem_class(name: str) -> Optional[type]:
 
 def list_problems() -> List[str]:
     _ensure_loaded()
-    return sorted(_PROBLEM_REGISTRY.keys())
+    return sorted(
+        name for name, cls in _PROBLEM_REGISTRY.items() if _problem_shown_in_picker(cls)
+    )
 
 
 def get_problem_info() -> List[Dict]:
@@ -84,6 +91,8 @@ def get_problem_info() -> List[Dict]:
     _ensure_loaded()
     out = []
     for name, cls in _PROBLEM_REGISTRY.items():
+        if not _problem_shown_in_picker(cls):
+            continue
         out.append({
             "name":        name,
             "description": getattr(cls, "description", ""),

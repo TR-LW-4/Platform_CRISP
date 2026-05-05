@@ -14,13 +14,13 @@ algorithms/
 │   ├── evolutionary/genetic/
 │   └── rl/{ppo,reinforce}/
 │
-├── brp_fixed/                # single-bay BRP, priority 1..N
+├── CRP_R/                # fixed-order yard retrieval (BRP-Fixed / CRP-R)
 │   ├── heuristic/
 │   │   ├── kim_hong/         ← physical (original paper = single-bay BRP)
 │   │   ├── caserta/          ← physical
 │   │   ├── lan/              ← physical
 │   │   ├── glah/             ← physical
-│   │   ├── lee_lee/          → symlink to crp_time/heuristic/lee_lee
+│   │   ├── lee_lee/          → symlink to CRP_Time/heuristic/lee_lee
 │   │   ├── lin_2015/         → symlink
 │   │   ├── cifuentes_riff_2020/  → symlink
 │   │   ├── durasevic_2024/   → symlink
@@ -29,14 +29,14 @@ algorithms/
 │   ├── evolutionary/genetic/ → symlink
 │   └── rl/{ppo,reinforce}/   → symlinks
 │
-├── crp_time/                 # multi-bay CRP with crane-time objective
+├── CRP_Time/                 # multi-bay CRP with crane-time objective
 │   ├── heuristic/
 │   │   ├── lee_lee/          ← physical (Lee & Lee 2010, COR)
 │   │   ├── lin_2015/         ← physical (Lin, Lee & Lee 2015, TRC)
 │   │   ├── cifuentes_riff_2020/  ← physical (Cifuentes & Riff 2020, ASOC)
 │   │   ├── durasevic_2024/   ← physical (Ðurasević & Ðumić 2024, ASOC)
 │   │   ├── durasevic_2025_mgp/   ← physical (Ðurasević et al. 2025, EAAI)
-│   │   ├── kim_hong/         → symlink to brp_fixed
+│   │   ├── kim_hong/         → symlink to CRP_R
 │   │   ├── caserta/          → symlink
 │   │   ├── lan/              → symlink
 │   │   ├── glah/             → symlink
@@ -49,9 +49,8 @@ algorithms/
 │   ├── evolutionary/genetic/ → symlink
 │   └── rl/{ppo,reinforce}/   → symlinks
 │
-├── premarshalling/           # same pattern
-├── cspp/                     # same pattern
-└── cspp_constrained/         # same pattern
+├── CRP_Prem/               # pre-marshalling (CRP-Prem)
+├── CRP_Stow/               # stowage (CRP-Stow)
 ```
 
 ## Conventions

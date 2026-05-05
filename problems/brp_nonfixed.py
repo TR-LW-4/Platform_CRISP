@@ -38,6 +38,8 @@ class BRPNonFixed(BaseProblem):
                     "Choose which container to retrieve next to minimise total relocations.")
     tags         = ["relocation", "non-fixed-order", "yard-only"]
     metric_names = ["relocations", "steps", "time"]
+    # Base for CRP-U; omitted from GUI / ``list_problems()`` (see ``core.registry``).
+    hide_from_problem_list = True
 
     def __init__(
         self,

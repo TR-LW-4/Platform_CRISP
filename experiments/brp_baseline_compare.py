@@ -42,13 +42,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.base_problem import ProblemConfig
 from core.objectives import lower_bound_relocations
 from core.plan import simulate_plan
-from problems.brp_fixed import BRPFixed
+from problems.CRP_R import BRPFixed
 
 from algorithms._shared.heuristic.greedy.algorithm     import GreedyHeuristic
-from algorithms.brp_fixed.heuristic.kim_hong.scoring   import select_action as kim_select
-from algorithms.brp_fixed.heuristic.lan.planner        import build_lan_plan
-from algorithms.crp_time.heuristic.lee_lee.phase1      import phase1_greedy
-from algorithms.crp_time.heuristic.lee_lee.phase2      import phase2_reduce_moves
+from algorithms.CRP_R.heuristic.kim_hong.scoring   import select_action as kim_select
+from algorithms.CRP_R.heuristic.lan.planner        import build_lan_plan
+from algorithms.CRP_Time.heuristic.lee_lee.phase1      import phase1_greedy
+from algorithms.CRP_Time.heuristic.lee_lee.phase2      import phase2_reduce_moves
 
 
 # ================================================================ #
