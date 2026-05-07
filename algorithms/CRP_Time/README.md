@@ -17,8 +17,7 @@ Multi-bay yard, fixed retrieval order, Lee–Lee (2010) RMGC kinematics
 | `heuristic/kim_hong/` | rule | Kim & Hong 2006, COR | symlink (native: CRP_R, single-bay origin) |
 | `heuristic/caserta/` | rule | Caserta et al. 2012, EJOR | symlink (native: CRP_R) |
 | `heuristic/lan/` | look-ahead | Petering & Hussein 2013, EJOR | symlink (native: CRP_R) |
-| `heuristic/glah/` | metaheuristic | Jin, Zhu & Lim 2015, EJOR | symlink (native: CRP_R) |
-| `heuristic/greedy/` | depth-1 greedy | — | symlink (`_shared/`) |
+| `heuristic/glah/` | metaheuristic | Jin, Zhu & Lim 2015, EJOR | **native** (CRP-Time packaging; keep in sync with `CRP_D` / `CRP_U` copies) |
 | `evolutionary/genetic/` | GA | — | symlink (`_shared/`) |
 | `rl/ppo/` | RL | Schulman et al. 2017 | symlink (`_shared/`) |
 | `rl/reinforce/` | RL | Williams 1992 | symlink (`_shared/`) |

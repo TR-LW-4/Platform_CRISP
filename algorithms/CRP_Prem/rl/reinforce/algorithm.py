@@ -22,7 +22,7 @@ class REINFORCE(BaseAlgorithm):
                    "REINFORCE policy gradient with greedy baseline. "
                    "Works with any problem that exposes an action mask.")
     compatible_problems = [
-        "BRP-Fixed",
+        "CRP-R",
         "CRP-Time",
         "BRP-NonFixed",
         "CRP-Prem",

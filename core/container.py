@@ -44,7 +44,7 @@ class Container:
     Core fields (always present):
         id        – unique integer ID within an episode
         group     – destination-port group (0-indexed)
-        priority  – retrieval order for BRP-Fixed (1 = retrieve first)
+        priority  – retrieval order for CRP-R (1 = retrieve first)
         weight    – gross weight in metric tons
         size      – TEU / FEU / CUSTOM
         ctype     – STANDARD / REEFER / HAZMAT / OVERSIZE
@@ -142,7 +142,7 @@ def make_containers(
         else:
             group = int(rng.randint(0, num_groups))
 
-        # Priority (for BRP-Fixed): 1..n
+        # Priority (for CRP-R): 1..n
         if priority_assignment == "sequential":
             priority = i + 1
         else:

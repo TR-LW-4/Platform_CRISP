@@ -1,5 +1,5 @@
 """
-Caserta et al. (2012) HEUR heuristic for BRP-Fixed.
+Caserta et al. (2012) HEUR heuristic for CRP-R.
 
 Algorithm (Section 4, Algorithm 1)
 ------------------------------------
@@ -11,8 +11,8 @@ For each target block n = 1 … N:
   Retrieve block n
 
 Objective : minimise total RELOCATIONS.
-Interface : BRPFixed.step()  (same as Kim–Hong, Greedy).
-Compatible: BRP-Fixed only (assumption A1 — relocate only blocks
+Interface : CRP_R.step()  (same as Kim–Hong, Greedy).
+Compatible: CRP-R only (assumption A1 — relocate only blocks
             above the current target).
 
 Reference
@@ -41,13 +41,13 @@ class CasertaHeuristic(BaseAlgorithm):
     category            = "Heuristic"
     description         = (
         "[single-bay origin]  "
-        "Caserta et al. (EJOR 2012) stack-score heuristic for BRP-Fixed. "
+        "Caserta et al. (EJOR 2012) stack-score heuristic for CRP-R. "
         "Relocates blockers to the stack with the smallest min-priority "
         "greater than the blocker (good fit), or the highest min-priority "
         "if no good stack exists (delay re-relocation). "
         "Average gap to optimum ≈1.9%; outperforms Kim–Hong."
     )
-    compatible_problems = ["BRP-Fixed", "CRP-R", "CRP-Time"]
+    compatible_problems = ["CRP-R", "CRP-Time"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -85,11 +85,32 @@ class CasertaHeuristic(BaseAlgorithm):
             solution: List[int] = []
             done = False
 
+            import sys
+            step_i = 0
             while not done:
-                info   = env._get_info()
+                info = env._get_info()
                 action = caserta_select_action(env, info.get("action_mask"))
                 _, _, done, _, _ = env.step(action)
+                
+                step_i += 1
+                dst = env._action_to_stack(action)
+                m = env.get_metrics()
+                print(
+                    f"step={step_i}  action={action}  dst_stack={dst}  "
+                    f"relocations={m['relocations']}  steps={m['steps']}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                # 若要堆场「形状」：
+                print(env.yard, file=sys.stderr, flush=True)   # 可能很长
                 solution.append(action)
+
+
+            # while not done:
+            #     info   = env._get_info()
+            #     action = caserta_select_action(env, info.get("action_mask"))
+            #     _, _, done, _, _ = env.step(action)
+            #     solution.append(action)
 
             metrics = env.get_metrics()
             all_metrics.append(metrics)

@@ -25,7 +25,7 @@ The destination minimising this composite score is chosen.  Defaults
 subsequent literature (e.g. Shin et al., TRC 2026) as the canonical
 "Lin" baseline.
 
-This module is algorithm-agnostic: it only needs the BRPFixed / CRP_Time
+This module is algorithm-agnostic: it only needs the CRP_R / CRP_Time
 environment, its current blocker, and a ``KinematicsModel`` read from
 ``env.config.extra``.
 """
@@ -132,14 +132,14 @@ def lin_select_action(
 
     Parameters
     ----------
-    env  : BRPFixed or CRP_Time environment (priority-based fixed order)
+    env  : CRP_R or CRP_Time environment (priority-based fixed order)
     mask : optional boolean action mask (non-full stacks)
     P_r  : severity weight (default 30, Shin 2026)
     P_b  : well-placed violation weight (default 300, Shin 2026)
 
     Returns
     -------
-    Flat action index compatible with BRPFixed.step().
+    Flat action index compatible with CRP_R.step().
     """
     if mask is None:
         mask = env._get_info().get("action_mask")
@@ -150,7 +150,7 @@ def lin_select_action(
 
     src_stack = env.yard._find_stack(target)
     if src_stack is None or src_stack.top == target:
-        # Target is already on top; BRPFixed will auto-retrieve, no choice needed.
+        # Target is already on top; CRP_R will auto-retrieve, no choice needed.
         return 0
 
     blocker    = src_stack.top

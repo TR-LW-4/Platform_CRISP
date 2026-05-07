@@ -2,7 +2,7 @@
 CRP-Time – Container retrieval with fixed order; primary objective is total
 crane working time (RMGC model in core.objectives, Lee & Lee style defaults).
 
-Dynamics match BRP-Fixed: strict priorities 1…N, relocate only the top
+Dynamics match CRP-R: strict priorities 1…N, relocate only the top
 blocker when the target is buried, auto-retrieve when the target is on top.
 
 RL: sparse terminal reward = negative total crane time (seconds); invalid

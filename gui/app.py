@@ -142,9 +142,9 @@ def _schema_defaults(prob_schema: Dict[str, Any]) -> Dict[str, Any]:
     return d
 
 
-BENCH_RANDOM = "随机布局（schema 默认参数）"
-BENCH_CASERTA = "Caserta benchmark（按文件名：单选 H、多选 w、加入列表）"
-BENCH_ZHU = "Zhu benchmark（子目录 H-S-N：单选 H、多选规模、加入列表）"
+BENCH_RANDOM = "Random Layout (schema defaults)"
+BENCH_CASERTA = "Caserta Benchmark (select H, pick w values, add to list)"
+BENCH_ZHU = "Zhu Benchmark (sub-folder H-S-N: select H, pick sizes, add to list)"
 
 _BASE_ALGO_KEYS = frozenset({
     "max_iterations", "seed", "report_interval", "num_eval_seeds",
@@ -179,22 +179,22 @@ def _benchmark_shape_messages(
         if z:
             h_, s_, n_ = z
             meta_plain = f"H-S-N folder=({h_},{s_},{n_}) "
-            meta_md = f"子目录 **H-S-N** = ({h_}, {s_}, {n_})（规模标签）；"
+            meta_md = f"Sub-folder **H-S-N** = ({h_}, {s_}, {n_}) (size label); "
     else:
         c = parse_caserta_filename(fpath)
         if c:
             h_, w_, id_ = c
             meta_plain = f"filename H,w,id=({h_},{w_},{id_}) "
-            meta_md = f"文件名 **H, w, id** = ({h_}, {w_}, {id_})；"
+            meta_md = f"Filename **H, w, id** = ({h_}, {w_}, {id_}); "
     stderr_line = (
         f"[CRP Platform] instance {rel}: {meta_plain}"
         f"bays×rows×tiers={nb}×{nr}×{mt}, containers={nc}"
     )
     md = (
-        f"**文件** `{rel}`\n\n"
+        f"**File** `{rel}`\n\n"
         f"{meta_md}\n"
-        f"- **网格**：{nb} bays × {nr} rows，层高 **max_tiers = {mt}**\n"
-        f"- **箱数 N** = **{nc}**\n"
+        f"- **Grid**: {nb} bays × {nr} rows, max height **max_tiers = {mt}**\n"
+        f"- **Containers N** = **{nc}**\n"
     )
     return stderr_line, md
 
@@ -222,10 +222,10 @@ def _run_one_benchmark_file(
     import multiprocessing as mp
 
     rel = fpath.parent.name + "/" + fpath.name if run_zhu_batch else fpath.name
-    status_txt.caption(f"运行 {batch_index + 1}/{batch_total}：`{rel}` …")
+    status_txt.caption(f"Running {batch_index + 1}/{batch_total}: `{rel}` …")
     if terminal_detail:
         print(
-            "\n[CRP Platform] ========== 仅第 1 个实例（列表首项，人工检查） ==========",
+            "\n[CRP Platform] ========== First instance only (manual inspection) ==========",
             file=sys.stderr,
             flush=True,
         )
@@ -294,7 +294,7 @@ def _run_one_benchmark_file(
         )
         if terminal_detail:
             print(
-                "[CRP Platform] ---------- 处理结果（最终一步） ----------",
+                "[CRP Platform] ---------- Result (final step) ----------",
                 file=sys.stderr,
                 flush=True,
             )
@@ -306,13 +306,13 @@ def _run_one_benchmark_file(
             )
             print(f"  metrics: {final.metrics}", file=sys.stderr, flush=True)
             print(
-                "[CRP Platform] ---------- 结束（未继续后续文件） ----------\n",
+                "[CRP Platform] ---------- Done (remaining files skipped) ----------\n",
                 file=sys.stderr,
                 flush=True,
             )
     elif terminal_detail:
         print(
-            "[CRP Platform] 警告: 未收到任何训练进度（子进程未向队列写入结果）。",
+            "[CRP Platform] Warning: no training progress received (subprocess did not write to queue).",
             file=sys.stderr,
             flush=True,
         )
@@ -320,7 +320,7 @@ def _run_one_benchmark_file(
     progress_bar.progress((batch_index + 1) / batch_total)
     if show_completion_banner:
         st.success(
-            f"✅ 已完成 **{batch_index + 1}/{batch_total}** — `{rel}`\n\n{md_shape}"
+            f"✅ Completed **{batch_index + 1}/{batch_total}** — `{rel}`\n\n{md_shape}"
         )
 
 
@@ -374,6 +374,7 @@ with st.sidebar:
         "RL":           "#4E79A7",
         "Evolutionary": "#59A14F",
         "Heuristic":    "#F28E2B",
+        "Exact":        "#9333EA",
     }
     cat_to_algos: Dict[str, List[str]] = {}
     for aname in avail_algos:
@@ -385,6 +386,7 @@ with st.sidebar:
         "RL":           "🤖 Reinforcement Learning",
         "Evolutionary": "🧬 Evolutionary Algorithm",
         "Heuristic":    "⚡ Heuristic",
+        "Exact":        "✓ Exact / Optimal",
     }
     display_cats     = [category_labels.get(c, c) for c in all_categories]
     cat_idx          = st.radio(
@@ -478,40 +480,42 @@ with tab_test:
         if selected_problem == "CRP-R" and len(bench_opts) > 1:
             if not os.environ.get("CRISP_TRACE_LAYOUT"):
                 st.caption(
-                    "终端看不到 `[CRISP_TRACE_LAYOUT]` 日志时：请在**启动 Streamlit 的那个终端**里先执行 "
-                    "`export CRISP_TRACE_LAYOUT=1`，再运行 `streamlit run gui/app.py`（需重启进程）；"
-                    "日志在 **stderr**，不会出现在浏览器页面。"
+                    "To enable layout trace logs in the terminal: run "
+                    "`export CRISP_TRACE_LAYOUT=1` in the terminal where Streamlit is started, "
+                    "then restart with `streamlit run gui/app.py`. "
+                    "Logs appear on **stderr**, not in the browser."
                 )
         if selected_problem == "CRP-R" and len(bench_opts) > 1:
             bench_source = st.radio(
-                "实例来源",
+                "Instance Source",
                 bench_opts,
                 horizontal=False,
                 key=f"bench_src_{selected_problem}",
             )
         elif selected_problem != "CRP-R":
-            st.caption("Caserta / Zhu 筛选目前仅支持 **CRP-R**；请在侧栏选择 CRP-R。")
+            st.caption("Caserta / Zhu filtering is only supported for **CRP-R**; please select CRP-R in the sidebar.")
         elif len(bench_opts) == 1:
-            st.caption("未找到 Caserta（`dataH-w-id.dat`）或 Zhu（`H-S-N/*.txt`）基准数据。")
+            st.caption("No Caserta (`dataH-w-id.dat`) or Zhu (`H-S-N/*.txt`) benchmark data found.")
 
         if selected_problem == "CRP-R" and bench_source == BENCH_CASERTA and ws_by_height:
             st.caption(
-                "文件名：`data[H]-[w]-[编号].dat`。先 **单选高度 H**（白名单 3,4,5,6,10 与数据集的交集），"
-                "再 **多选垛数 w**；点「加入实例列表」累积。可换高度继续添加。"
-                "**第三段编号不筛选**，选中 (H,w) 后包含该组全部文件。"
+                "Filename format: `data[H]-[w]-[id].dat`. "
+                "First **select a single height H** (whitelist {3,4,5,6,10} intersected with dataset), "
+                "then **select one or more stack counts w** and click 'Add to Instance List'. "
+                "**The id segment is not filtered** — all files for the chosen (H, w) pair are included."
             )
             if not height_options_caserta:
-                st.warning("标准高度 {3,4,5,6,10} 在 Caserta 数据集中无匹配文件。")
+                st.warning("No files match standard heights {3,4,5,6,10} in the Caserta dataset.")
             else:
                 cur_h = st.selectbox(
-                    "高度 H（单选）",
+                    "Height H (single select)",
                     options=height_options_caserta,
                     format_func=lambda x: f"H = {x}",
                     key=f"cb_H_single_{selected_problem}",
                 )
                 w_opts = ws_by_height.get(cur_h, [])
                 sel_ws_str = st.multiselect(
-                    f"垛数 w（当前 H={cur_h}，可多选）",
+                    f"Stack count w (H={cur_h}, multi-select)",
                     options=[str(w) for w in w_opts],
                     format_func=lambda x: f"w = {x}",
                     key=f"cb_ws_pick_{selected_problem}_{cur_h}",
@@ -520,40 +524,41 @@ with tab_test:
 
                 b_add, b_clr = st.columns(2)
                 with b_add:
-                    add_clicked = st.button("➕ 添加到实例列表", key=f"add_hw_{selected_problem}")
+                    add_clicked = st.button("➕ Add to Instance List", key=f"add_hw_{selected_problem}")
                 with b_clr:
-                    clr_clicked = st.button("🗑 清空实例列表", key=f"clr_hw_{selected_problem}")
+                    clr_clicked = st.button("🗑 Clear Instance List", key=f"clr_hw_{selected_problem}")
 
                 if clr_clicked:
                     st.session_state.caserta_instance_queue = []
                     st.rerun()
                 if add_clicked:
                     if not sel_ws:
-                        st.warning("请至少勾选一个垛数 w。")
+                        st.warning("Please select at least one stack count w.")
                     else:
                         merge_hw_queue_item(st.session_state.caserta_instance_queue, cur_h, sel_ws)
                         st.rerun()
 
             q_c = st.session_state.caserta_instance_queue
             if q_c:
-                st.markdown("**当前实例列表（Caserta）**")
+                st.markdown("**Current Instance List (Caserta)**")
                 for idx, block in enumerate(q_c):
                     st.write(
-                        f"{idx + 1}. **H = {block['h']}**，"
+                        f"{idx + 1}. **H = {block['h']}**, "
                         f"w ∈ {{{', '.join(str(w) for w in block['ws'])}}}"
                     )
 
             all_caserta_paths = collect_paths_from_hw_queue(caserta_root, q_c)
-            st.info(f"Caserta 列表合并后共 **{len(all_caserta_paths)}** 个 `.dat`（将依次运行）。")
+            st.info(f"Caserta list contains **{len(all_caserta_paths)}** `.dat` files in total (will run sequentially).")
 
         elif selected_problem == "CRP-R" and bench_source == BENCH_ZHU and height_options_zhu:
             st.caption(
-                "子目录名：**`H-S-N`**（H 为层数标签，S 为垛数，N 为箱数）。"
-                "先 **单选 H**（Zhu 白名单 **3,4,5,6,7,10** 与数据集的交集），再 **多选 (S,N) 规模**；"
-                "每个规模文件夹下通常有 **100** 个 `.txt` 实例，加入列表后**会全部纳入**。"
+                "Sub-folder name format: **`H-S-N`** (H = height label, S = stacks, N = containers). "
+                "First **select a single H** (Zhu whitelist **3,4,5,6,7,10** intersected with dataset), "
+                "then **select one or more (S, N) sizes**. "
+                "Each size folder typically contains **100** `.txt` instances — all are included when added."
             )
             cur_hz = st.selectbox(
-                "高度 H（单选）",
+                "Height H (single select)",
                 options=height_options_zhu,
                 format_func=lambda x: f"H = {x}",
                 key=f"zhu_H_single_{selected_problem}",
@@ -561,7 +566,7 @@ with tab_test:
             sn_list = zhu_sn_by_height.get(cur_hz, [])
             sn_labels = [f"{s}-{n}" for s, n in sn_list]
             sel_sn_str = st.multiselect(
-                f"规模 S-N（当前 H={cur_hz}，S=垛数、N=箱数；可多选）",
+                f"Scale S-N (H={cur_hz}, S=stacks, N=containers; multi-select)",
                 options=sn_labels,
                 format_func=lambda lab: f"S={lab.split('-')[0]}, N={lab.split('-')[1]}",
                 key=f"zhu_sn_pick_{selected_problem}_{cur_hz}",
@@ -574,31 +579,31 @@ with tab_test:
 
             zb_add, zb_clr = st.columns(2)
             with zb_add:
-                zhu_add = st.button("➕ 添加到实例列表", key=f"add_zhu_hw_{selected_problem}")
+                zhu_add = st.button("➕ Add to Instance List", key=f"add_zhu_hw_{selected_problem}")
             with zb_clr:
-                zhu_clr = st.button("🗑 清空实例列表", key=f"clr_zhu_hw_{selected_problem}")
+                zhu_clr = st.button("🗑 Clear Instance List", key=f"clr_zhu_hw_{selected_problem}")
 
             if zhu_clr:
                 st.session_state.zhu_instance_queue = []
                 st.rerun()
             if zhu_add:
                 if not sel_pairs:
-                    st.warning("请至少勾选一个规模 (S, N)。")
+                    st.warning("Please select at least one scale (S, N).")
                 else:
                     merge_zhu_queue_item(st.session_state.zhu_instance_queue, cur_hz, sel_pairs)
                     st.rerun()
 
             q_z = st.session_state.zhu_instance_queue
             if q_z:
-                st.markdown("**当前实例列表（Zhu）**")
+                st.markdown("**Current Instance List (Zhu)**")
                 for idx, block in enumerate(q_z):
                     pairs_s = ", ".join(f"({p[0]},{p[1]})" for p in block["sn_pairs"])
-                    st.write(f"{idx + 1}. **H = {block['h']}**：{pairs_s}")
+                    st.write(f"{idx + 1}. **H = {block['h']}**: {pairs_s}")
 
             all_zhu_paths = collect_paths_from_zhu_queue(zhu_root, q_z)
             st.info(
-                f"Zhu 列表合并后共 **{len(all_zhu_paths)}** 个 `.txt`（将依次运行；"
-                f"每个所选 `H-S-N` 文件夹内全部实例）。"
+                f"Zhu list contains **{len(all_zhu_paths)}** `.txt` files in total "
+                f"(will run sequentially; all instances in each selected `H-S-N` folder are included)."
             )
 
         st.markdown("---")
@@ -608,9 +613,9 @@ with tab_test:
         metric_placeholder  = st.empty()
         chart_placeholder   = st.empty()
 
-    # ── Left: algorithm only（Problem Config 已隐藏）────────────────── #
+    # ── Left: algorithm only (Problem Config form hidden) ───────────── #
     with col_left:
-        st.caption("Problem 参数使用各类 **config_schema 默认值**（未展示表单）。")
+        st.caption("Problem parameters use the **config_schema defaults** (form not shown).")
         st.subheader("Algorithm Config")
 
         algo_params: Dict[str, Any] = {}
@@ -635,6 +640,14 @@ with tab_test:
                 algo_params[aname] = st.checkbox(
                     label, value=spec["default"], key=f"a_{aname}", help=help_,
                 )
+            elif t == "str":
+                options = spec.get("options", [spec["default"]])
+                default = spec.get("default", options[0])
+                idx = options.index(default) if default in options else 0
+                algo_params[aname] = st.selectbox(
+                    label, options=options, index=idx,
+                    key=f"a_{aname}", help=help_,
+                )
 
         show_pause_opt = (
             selected_problem == "CRP-R"
@@ -644,14 +657,14 @@ with tab_test:
         pause_each_file = False
         if show_pause_opt:
             first_instance_only = st.checkbox(
-                "仅运行列表 **第 1 个**实例：在 **终端（stderr）** 打印规模与结果后 **停止**（不跑其余文件）",
+                "Run **first instance only**: print size info and result to **terminal (stderr)** then stop",
                 key=f"bench_first_only_{selected_problem}",
-                help="适合肉眼核对首个实例；勾选后忽略下面的「每文件暂停」。",
+                help="Useful for manually inspecting the first instance. Overrides the 'pause after each file' option.",
             )
             pause_each_file = st.checkbox(
-                "每完成 **1 个布局文件**后暂停，并在页面输出该实例规模（文件名 / H-S-N、网格、层高、箱数）",
+                "Pause after each layout file and display instance info (filename / H-S-N, grid, height, containers)",
                 key=f"bench_pause_each_{selected_problem}",
-                help="仅当实例来源为 Caserta/Zhu 且 Start 跑批量时生效；与「仅第 1 个」同时勾选时以前者为准。",
+                help="Only applies when running a Caserta/Zhu batch via Start. Overridden by 'first instance only'.",
                 disabled=first_instance_only,
             )
 
@@ -668,16 +681,16 @@ with tab_test:
         next_i = int(pay_b.get("next_idx", 0))
         done_n = min(next_i, paths_bn)
         st.info(
-            f"**单步批量**：已完成 **{done_n} / {paths_bn}** 个布局文件；"
-            f"下一待跑为列表第 **{next_i + 1}** 个（索引 {next_i}）。"
+            f"**Step-by-step batch**: completed **{done_n} / {paths_bn}** layout files; "
+            f"next up is item **{next_i + 1}** in the list (index {next_i})."
         )
         bp1, bp2 = st.columns(2)
         with bp1:
             bench_pause_cont = st.button(
-                "▶ 继续下一个布局文件", key="bench_pause_continue", type="primary"
+                "▶ Continue to Next Layout File", key="bench_pause_continue", type="primary"
             )
         with bp2:
-            bench_pause_cancel = st.button("取消单步批量", key="bench_pause_cancel")
+            bench_pause_cancel = st.button("Cancel Step-by-Step Batch", key="bench_pause_cancel")
 
     # ── Button handlers ───────────────────────────────────────────── #
     prob_cfg = None   # defined below when Start is clicked
@@ -685,7 +698,7 @@ with tab_test:
     if bench_pause_cancel:
         st.session_state.bench_pause_waiting = False
         st.session_state.bench_pause_payload = None
-        st.warning("已取消单步批量（实例队列保留，可重新 Start）。")
+        st.warning("Step-by-step batch cancelled (instance queue preserved; click Start to restart).")
         st.rerun()
 
     if bench_pause_cont and st.session_state.get("bench_pause_payload"):
@@ -732,7 +745,7 @@ with tab_test:
             status_txt_p.empty()
             progress_bar_p.empty()
             st.success(
-                f"✅ {batch_label_p} 批次完成：共 **{len(paths_bp)}** 个实例；结果已写入 `results/`。"
+                f"✅ {batch_label_p} batch complete: **{len(paths_bp)}** instances processed; results saved to `results/`."
             )
         else:
             st.session_state.bench_pause_waiting = True
@@ -755,17 +768,17 @@ with tab_test:
         )
 
         if bench_source == BENCH_CASERTA and selected_problem != "CRP-R":
-            st.error("Caserta benchmark 仅支持 **CRP-R**；请在侧栏切换问题。")
+            st.error("Caserta benchmark only supports **CRP-R**; please switch the problem in the sidebar.")
             st.stop()
         if bench_source == BENCH_ZHU and selected_problem != "CRP-R":
-            st.error("Zhu benchmark 仅支持 **CRP-R**；请在侧栏切换问题。")
+            st.error("Zhu benchmark only supports **CRP-R**; please switch the problem in the sidebar.")
             st.stop()
         if bench_source == BENCH_CASERTA and selected_problem == "CRP-R" and not all_caserta_paths:
-            st.error("请先在「实例列表」中添加：**单选高度 H + 多选垛数 w**（点「添加到实例列表」）。")
+            st.error("Please add instances first: **select height H + select stack count w** (click 'Add to Instance List').")
             st.stop()
         if bench_source == BENCH_ZHU and selected_problem == "CRP-R" and not all_zhu_paths:
             st.error(
-                "请先在「实例列表」中添加：**单选高度 H + 多选规模 (S,N)**（点「添加到实例列表」）。"
+                "Please add instances first: **select height H + select scale (S, N)** (click 'Add to Instance List')."
             )
             st.stop()
 
@@ -788,7 +801,7 @@ with tab_test:
                 first_path = batch_paths[0]
                 print(
                     "\n[CRP Platform] mode=first_instance_only — "
-                    f"队列共 {len(batch_paths)} 个文件，仅运行第 1 个；其余跳过。\n",
+                    f"queue has {len(batch_paths)} file(s); running only the first, skipping the rest.\n",
                     file=sys.stderr,
                     flush=True,
                 )
@@ -815,8 +828,8 @@ with tab_test:
                 status_txt_f.empty()
                 progress_bar_f.empty()
                 st.info(
-                    "已在启动 Streamlit 的 **终端** 输出：实例路径、规模行、`处理结果` 指标。"
-                    "页面此处不再重复；未继续队列中其余文件。"
+                    "Results printed to the **terminal** (stderr): instance path, size info, final metrics. "
+                    "The remaining instances in the queue were skipped."
                 )
                 st.rerun()
 
@@ -893,7 +906,7 @@ with tab_test:
                 status_txt.empty()
                 progress_bar.empty()
                 st.success(
-                    f"✅ {batch_label} 批次完成：共 **{len(batch_paths)}** 个实例；结果已写入 `results/`。"
+                    f"✅ {batch_label} batch complete: **{len(batch_paths)}** instances processed; results saved to `results/`."
                 )
                 st.rerun()
 
@@ -1246,11 +1259,11 @@ with tab_about:
     ### Problems
     | Name | Description |
     |---|---|
-    | **BRP-Fixed** | Block Relocation Problem – fixed retrieval order |
+    | **CRP-R** | Block Relocation Problem – fixed retrieval order |
     | **CRP-Prem** | Pre-marshalling: rearrange yard before ship arrival (sorting) |
     | **CRP-Stow** | Container stowage planning – yard → vessel loading |
     | **CRP-Stoch** | Stochastic CRP (extends CRP-Time scaffold) |
-    | **CRP-U** | Unrestricted retrieval order (free choice of next retrieval) |
+    | **CRP-U** | Unrestricted BRP: fixed retrieval order 1→…→N, relocations may take the **top** of **any** stack to any non-full stack (uBRP; Jovanović, Tuba & Voß 2019, EJOR) |
     | **CRP-D** | Duplicate-group stowage (extends CRP-Stow scaffold) |
 
     ### Algorithms
@@ -1259,7 +1272,7 @@ with tab_about:
     | **REINFORCE** | RL | Policy gradient with greedy baseline |
     | **PPO** | RL | Proximal Policy Optimization (Actor-Critic) |
     | **Genetic Algorithm** | Evolutionary | Chromosome = action sequence, uniform crossover |
-    | **Greedy Heuristic** | Heuristic | Depth-1 look-ahead baseline |
+    | **Caserta (2012) HEUR** | Heuristic | Caserta et al. 2012 fixed-order destination-stack rule |
 
     ### Debugging (Caserta / Zhu layout call chain)
     Set environment variable **`CRISP_TRACE_LAYOUT=1`** before launching (`streamlit run gui/app.py`).

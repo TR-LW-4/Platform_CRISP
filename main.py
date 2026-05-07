@@ -9,7 +9,7 @@ python main.py gui
 # List registered problems and algorithms
 python main.py list
 
-# Quick smoke-test: run greedy on every problem for 1 episode
+# Quick smoke-test: run a compatible heuristic on every problem for 1 episode
 python main.py test
 
 # Run a single experiment from the command line
@@ -18,6 +18,14 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 # Run one benchmark layout (Caserta .dat or Zhu .txt) without the GUI — prints metrics
 python main.py layout-run --problem "CRP-R" --algo "Caserta (2012) HEUR" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat
+
+# Same, but print LA-N move-by-move trace on stderr (--trace-lan or export CRISP_TRACE_LAN=1)
+python main.py layout-run --problem "CRP-R" --algo "LA-N Look-Ahead" \\
+    --layout benchmark/Caserta_dataset/data3-3-1.dat --trace-lan
+
+# Exact solver (Tanaka B&B on bundled ``brp_bb``)
+python main.py layout-run --problem "CRP-R" --algo "Tanaka (2016) B&B" \\
+    --layout benchmark/Zhu_dataset/5-8-39/06101.txt --seeds 1
 
 # Show recent saved result JSON files (same as GUI Test/Experiment writes under results/)
 python main.py results --limit 15
@@ -48,29 +56,55 @@ def cmd_list():
 
 
 def cmd_test():
-    """Quick smoke-test: greedy on every problem."""
-    from core.registry        import list_problems, get_problem_class
-    from core.base_problem    import ProblemConfig
-    from algorithms._shared.heuristic.greedy import GreedyHeuristic
-    from core.base_algorithm  import AlgorithmConfig
+    """Quick smoke-test: one heuristic episode per registered problem (no Greedy module)."""
+    from core.registry import (
+        compatible_algorithms,
+        get_algorithm_class,
+        get_problem_class,
+        list_problems,
+    )
+    from core.base_problem import ProblemConfig
+    from core.base_algorithm import AlgorithmConfig
     import multiprocessing as mp
 
+    _PREFERRED = ("Caserta (2012) HEUR", "Kim–Hong (2006) ENAR")
+
     print("\n=== Smoke Test ===")
+    cfg = ProblemConfig(num_bays=3, num_rows=2, max_tiers=3, num_containers=8, num_groups=2)
     for pname in list_problems():
         pcls = get_problem_class(pname)
         if pcls is None:
             continue
-        cfg  = ProblemConfig(num_bays=3, num_rows=2, max_tiers=3, num_containers=8, num_groups=2)
-        algo = GreedyHeuristic(AlgorithmConfig(num_eval_seeds=2, max_iterations=20))
-        q    = mp.Queue()
-        ev   = mp.Event()
+        names = compatible_algorithms(pname)
+        heur = [
+            n
+            for n in names
+            if getattr(get_algorithm_class(n), "category", "") == "Heuristic"
+        ]
+        pick = None
+        for pref in _PREFERRED:
+            if pref in heur:
+                pick = pref
+                break
+        if pick is None and heur:
+            pick = heur[0]
+        if pick is None and names:
+            pick = names[0]
+        if pick is None:
+            print(f"  ? {pname}: no compatible algorithm")
+            continue
+
+        acls = get_algorithm_class(pick)
+        algo = acls(AlgorithmConfig(num_eval_seeds=2, max_iterations=20))
+        q = mp.Queue()
+        ev = mp.Event()
 
         def factory(_p=pcls, _c=cfg):
             return _p(config=_c)
 
         proc = mp.Process(target=algo.train, args=(factory, q, ev), daemon=True)
         proc.start()
-        proc.join(timeout=30)
+        proc.join(timeout=60)
         ev.set()
 
         records = []
@@ -79,9 +113,11 @@ def cmd_test():
 
         if records:
             final = records[-1]
-            print(f"  ✓ {pname}: metric={final.metric:.3f}  metrics={final.metrics}")
+            print(
+                f"  ✓ {pname} [{pick}]: metric={final.metric:.3f}  metrics={final.metrics}"
+            )
         else:
-            print(f"  ? {pname}: no records returned")
+            print(f"  ? {pname} [{pick}]: no records returned")
 
 
 def cmd_run(problem: str, algo: str, iterations: int):
@@ -164,11 +200,20 @@ def cmd_layout_run(
     seeds: int,
     save: bool,
     timeout: float,
+    trace_lan: bool = False,
 ):
     """
     Run *one* registered algorithm on *one* Caserta (.dat) or Zhu (.txt) layout file.
     No Streamlit — metrics go to stdout; optional JSON under results/.
     """
+    if trace_lan:
+        os.environ["CRISP_TRACE_LAN"] = "1"
+        print(
+            "[layout-run] LA-N planner trace enabled on stderr ([CRISP_TRACE_LAN]=1).",
+            file=sys.stderr,
+            flush=True,
+        )
+
     from pathlib import Path
 
     from core.registry import get_algorithm_class, get_problem_class
@@ -316,7 +361,7 @@ if __name__ == "__main__":
 
     run_parser = subparsers.add_parser("run", help="Run a single experiment")
     run_parser.add_argument("--problem",    default="CRP-Stow")
-    run_parser.add_argument("--algo",       default="Greedy Heuristic")
+    run_parser.add_argument("--algo",       default="Caserta (2012) HEUR")
     run_parser.add_argument("--iterations", type=int, default=100)
 
     layout_parser = subparsers.add_parser(
@@ -353,6 +398,14 @@ if __name__ == "__main__":
         default=900.0,
         help="Seconds to wait for the training subprocess (default 900)",
     )
+    layout_parser.add_argument(
+        "--trace-lan",
+        action="store_true",
+        help=(
+            "Print LA-N build_lan_plan step-by-move trace to stderr "
+            '(same as export CRISP_TRACE_LAN=1; only affects "LA-N Look-Ahead").'
+        ),
+    )
 
     res_parser = subparsers.add_parser(
         "results",
@@ -384,6 +437,7 @@ if __name__ == "__main__":
             args.seeds,
             args.save,
             args.timeout,
+            trace_lan=args.trace_lan,
         )
     elif args.command == "results":
         cmd_results(args.limit, args.verbose)

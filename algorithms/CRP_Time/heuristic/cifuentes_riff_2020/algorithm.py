@@ -63,7 +63,7 @@ class CifuentesRiff2020GRASP(BaseAlgorithm):
         "(Wu & Ting 2010).  Objective = α·moves + β·crane_time; "
         "defaults α=0.3, β=0.005, k=3 follow the paper's ParamILS tune."
     )
-    compatible_problems = ["CRP-Time", "BRP-Fixed"]
+    compatible_problems = ["CRP-Time"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -250,7 +250,7 @@ class CifuentesRiff2020GRASP(BaseAlgorithm):
 # ================================================================ #
 
 def _plan_to_action_list(plan: RelocationPlan, env) -> List[int]:
-    """Flatten the plan's relocations into BRPFixed.step() action indices.
+    """Flatten the plan's relocations into CRP_R.step() action indices.
 
     Retrieval moves are skipped (auto-retrieved inside the environment).
     """

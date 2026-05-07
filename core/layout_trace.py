@@ -1,10 +1,15 @@
 """
 Optional stderr tracing for Caserta / Zhu layout loading.
 
-Enable::
+Enable layout loading tracing::
 
     export CRISP_TRACE_LAYOUT=1
     streamlit run gui/app.py
+
+Enable LA-N ``build_lan_plan`` move tracing (stderr)::
+
+    export CRISP_TRACE_LAN=1
+    python main.py layout-run --problem CRP-R --algo "LA-N Look-Ahead" ...
 
 Typical order per benchmark instance:
 
@@ -24,3 +29,9 @@ import sys
 def trace_layout(msg: str) -> None:
     if os.environ.get("CRISP_TRACE_LAYOUT"):
         print(f"[CRISP_TRACE_LAYOUT] {msg}", file=sys.stderr, flush=True)
+
+
+def trace_lan(msg: str) -> None:
+    """LA-N ``planner.build_lan_plan`` move-by-move trace."""
+    if os.environ.get("CRISP_TRACE_LAN"):
+        print(f"[CRISP_TRACE_LAN] {msg}", file=sys.stderr, flush=True)

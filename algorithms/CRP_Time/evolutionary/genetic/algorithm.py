@@ -28,7 +28,6 @@ class GeneticAlgorithm(BaseAlgorithm):
                    "Population-based genetic algorithm. "
                    "Uniform crossover, random mutation, tournament selection.")
     compatible_problems = [
-        "BRP-Fixed",
         "CRP-Time",
         "BRP-NonFixed",
         "CRP-Prem",
@@ -144,8 +143,6 @@ class GeneticAlgorithm(BaseAlgorithm):
                                 "label": "Report every N generations"},
             "population_size": {"type": "int",   "default": 50,   "min": 10,    "max": 500,
                                 "label": "Population size"},
-            "crossover_rate":  {"type": "float", "default": 0.8,  "min": 0.1,   "max": 1.0,
-                                "label": "Crossover rate"},
             "mutation_rate":   {"type": "float", "default": 0.1,  "min": 0.001, "max": 0.5,
                                 "label": "Mutation rate"},
             "tournament_size": {"type": "int",   "default": 3,    "min": 2,     "max": 10,

@@ -1,5 +1,5 @@
 """
-BRP-Fixed baseline comparison – relocations only.
+CRP-R baseline comparison – relocations only.
 
 Compares four heuristics on the same random instances:
   - Greedy (depth-1 look-ahead)
@@ -42,9 +42,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.base_problem import ProblemConfig
 from core.objectives import lower_bound_relocations
 from core.plan import simulate_plan
-from problems.CRP_R import BRPFixed
+from problems.CRP_R import CRP_R
 
-from algorithms._shared.heuristic.greedy.algorithm     import GreedyHeuristic
 from algorithms.CRP_R.heuristic.kim_hong.scoring   import select_action as kim_select
 from algorithms.CRP_R.heuristic.lan.planner        import build_lan_plan
 from algorithms.CRP_Time.heuristic.lee_lee.phase1      import phase1_greedy
@@ -55,8 +54,8 @@ from algorithms.CRP_Time.heuristic.lee_lee.phase2      import phase2_reduce_move
 #  Per-algorithm runners (direct, no multiprocessing overhead)      #
 # ================================================================ #
 
-def run_greedy(env: BRPFixed) -> Dict:
-    """Depth-1 greedy via BRPFixed.step()."""
+def run_greedy(env: CRP_R) -> Dict:
+    """Depth-1 greedy via CRP_R.step()."""
     import copy as _copy
     obs, info = env.reset()
     done = False
@@ -79,8 +78,8 @@ def run_greedy(env: BRPFixed) -> Dict:
     return env.get_metrics()
 
 
-def run_kim_hong(env: BRPFixed) -> Dict:
-    """Kim–Hong ENAR rule via BRPFixed.step()."""
+def run_kim_hong(env: CRP_R) -> Dict:
+    """Kim–Hong ENAR rule via CRP_R.step()."""
     env.reset()
     done = False
     while not done:
@@ -91,7 +90,7 @@ def run_kim_hong(env: BRPFixed) -> Dict:
 
 
 def run_lan(
-    env:       BRPFixed,
+    env:       CRP_R,
     initial_yard,
     containers: list,
     N:          int,
@@ -103,7 +102,7 @@ def run_lan(
 
 
 def run_lee_lee_p1(
-    env:        BRPFixed,
+    env:        CRP_R,
     initial_yard,
     containers: list,
 ) -> Dict:
@@ -114,7 +113,7 @@ def run_lee_lee_p1(
 
 
 def run_lee_lee_full(
-    env:        BRPFixed,
+    env:        CRP_R,
     initial_yard,
     containers: list,
     max_no_improve: int = 200,
@@ -159,7 +158,7 @@ def run_comparison(
     # ── Header ──────────────────────────────────────────────────── #
     print()
     print("=" * 72)
-    print("  BRP-Fixed Baseline Comparison  –  Relocations only")
+    print("  CRP-R Baseline Comparison  –  Relocations only")
     print("=" * 72)
     print(f"  Config : {num_bays} bay(s) × {num_rows} rows × H={max_tiers}"
           f"  |  C={num_containers}  |  capacity={S*max_tiers}"
@@ -180,37 +179,38 @@ def run_comparison(
             seed=seed,
         )
 
-        # Shared initial state for plan-based algorithms
-        env_base = BRPFixed(cfg)
-        env_base.reset()
+        # Shared initial state for plan-based algorithms (full layout; opening
+        # retrievals stay inside RelocationPlan / evaluate_plan).
+        env_base = CRP_R(cfg)
+        env_base.reset(options={"skip_auto_retrieve": True})
         initial_yard = copy.deepcopy(env_base.yard)
         containers   = list(env_base.containers)
         lb           = lower_bound_relocations(initial_yard)
         all_lb.append(float(lb))
 
         # ── Greedy ─────────────────────────────────────────────── #
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_greedy(env)
         timing["Greedy"] += time.perf_counter() - t0
         all_relocs["Greedy"].append(m["relocations"])
 
         # ── Kim–Hong ───────────────────────────────────────────── #
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_kim_hong(env)
         timing["Kim–Hong"] += time.perf_counter() - t0
         all_relocs["Kim–Hong"].append(m["relocations"])
 
         # ── LA-1 ───────────────────────────────────────────────── #
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_lan(env, initial_yard, containers, N=1)
         timing["LA-1"] += time.perf_counter() - t0
         all_relocs["LA-1"].append(m["relocations"])
 
         # ── LA-2 ───────────────────────────────────────────────── #
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_lan(env, initial_yard, containers, N=2)
         timing["LA-2"] += time.perf_counter() - t0
@@ -219,14 +219,14 @@ def run_comparison(
         # ── LA-(S-1) ───────────────────────────────────────────── #
         N_max = max(1, S - 1)
         key_la = f"LA-(S-1) [N={N_max}]"
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_lan(env, initial_yard, containers, N=N_max)
         timing[key_la] += time.perf_counter() - t0
         all_relocs[key_la].append(m["relocations"])
 
         # ── Lee–Lee P1 ─────────────────────────────────────────── #
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_lee_lee_p1(env, initial_yard, containers)
         timing["Lee–Lee P1"] += time.perf_counter() - t0
@@ -234,7 +234,7 @@ def run_comparison(
 
         # ── Lee–Lee P1+P2 ──────────────────────────────────────── #
         key_ll = f"Lee–Lee P1+P2 [{lee_lee_p2_iters}it]"
-        env = BRPFixed(cfg)
+        env = CRP_R(cfg)
         t0  = time.perf_counter()
         m   = run_lee_lee_full(env, initial_yard, containers,
                                max_no_improve=lee_lee_p2_iters)
@@ -325,7 +325,7 @@ def run_comparison(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="BRP-Fixed baseline comparison (relocations only)",
+        description="CRP-R baseline comparison (relocations only)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--bays",       type=int,  default=1,   help="Number of yard bays")

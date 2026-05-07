@@ -1,5 +1,5 @@
 """
-Ðurasević & Ðumić (2024) — GP hyper-heuristic for CRP-Time / BRP-Fixed.
+Ðurasević & Ðumić (2024) — GP hyper-heuristic for CRP-Time / CRP-R.
 
 Reference
 ---------
@@ -13,7 +13,7 @@ Role on the platform (phase 1)
 Covers the **multi-bay, distinct-due-date, restricted** variant
 (paper §7.1, RS-only).  Same problem family as Lin 2015 / G-CREM 2020 /
 Lee–Lee 2010, so this algorithm plugs straight into ``CRP-Time`` and
-``BRP-Fixed`` with no modelling changes.
+``CRP-R`` with no modelling changes.
 
 Two further variants are intentionally deferred:
 
@@ -90,7 +90,7 @@ class Durasevic2024GP(BaseAlgorithm):
         "Terminals: SH/EMP/CUR/RI/AVG/DIFF (+ DIS/DUR for multi-bay). "
         "Phase-1 deployment: restricted RS, distinct due dates only."
     )
-    compatible_problems = ["CRP-Time", "BRP-Fixed"]
+    compatible_problems = ["CRP-Time", "CRP-R"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -122,7 +122,7 @@ class Durasevic2024GP(BaseAlgorithm):
         objective     = str  (cfg.extra.get("objective",           "auto"))
 
         # Resolve "auto" objective from the problem class name (CRP-Time family
-        # minimises crane working time; BRP-Fixed family minimises relocations)
+        # minimises crane working time; CRP-R family minimises relocations)
         if objective == "auto":
             probe_name = getattr(problem_factory(), "name", "")
             objective  = "crane_time" if "time" in probe_name.lower() else "relocations"
@@ -329,7 +329,7 @@ class Durasevic2024GP(BaseAlgorithm):
                 "label": "GP objective",
                 "help": (
                     "auto = pick by problem (CRP-Time → crane_time, "
-                    "BRP-Fixed → relocations); or set explicitly to "
+                    "CRP-R → relocations); or set explicitly to "
                     "'crane_time' / 'relocations'."
                 ),
             },

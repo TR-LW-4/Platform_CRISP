@@ -1,5 +1,5 @@
 """
-Crane kinematics model and objective functions for BRP-Fixed /
+Crane kinematics model and objective functions for CRP-R /
 Lee & Lee (2010) style crane time estimation.
 
 The KinematicsModel computes w(crane_pos, move): the time an RMGC needs

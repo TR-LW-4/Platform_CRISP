@@ -1,5 +1,5 @@
 """
-Caserta et al. (2012) HEUR heuristic for BRP-Fixed.
+Caserta et al. (2012) HEUR heuristic for CRP-R.
 
 Algorithm (Section 4, Algorithm 1)
 ------------------------------------
@@ -11,8 +11,8 @@ For each target block n = 1 … N:
   Retrieve block n
 
 Objective : minimise total RELOCATIONS.
-Interface : BRPFixed.step()  (same as Kim–Hong, Greedy).
-Compatible: BRP-Fixed only (assumption A1 — relocate only blocks
+Interface : CRP_R.step()  (same as Kim–Hong, Greedy).
+Compatible: CRP-R only (assumption A1 — relocate only blocks
             above the current target).
 
 Reference
@@ -41,13 +41,13 @@ class CasertaHeuristic(BaseAlgorithm):
     category            = "Heuristic"
     description         = (
         "[single-bay origin]  "
-        "Caserta et al. (EJOR 2012) stack-score heuristic for BRP-Fixed. "
+        "Caserta et al. (EJOR 2012) stack-score heuristic for CRP-R. "
         "Relocates blockers to the stack with the smallest min-priority "
         "greater than the blocker (good fit), or the highest min-priority "
         "if no good stack exists (delay re-relocation). "
         "Average gap to optimum ≈1.9%; outperforms Kim–Hong."
     )
-    compatible_problems = ["BRP-Fixed", "CRP-Time"]
+    compatible_problems = ["CRP-R", "CRP-Time"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

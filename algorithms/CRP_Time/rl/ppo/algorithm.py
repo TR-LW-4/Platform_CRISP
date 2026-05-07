@@ -23,7 +23,7 @@ class PPO(BaseAlgorithm):
                    "Proximal Policy Optimization (clipped objective). "
                    "Actor-critic architecture with GAE advantage estimation.")
     compatible_problems = [
-        "BRP-Fixed",
+        "CRP-R",
         "CRP-Time",
         "BRP-NonFixed",
         "CRP-Prem",

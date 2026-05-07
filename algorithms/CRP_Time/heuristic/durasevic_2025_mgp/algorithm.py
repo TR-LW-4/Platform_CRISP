@@ -13,7 +13,7 @@ Role on the platform (phase 1)
 Continuation of the 2024 single-task GP baseline.  This implementation
 covers the paper's **four scenarios that do NOT require new problem
 classes** — they can all be built from the existing ``CRP-Time`` /
-``BRP-Fixed`` families just by varying the ``ProblemConfig``:
+``CRP-R`` families just by varying the ``ProblemConfig``:
 
 * ``max_tiers``  (paper Scenario 1)  — subpops differ in stack-height cap.
 * ``objective``  (paper Scenario 3)  — one subpop optimises relocations,
@@ -274,7 +274,7 @@ class Durasevic2025MGP(BaseAlgorithm):
         "max_tiers / objective / layout / load.  The 'objective' scenario "
         "reproduces the paper's Table 7 gain on crane_time."
     )
-    compatible_problems = ["CRP-Time", "BRP-Fixed"]
+    compatible_problems = ["CRP-Time"]
     step_label          = "Subpop-seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

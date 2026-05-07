@@ -33,10 +33,10 @@ from .phase3 import phase3_reduce_time
 
 class LeeLeeRetrievalHeuristic(BaseAlgorithm):
     """
-    Three-phase retrieval heuristic (Lee & Lee, COR 2010) for BRP-Fixed.
+    Three-phase retrieval heuristic (Lee & Lee, COR 2010).
 
-    Produces a complete RelocationPlan and evaluates it with
-    BRPFixed.evaluate_plan() for rich metrics (relocations + crane_time).
+    Builds a complete RelocationPlan; reported metrics include relocations
+    and crane_time (Phase 3 shortens RMGC time without increasing move count).
     """
 
     name                = "Lee–Lee (2010) Retrieval"
@@ -48,7 +48,7 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
         "Phase 2: iterative path shortening (move reduction).  "
         "Phase 3: crane-time reduction via alternate waypoints."
     )
-    compatible_problems = ["BRP-Fixed", "CRP-Time"]
+    compatible_problems = ["CRP-R", "CRP-Time"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -83,13 +83,14 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
 
             env = problem_factory()
             env.config.seed = seed
-            env.reset()
+            env.reset(options={"skip_auto_retrieve": True})
 
             kin          = KinematicsModel.from_config_extra(env.config.extra)
             initial_yard = copy.deepcopy(env.yard)
             containers   = list(env.containers)
             max_tiers    = env.config.max_tiers
             n_containers = env.config.num_containers
+            env._finish_reset_after_layout_loaded()
             lb           = lower_bound_relocations(initial_yard)
 
             # ── Phase 1 ──────────────────────────────────────────── #
@@ -229,8 +230,8 @@ def _plan_metrics(
 
 def _plan_to_action_list(plan: RelocationPlan, env) -> List[int]:
     """
-    Convert a RelocationPlan to flat action indices for BRPFixed.step().
-    Retrieval moves (to_pos=None) are skipped – BRPFixed auto-retrieves.
+    Convert a RelocationPlan to flat action indices for the environment ``step()``.
+    Retrieval moves (to_pos=None) are skipped — the env applies auto-retrieval when the target is on top.
     """
     num_rows = env.config.num_rows
     actions  = []

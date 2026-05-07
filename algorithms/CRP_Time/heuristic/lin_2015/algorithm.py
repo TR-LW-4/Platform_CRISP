@@ -1,5 +1,5 @@
 """
-Lin, Lee & Lee (2015) priority-rule heuristic for CRP-Time / BRP-Fixed.
+Lin, Lee & Lee (2015) priority-rule heuristic for CRP-Time / CRP-R.
 
 Reference
 ---------
@@ -12,7 +12,7 @@ Role on the platform
 Main target problem: ``CRP-Time`` (multi-bay RMGC, Lee & Lee kinematics).
 Shin et al. (TRC 2026) use this rule — with ``P_r = 30`` and
 ``P_b = 300`` — as the strongest classical baseline for the CRP.  The
-degenerate ``num_bays = 1`` case makes it usable on ``BRP-Fixed`` too.
+degenerate ``num_bays = 1`` case makes it usable on ``CRP-R`` too.
 
 Per-step decision flow (see ``scoring.lin_select_action``)
 ----------------------------------------------------------
@@ -50,9 +50,9 @@ class Lin2015Heuristic(BaseAlgorithm):
         "Composite score per candidate destination: "
         "P_b·(not-well-placed) + P_r·severity + carry-time "
         "(Lee–Lee RMGC kinematics).  Defaults P_r=30, P_b=300 follow "
-        "Shin et al. (TRC 2026).  Also usable on BRP-Fixed (single-bay)."
+        "Shin et al. (TRC 2026).  Also usable on CRP-R (single-bay)."
     )
-    compatible_problems = ["CRP-Time", "BRP-Fixed"]
+    compatible_problems = ["CRP-Time", "CRP-R"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

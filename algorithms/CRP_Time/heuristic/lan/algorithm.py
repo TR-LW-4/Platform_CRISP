@@ -1,5 +1,5 @@
 """
-LA-N look-ahead heuristic for BRP-Fixed (Petering & Hussein, EJOR 2013).
+LA-N look-ahead heuristic for CRP-R (Petering & Hussein, EJOR 2013).
 
 Algorithm family
 ----------------
@@ -11,12 +11,12 @@ LA-N  (N > 1)  extends LA-1 with cleaning moves: containers on top of any
 Objective
 ---------
 Minimise total RELOCATIONS  (= total moves − C retrievals).
-Directly comparable with Kim–Hong (2006) and Lee–Lee (2010) on BRP-Fixed.
+Directly comparable with Kim–Hong (2006) and Lee–Lee (2010) on CRP-R.
 
 Implementation notes
 --------------------
-- Uses RelocationPlan + evaluate_plan() interface (same as Lee–Lee).
-  No changes to BRPFixed.step() required.
+- Uses RelocationPlan + CRP_R.step(); metrics report relocations, retrievals,
+  and total moves only (no crane-time model).
 - N is a GUI-configurable parameter; defaults to 2 (good for most sizes).
 - The algorithm is deterministic: different seeds produce different initial
   yard layouts, so multi-seed evaluation gives a fair average.
@@ -31,14 +31,14 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from core.objectives import KinematicsModel, compute_crane_time, lower_bound_relocations
+from core.objectives import lower_bound_relocations
 from core.plan import RelocationPlan
 from .planner import build_lan_plan
 
 
 class LANHeuristic(BaseAlgorithm):
     """
-    Look-Ahead N (LA-N) heuristic for BRP-Fixed.
+    Look-Ahead N (LA-N) heuristic for CRP-R.
 
     Petering & Hussein (2013) show LA-N consistently outperforms
     Kim–Hong (2006) and Lee–Lee (2010) on relocation count
@@ -49,12 +49,12 @@ class LANHeuristic(BaseAlgorithm):
     category            = "Heuristic"
     description         = (
         "[single-bay origin]  "
-        "Look-Ahead N heuristic for BRP-Fixed (Petering & Hussein, EJOR 2013).  "
+        "Look-Ahead N heuristic for CRP-R (Petering & Hussein, EJOR 2013).  "
         "N=1: basic LA (no cleaning moves).  "
         "N>1: proactive cleaning moves for the next N targets.  "
         "Generally outperforms Kim–Hong and Lee–Lee on relocations."
     )
-    compatible_problems = ["BRP-Fixed", "CRP-Time"]
+    compatible_problems = ["CRP-R", "CRP-Time"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -83,19 +83,19 @@ class LANHeuristic(BaseAlgorithm):
 
             env = problem_factory()
             env.config.seed = rng_seed + seed_idx
-            env.reset()
+            env.reset(options={"skip_auto_retrieve": True})
 
-            kin          = KinematicsModel.from_config_extra(env.config.extra)
             initial_yard = copy.deepcopy(env.yard)
             containers   = list(env.containers)
             max_tiers    = env.config.max_tiers
             n_containers = env.config.num_containers
+            env._finish_reset_after_layout_loaded()
             lb           = lower_bound_relocations(initial_yard)
 
             # Build plan with LA-N
             plan = build_lan_plan(initial_yard, containers, N, max_tiers)
 
-            metrics = _plan_metrics(plan, kin, lb)
+            metrics = _plan_metrics(plan, lb)
             all_metrics.append(metrics)
             primary = float(plan.num_relocations())
 
@@ -169,29 +169,21 @@ class LANHeuristic(BaseAlgorithm):
 #  Private helpers                                                   #
 # ================================================================ #
 
-def _plan_metrics(
-    plan:      RelocationPlan,
-    kin:       KinematicsModel,
-    lb_relocs: int,
-) -> Dict:
-    n_relocs   = plan.num_relocations()
-    crane_time = compute_crane_time(plan, kin)
+def _plan_metrics(plan: RelocationPlan, lb_relocs: int) -> Dict:
+    n_relocs = plan.num_relocations()
     return {
-        "relocations": float(n_relocs),
-        "crane_time":  crane_time,
-        "total_moves": float(plan.num_moves()),
-        "lower_bound": float(lb_relocs),
-        "lb_ratio":    float(n_relocs / max(lb_relocs, 1)),
-        # aliases for GUI
-        "time":  crane_time,
-        "steps": float(plan.num_moves()),
+        "relocations":  float(n_relocs),
+        "retrievals":   float(plan.num_retrievals()),
+        "total_moves":  float(plan.num_moves()),
+        "lower_bound":  float(lb_relocs),
+        "lb_ratio":     float(n_relocs / max(lb_relocs, 1)),
     }
 
 
 def _plan_to_action_list(plan: RelocationPlan, env) -> List[int]:
     """
-    Convert plan to flat destination-stack indices for BRPFixed.step().
-    Retrieval moves (to_pos=None) are skipped – BRPFixed auto-retrieves.
+    Convert plan to flat destination-stack indices for CRP_R.step().
+    Retrieval moves (to_pos=None) are skipped – CRP_R auto-retrieves.
     """
     num_rows = env.config.num_rows
     actions  = []

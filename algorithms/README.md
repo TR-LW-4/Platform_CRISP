@@ -10,22 +10,26 @@ problem, or as a symlink for cross-problem support).
 ```
 algorithms/
 ├── _shared/                  # universal algorithms (physical home)
-│   ├── heuristic/greedy/
 │   ├── evolutionary/genetic/
 │   └── rl/{ppo,reinforce}/
 │
-├── CRP_R/                # fixed-order yard retrieval (BRP-Fixed / CRP-R)
+├── CRP_D/                # duplicate-group stowage (CRP-D scaffold)
 │   ├── heuristic/
-│   │   ├── kim_hong/         ← physical (original paper = single-bay BRP)
+│   │   └── glah/             ← physical (Jin 2015 GLAH — CRP-D packaging)
+│   └── exact/
+│       ├── tanaka/            ← physical (Tanaka 2016 CRP-D adapter)
+│       └── tanaka_2018/       ← physical (Tanaka 2018 CRP-D adapter)
+│
+├── CRP_R/                # fixed-order yard retrieval (CRP-R problem family)
+│   ├── heuristic/
+│   │   ├── kim_hong/         ← physical (original paper = single-bay CRP-R)
 │   │   ├── caserta/          ← physical
 │   │   ├── lan/              ← physical
-│   │   ├── glah/             ← physical
-│   │   ├── lee_lee/          → symlink to CRP_Time/heuristic/lee_lee
 │   │   ├── lin_2015/         → symlink
-│   │   ├── cifuentes_riff_2020/  → symlink
-│   │   ├── durasevic_2024/   → symlink
-│   │   ├── durasevic_2025_mgp/   → symlink
-│   │   └── greedy/           → symlink to _shared
+│   │   └── durasevic_2024/   → symlink
+│   ├── exact/
+│   │   ├── tanaka/            ← physical (Tanaka 2016 B&B + vendor C)
+│   │   └── tanaka_2018/       ← physical (Tanaka 2018 B&B + vendor C)
 │   ├── evolutionary/genetic/ → symlink
 │   └── rl/{ppo,reinforce}/   → symlinks
 │
@@ -39,13 +43,15 @@ algorithms/
 │   │   ├── kim_hong/         → symlink to CRP_R
 │   │   ├── caserta/          → symlink
 │   │   ├── lan/              → symlink
-│   │   ├── glah/             → symlink
-│   │   └── greedy/           → symlink to _shared
+│   │   └── glah/             ← physical (CRP-Time packaging; sync with CRP_D / CRP_U)
 │   ├── evolutionary/genetic/ → symlink
 │   └── rl/{ppo,reinforce}/   → symlinks
 │
-├── brp_nonfixed/             # free-order BRP (only universal algos for now)
-│   ├── heuristic/greedy/     → symlink
+├── CRP_U/                # free-order CRP (same env as BRP-NonFixed)
+│   └── heuristic/
+│       └── glah/             ← physical (Jin 2015 GLAH — CRP-U packaging)
+│
+├── brp_nonfixed/             # free-order BRP (GA / RL only; see also CRP_U/)
 │   ├── evolutionary/genetic/ → symlink
 │   └── rl/{ppo,reinforce}/   → symlinks
 │
@@ -61,7 +67,7 @@ algorithms/
   algorithm's `compatible_problems`.  No file duplication, no sync
   trouble.
 * **`_shared/`** holds algorithms that are not tied to any specific
-  problem (Greedy, GA, PPO, REINFORCE).  They appear under **every**
+  problem (GA, PPO, REINFORCE).  They appear under **every**
   problem dir via symlink.
 * **`core/gp/`** (not inside `algorithms/`) hosts the platform-level
   GP engine (tree, operators, CRP terminals, restricted RS).  Any GP

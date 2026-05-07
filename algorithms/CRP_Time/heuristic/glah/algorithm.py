@@ -1,5 +1,5 @@
 """
-GLAH – Greedy Look-Ahead Heuristic for BRP-Fixed.
+GLAH – Greedy Look-Ahead Heuristic for CRP-R.
 
 Port of MainProcess.java + Probing.java (Bo Jin, 2015).
 Reference: Jin, Zhu & Lim, EJOR 240 (2015) 837–847.
@@ -17,14 +17,20 @@ Phase 3: Record best solution found during Phase 2 (updated whenever
 
 Platform interface
 ------------------
-Compatible with BRP-Fixed.
+Packaged for **CRP-Time** (crane-time objective).  Same port as CRP-D / CRP-U
+GLAH copies; registry keys differ so all can load.
+
 Uses GlahLayout internally; outputs RelocationPlan via evaluate_plan().
+
+NOTE:  Keep in sync with ``algorithms/CRP_U/heuristic/glah`` and
+``algorithms/CRP_D/heuristic/glah`` or symlink.
 """
 
 from __future__ import annotations
 
 import copy
 import multiprocessing as mp
+import os
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
@@ -42,23 +48,22 @@ from .lookahead import Lookahead
 
 class GLAHHeuristic(BaseAlgorithm):
     """
-    Greedy Look-Ahead Heuristic (Jin, Zhu & Lim 2015) for BRP-Fixed.
+    Greedy Look-Ahead Heuristic (Jin, Zhu & Lim 2015) for CRP-R.
 
     Significantly outperforms Kim–Hong and Caserta on large instances.
     Uses a limited look-ahead tree (depth D) to choose the next relocation,
     guided by an evaluation heuristic at each leaf.
     """
 
-    name                = "Jin (2015) GLAH"
+    name                = "Jin (2015) GLAH (CRP-Time)"
     category            = "Heuristic"
     description         = (
-        "[single-bay origin]  "
-        "Greedy Look-Ahead Heuristic for BRP-Fixed (Jin, Zhu & Lim, EJOR 2015). "
+        "[CRP-Time packaging] [single-bay origin]  "
+        "Greedy Look-Ahead Heuristic for CRP-R (Jin, Zhu & Lim, EJOR 2015). "
         "Classifies relocations into 6 types, builds a depth-D look-ahead tree, "
-        "and uses an evaluation heuristic at leaves. "
-        "Outperforms Kim–Hong and Caserta on most instance sizes."
+        "and uses an evaluation heuristic at leaves."
     )
-    compatible_problems = ["BRP-Fixed", "CRP-Time"]
+    compatible_problems = ["CRP-Time", "CRP-R"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -108,6 +113,11 @@ class GLAHHeuristic(BaseAlgorithm):
             state = GlahState(glah_layout.copy())
             evaluation_heuristic(state)
             # best is now set inside state
+            if _should_print_plan(cfg):
+                p1_ops = state.best_ops or state.ops
+                if p1_ops:
+                    plan_p1 = ops_to_relocation_plan(p1_ops, glah_layout)
+                    _print_plan_moves(plan_p1, "Phase-1 plan (after evaluation_heuristic)")
 
             # ── Phase 2: greedy + look-ahead ─────────────────────── #
             la    = Lookahead(depth, ftbg_n, nfbg_n, ftbb_n, nfbb_n, gg_n, gb_n)
@@ -117,17 +127,33 @@ class GLAHHeuristic(BaseAlgorithm):
 
             state2.try_retrievals()
 
+            step_i = 0
             while not state2.is_empty():
                 lb_now = lower_bound(state2.inst)
                 if lb_now + state2.reloc_count >= state2.best_reloc:
+                    print(
+                        "[GLAH] phase2 stop: LB prune  "
+                        f"lb_now={lb_now}  reloc_count={state2.reloc_count}  "
+                        f"best_reloc={state2.best_reloc}",
+                        flush=True,
+                    )
                     break
                 if stop_event.is_set():
                     break
 
                 op = la.most_promising_relocation(state2)
                 if op is None:
+                    print("[GLAH] phase2 stop: no relocation candidate", flush=True)
                     break
+
                 state2.go_one_step(op)
+                step_i += 1
+                kind = "reloc" if op.is_relocation else "retrieve"
+                print(
+                    f"[GLAH] step={step_i}  {kind}  from_stack={op.from_s}  to={op.to_s}  "
+                    f"prior={op.gc.priority}  reloc_count={state2.reloc_count}",
+                    flush=True,
+                )
                 state2.try_retrievals()
 
             # ── Phase 3: collect best solution ───────────────────── #
@@ -140,6 +166,8 @@ class GLAHHeuristic(BaseAlgorithm):
                 best_reloc = state2.reloc_count
 
             plan = ops_to_relocation_plan(best_ops, glah_layout)
+            if _should_print_plan(cfg):
+                _print_plan_moves(plan, "Final plan (metrics / export)")
 
             metrics = _plan_metrics(plan, kin, lb_val)
             all_metrics.append(metrics)
@@ -226,6 +254,11 @@ class GLAHHeuristic(BaseAlgorithm):
                 "type": "int", "default": 1, "min": 0, "max": 10,
                 "label": "GB candidates",
             },
+            "glah_print_plan": {
+                "type": "bool", "default": False,
+                "label": "Print full movement sequence",
+                "help": "Print Phase-1 and final RelocationPlan step lists (or set env GLAH_PRINT_PLAN=1).",
+            },
         })
         return base
 
@@ -233,6 +266,29 @@ class GLAHHeuristic(BaseAlgorithm):
 # ================================================================ #
 #  Private helpers                                                  #
 # ================================================================ #
+
+def _should_print_plan(cfg: AlgorithmConfig) -> bool:
+    v = (cfg.extra or {}).get("glah_print_plan")
+    if v is True:
+        return True
+    if isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    return os.environ.get("GLAH_PRINT_PLAN", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _print_plan_moves(plan, header: str) -> None:
+    """Human-readable list of Movement rows (stdout, flushed)."""
+    n_m = plan.num_moves()
+    n_r = plan.num_relocations()
+    print(
+        f"[GLAH] {header}  ({n_m} moves, {n_r} relocations)",
+        flush=True,
+    )
+    for i, m in enumerate(plan.movements, start=1):
+        print(f"  [{i:4d}]  {m!r}", flush=True)
+
 
 def _plan_metrics(plan, kin: KinematicsModel, lb: int) -> Dict:
     from core.plan import RelocationPlan
@@ -250,7 +306,7 @@ def _plan_metrics(plan, kin: KinematicsModel, lb: int) -> Dict:
 
 
 def _plan_to_action_list(plan, env) -> List[int]:
-    """Convert RelocationPlan → flat action indices for BRPFixed.step()."""
+    """Convert RelocationPlan → flat action indices for CRP_R.step()."""
     num_rows = env.config.num_rows
     actions  = []
     for m in plan.movements:

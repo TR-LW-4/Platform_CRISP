@@ -43,9 +43,23 @@ European Journal of Operational Research 231 (2013) 120–130.
 from __future__ import annotations
 
 import copy
-from typing import Dict, List, Optional, Set, Tuple
+import os
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
+from core.layout_trace import trace_lan
 from core.plan import Movement, RelocationPlan
+
+
+def _yard_compact(sim) -> str:
+    """Bottom→top priorities per nonempty stack (for tracing)."""
+    parts: List[str] = []
+    for pos in sorted(sim.stacks.keys()):
+        stk = sim.stacks[pos]
+        if stk.is_empty:
+            continue
+        pris = [c.priority for c in stk.containers]
+        parts.append(f"{pos}:{pris}")
+    return " | ".join(parts) if parts else "<empty>"
 
 
 # ================================================================ #
@@ -142,6 +156,7 @@ def _auto_retrieve(
     remaining:    List[int],
     priority_map: Dict[int, object],
     plan:         RelocationPlan,
+    log_move: Optional[Callable[[str], None]] = None,
 ) -> None:
     """
     Step 1: retrieve every target that is already on top of its stack.
@@ -156,6 +171,12 @@ def _auto_retrieve(
         stk.pop()
         plan.add(Movement(container_id=target.id, from_pos=from_pos, to_pos=None))
         remaining.pop(0)
+        if log_move is not None:
+            nxt = remaining[0] if remaining else None
+            log_move(
+                f"RETRIEVE id={target.id} priority={target.priority} "
+                f"from={from_pos} next_target_pri={nxt}"
+            )
 
 
 def _shrink_N_prime(
@@ -214,6 +235,21 @@ def build_lan_plan(
     remaining: List[int]            = sorted(priority_map.keys())
     all_stacks: Set[Tuple[int, int]] = set(sim.stacks.keys())
 
+    trace_on = bool(os.environ.get("CRISP_TRACE_LAN"))
+    seq: List[int] = [0]
+
+    def log_move(msg: str) -> None:
+        if not trace_on:
+            return
+        seq[0] += 1
+        trace_lan(f"#{seq[0]} {msg} | stacks={_yard_compact(sim)}")
+
+    if trace_on:
+        trace_lan(
+            f"build_lan_plan start N={N} max_tiers={max_tiers} "
+            f"n_containers={len(containers)} | {_yard_compact(sim)}"
+        )
+
     # Safety cap: at most C*(C+1) moves before declaring failure
     max_moves = len(containers) * (len(containers) + 1)
     move_count = 0
@@ -221,7 +257,7 @@ def build_lan_plan(
     while remaining and move_count < max_moves:
 
         # ── Step 1: auto-retrieve accessible targets ──────────────── #
-        _auto_retrieve(sim, remaining, priority_map, plan)
+        _auto_retrieve(sim, remaining, priority_map, plan, log_move=log_move)
         if not remaining:
             break
 
@@ -232,6 +268,12 @@ def build_lan_plan(
             remaining.pop(0)
             continue
         s_star = (target_stk.bay, target_stk.row)
+
+        if trace_on:
+            trace_lan(
+                f"--- outer-loop target_pri={target.priority} "
+                f"s*={s_star} remaining_cnt={len(remaining)}"
+            )
 
         # ── Step 2: N' = min(N, |remaining|) ─────────────────────── #
         N_prime   = min(N, len(remaining))
@@ -261,6 +303,10 @@ def build_lan_plan(
                 dst = _choose_dst(sim, D, max_tiers, n_pos)
                 plan.add(Movement(container_id=n.id, from_pos=n_pos, to_pos=dst))
                 sim.relocate(n_pos, dst)
+                log_move(
+                    f"RELOC target-blocker id={n.id} priority={n.priority} "
+                    f"{n_pos}->{dst}"
+                )
                 moved = True
                 break
 
@@ -276,6 +322,10 @@ def build_lan_plan(
                 dst = _choose_dst(sim, E, max_tiers, n_pos)
                 plan.add(Movement(container_id=n.id, from_pos=n_pos, to_pos=dst))
                 sim.relocate(n_pos, dst)
+                log_move(
+                    f"RELOC cleaning id={n.id} priority={n.priority} "
+                    f"{n_pos}->{dst}"
+                )
                 moved = True
                 break
 
@@ -288,8 +338,18 @@ def build_lan_plan(
                 dst = _choose_dst(sim, D, max_tiers, s_star)
                 plan.add(Movement(container_id=n.id, from_pos=s_star, to_pos=dst))
                 sim.relocate(s_star, dst)
+                log_move(
+                    f"RELOC fallback id={n.id} priority={n.priority} "
+                    f"{s_star}->{dst}"
+                )
                 move_count += 1
         else:
             move_count += 1
+
+    if trace_on:
+        trace_lan(
+            f"build_lan_plan done n_trace_steps={seq[0]} "
+            f"plan_moves={plan.num_moves()} remaining={remaining!r}"
+        )
 
     return plan

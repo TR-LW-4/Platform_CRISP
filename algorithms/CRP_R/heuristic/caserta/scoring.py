@@ -39,7 +39,7 @@ def caserta_select_action(env, mask: Optional[np.ndarray] = None) -> int:
     Pick the destination stack index for the current topmost blocker
     using Caserta et al. (2012) Eq. (11).
 
-    Returns a flat action index compatible with BRPFixed.step().
+    Returns a flat action index compatible with CRP_R.step().
     """
     if mask is None:
         mask = env._get_info().get("action_mask")

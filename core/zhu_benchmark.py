@@ -118,5 +118,26 @@ def collect_paths_from_zhu_queue(
 
 
 def problem_config_for_zhu_txt(dat_path: Path, prob_params_no_geom: Dict[str, Any]):
-    """Build ``ProblemConfig`` from a Zhu ``.txt`` file (same layout encoding as Caserta)."""
-    return problem_config_for_caserta_dat(dat_path, prob_params_no_geom)
+    """
+    Build ``ProblemConfig`` from a Zhu ``.txt`` file (same layout encoding as Caserta).
+
+    When the file lives under a subdirectory named ``H-S-N``, tier capacity is at least
+    ``H + 2`` (literature height label **H**), matching Caserta Set-1 style slack. This
+    avoids an overly tight ``max_tiers`` when ``implied_tier_capacity`` falls back to the
+    physical stack height only (e.g. ``N % S != 0``).
+    """
+    from core.layout_trace import trace_layout
+
+    cfg = problem_config_for_caserta_dat(dat_path, prob_params_no_geom)
+    parsed = parse_zhu_folder_name(dat_path.parent.name)
+    if parsed is None:
+        return cfg
+    h_label, _, _ = parsed
+    floor = h_label + 2
+    if cfg.max_tiers < floor:
+        trace_layout(
+            "problem_config_for_zhu_txt → bump max_tiers "
+            f"{cfg.max_tiers} → {floor} (folder label H={h_label}, use H+2)"
+        )
+        cfg.max_tiers = floor
+    return cfg

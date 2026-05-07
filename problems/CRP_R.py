@@ -18,11 +18,14 @@ Action      : destination stack index (bay×row, flattened) for the
 Reward      : 0 at each step; −1 terminal penalty per relocation.
              (dense variant: −1 every relocation during episode)
 
-Plan interface (for batch planning algorithms, e.g. Lee & Lee 2010)
---------------------------------------------------------------------
+Plan interface (for batch planners building RelocationPlan)
+-----------------------------------------------------------
 evaluate_plan(plan: RelocationPlan) → metrics dict
   Simulates a complete RelocationPlan on a fresh episode and returns
   relocations, crane_time (if kinematics configured), and other metrics.
+  Reset uses ``options={"skip_auto_retrieve": True}`` so simulation starts
+  from the full layout file / random placement (opening top-target retrieves
+  appear in the plan, matching batch planners).
   Kinematics parameters are read from ProblemConfig.extra:
     gantry_s_per_bay  (default 3.5 s)
     trolley_s_per_row (default 1.2 s)
@@ -110,6 +113,14 @@ class CRP_R(BaseProblem):
         seed: Optional[int] = None,
         options: Optional[Dict] = None,
     ) -> Tuple[np.ndarray, Dict]:
+        """
+        Gymnasium reset.
+
+        ``options["skip_auto_retrieve"]``: when truthy, the yard keeps **all**
+        containers after layout load (opening retrieves remain explicit in batch
+        plans). Typical batch workflow: ``reset(..., skip)``, clone ``yard``,
+        then ``_finish_reset_after_layout_loaded()`` for RL-aligned snapshots.
+        """
         super().reset(seed=seed)
         if seed is not None:
             self.config.seed = seed
@@ -121,6 +132,13 @@ class CRP_R(BaseProblem):
         self._hooks_clear_episode()
 
         self._build_episode()
+        opts = options if options is not None else {}
+        if opts.get("skip_auto_retrieve"):
+            # Full yard for batch planners; consecutive top-target retrieves stay in-plan.
+            self._current_target_priority = 1
+            obs  = self._get_obs()
+            info = self._get_info()
+            return obs, info
         return self._finish_reset_after_layout_loaded()
 
     def _finish_reset_after_layout_loaded(self) -> Tuple[np.ndarray, Dict]:
@@ -130,11 +148,6 @@ class CRP_R(BaseProblem):
         then expose observation — same end state as before this refactor.
         """
         self._current_target_priority = 1
-
-        import sys
-
-        print("=== 123 ===")
-        print(self.yard)
 
         self._advance_auto_retrievals()
 
@@ -351,7 +364,7 @@ class CRP_R(BaseProblem):
         dict with keys: relocations, crane_time, total_moves, lower_bound,
                         lb_ratio, steps, feasible
         """
-        self.reset()
+        self.reset(options={"skip_auto_retrieve": True})
         kin    = KinematicsModel.from_config_extra(self.config.extra)
         result = simulate_plan(self.yard, plan, self.config.max_tiers)
         lb     = lower_bound_relocations(self.yard)
@@ -404,7 +417,3 @@ class CRP_R(BaseProblem):
             },
         })
         return schema
-
-
-# Backwards-compatible alias (experiments / legacy imports)
-BRPFixed = CRP_R
