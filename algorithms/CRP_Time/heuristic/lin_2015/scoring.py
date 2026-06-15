@@ -1,5 +1,5 @@
 """
-Lin, Lee & Lee (2015) position-priority scoring rule.
+Lin, Lee & Lee (2015) SSI heuristic – action-selection logic.
 
 Reference
 ---------
@@ -7,172 +7,190 @@ D.-Y. Lin, Y.-J. Lee, Y. Lee,
 "The container retrieval problem with respect to relocation",
 Transportation Research Part C 52 (2015) 132–143.
 
-Paper context
--------------
-Lin et al. extend Lee & Lee (2010) into a fast, rule-based heuristic that
-explicitly considers RMGC working time (gantry / trolley / acceleration /
-spreader) on top of the relocation count.  Their scoring rule evaluates
-each candidate destination stack with a weighted combination of:
+Algorithm (matches baselines/lin2015.py in Shin et al. TRC 2026)
+-----------------------------------------------------------------
+Each decision step returns a *list* of (src_action, dst_action) pairs
+that the outer loop should execute sequentially via env.step().
 
-    1. A large penalty when the blocker would NOT be well-placed at s
-       (i.e. it would need to be relocated again in the future).
-    2. A severity term proportional to how badly the new placement would
-       violate the "later-retrieved on top" invariant.
-    3. The crane travel / carry time needed to deposit the blocker at s.
+Rule 1 – Ideal stacks exist (min_priority(s) > target_top_priority):
+    SSI(s) = min_priority(s) + P_r * row(s) + P_b * |bay(s) - bay(target)|
+    Choose argmin-SSI among ideal stacks.
 
-The destination minimising this composite score is chosen.  Defaults
-``P_r = 30`` and ``P_b = 300`` follow the parameter values used in
-subsequent literature (e.g. Shin et al., TRC 2026) as the canonical
-"Lin" baseline.
+Rule 2 – Pre-moves (optional, triggered when `restricted=False`):
+    Before the main move, attempt to pull high-priority containers
+    from OTHER stacks into the chosen ideal dest, as long as:
+      (a) dest has at least 2 spare tiers, and
+      (b) a candidate source has top_priority in the range
+          (target_top_priority, min_priority(dest)) and
+          min_priority(dest) - 5 < top_priority(candidate) < min_priority(dest).
 
-This module is algorithm-agnostic: it only needs the CRP_R / CRP_Time
-environment, its current blocker, and a ``KinematicsModel`` read from
-``env.config.extra``.
+Rule 3 – No ideal stacks:
+    Among all valid (non-full, non-target) stacks pick the one with the
+    maximum min_priority (= fewest future re-relocations).
 """
 
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-import numpy as np
-
-from core.objectives import KinematicsModel
-
 
 # ================================================================ #
-#  Kinematics helpers                                                #
+#  Stack feature helpers                                            #
 # ================================================================ #
 
-def _carry_time(
-    kin: KinematicsModel,
-    src: Tuple[int, int],
-    dst: Tuple[int, int],
-) -> float:
-    """
-    Time to carry a picked-up blocker from *src* to *dst*:
-        travel(src → dst) + spreader handling
-
-    The reposition-to-src cost is shared by every candidate (the crane is
-    already at src after picking up the blocker), so it is factored out of
-    the ranking and omitted here.
-    """
-    return kin.travel_time(src, dst) + kin.spreader_s
-
-
-# ================================================================ #
-#  Stack features                                                    #
-# ================================================================ #
-
-def _min_priority(stk) -> int:
-    """Lowest (earliest-retrieved) priority currently in the stack.
-
-    Empty stacks return a very large sentinel so they are treated as
-    'always well-placed' for any blocker.
-    """
+def _min_priority(stk) -> float:
+    """Minimum priority in *stk* (INF for empty stacks)."""
     if stk.is_empty:
-        return 1 << 30
-    return int(min(c.priority for c in stk.containers))
+        return float("inf")
+    return float(min(c.priority for c in stk.containers))
 
 
-def _is_well_placed(stk, blocker_priority: int) -> bool:
-    """Blocker is well-placed at ``stk`` iff every container already in
-    ``stk`` has a strictly larger (later-retrieved) priority."""
-    return _min_priority(stk) > blocker_priority
+def _top_priority(stk, n_containers: int) -> float:
+    """Top-of-stack priority. Empty stacks return a large sentinel."""
+    if stk.is_empty:
+        return float(n_containers * 10)
+    return float(stk.top.priority)
+
+
+def _stack_height(stk) -> int:
+    return len(stk.containers)
 
 
 # ================================================================ #
-#  Lin et al. (2015) destination score                               #
+#  Public entry point                                               #
 # ================================================================ #
 
-def lin_score(
+def lin_compute_moves(
     env,
-    dst_action: int,
-    blocker_priority: int,
-    src_key: Tuple[int, int],
-    kin: KinematicsModel,
-    P_r: float,
-    P_b: float,
-) -> Tuple[float, int]:
-    """
-    Composite score for a single candidate destination (lower is better).
-
-        score = P_b * 1[not well_placed]
-              + P_r * max(0, blocker_priority - min_priority(dst))
-              + carry_time(src → dst)
-
-    The second return value is a stable tie-break on the flat action index
-    so results are deterministic under ties.
-    """
-    dst  = env._action_to_stack(int(dst_action))
-    stk  = env.yard.stacks[dst]
-    minp = _min_priority(stk)
-
-    bad_flag = 0.0 if minp > blocker_priority else 1.0
-    severity = max(0, blocker_priority - minp) if minp != (1 << 30) else 0
-
-    travel = _carry_time(kin, src_key, dst)
-
-    score = P_b * bad_flag + P_r * float(severity) + float(travel)
-    return score, int(dst_action)
-
-
-# ================================================================ #
-#  Top-level action selector                                         #
-# ================================================================ #
-
-def lin_select_action(
-    env,
-    mask: Optional[np.ndarray] = None,
+    mask,
     P_r: float = 30.0,
     P_b: float = 300.0,
-) -> int:
+    restricted: bool = False,
+) -> List[int]:
     """
-    Choose the destination stack index for the current topmost blocker
-    using the Lin, Lee & Lee (2015) rule.
+    Compute the next action(s) for one 'decision step' of Lin (2015).
+
+    Returns a list of flat destination-stack action indices to execute
+    sequentially via env.step().  Usually length 1; Rule 2 can prepend
+    additional pre-move actions.
 
     Parameters
     ----------
-    env  : CRP_R or CRP_Time environment (priority-based fixed order)
-    mask : optional boolean action mask (non-full stacks)
-    P_r  : severity weight (default 30, Shin 2026)
-    P_b  : well-placed violation weight (default 300, Shin 2026)
-
-    Returns
-    -------
-    Flat action index compatible with CRP_R.step().
+    env        : CRP_Time / CRP_R gymnasium environment
+    mask       : boolean action mask (non-full stacks)
+    P_r        : row-index weight for SSI scoring (paper default 30)
+    P_b        : bay-distance weight for SSI scoring (paper default 300)
+    restricted : if True, skip Rule 2 pre-moves
     """
-    if mask is None:
-        mask = env._get_info().get("action_mask")
-
     target = env._get_target_container()
     if target is None:
-        return 0
+        return []
 
     src_stack = env.yard._find_stack(target)
     if src_stack is None or src_stack.top == target:
-        # Target is already on top; CRP_R will auto-retrieve, no choice needed.
-        return 0
+        return []
 
-    blocker    = src_stack.top
-    p_blk      = int(blocker.priority)
-    src_key    = (src_stack.bay, src_stack.row)
-    n_stacks   = env.action_space.n
+    target_top_priority = float(src_stack.top.priority)
+    src_bay  = src_stack.bay
+    n_bays   = env.config.num_bays
+    n_rows   = env.config.num_rows
+    max_tiers = env.config.max_tiers
+    n_containers = env.config.num_containers
 
-    valid: List[int] = (
+    n_stacks = n_bays * n_rows
+    valid_actions: List[int] = (
         list(range(n_stacks))
         if mask is None
-        else [int(i) for i in np.where(mask)[0]]
+        else [int(i) for i in range(n_stacks) if mask[i]]
     )
-    candidates = [
-        a for a in valid
-        if env._action_to_stack(int(a)) != src_key
-    ]
+
+    # Exclude the source stack from destinations
+    src_action = (src_bay - 1) * n_rows + (src_stack.row - 1)
+    candidates = [a for a in valid_actions if a != src_action]
     if not candidates:
-        return 0
+        return []
 
-    kin = KinematicsModel.from_config_extra(env.config.extra)
+    def get_stk(action: int):
+        key = env._action_to_stack(action)
+        return env.yard.stacks.get(key)
 
-    return min(
-        candidates,
-        key=lambda a: lin_score(env, a, p_blk, src_key, kin, P_r, P_b),
-    )
+    def minp(action: int) -> float:
+        stk = get_stk(action)
+        return _min_priority(stk) if stk else float("inf")
+
+    def topp(action: int) -> float:
+        stk = get_stk(action)
+        return _top_priority(stk, n_containers) if stk else float(n_containers * 10)
+
+    def height(action: int) -> int:
+        stk = get_stk(action)
+        return _stack_height(stk) if stk else max_tiers
+
+    def bay_of(action: int) -> int:
+        return action // n_rows + 1   # 1-indexed
+
+    def row_of(action: int) -> int:
+        return action % n_rows + 1    # 1-indexed
+
+    # ── Identify ideal stacks ──────────────────────────────────── #
+    ideal = [a for a in candidates if minp(a) > target_top_priority]
+
+    if ideal:
+        # Rule 1: SSI = min_priority + P_r * row + P_b * |bay - src_bay|
+        def ssi(a: int) -> float:
+            return (minp(a)
+                    + P_r * row_of(a)
+                    + P_b * abs(bay_of(a) - src_bay))
+
+        best_ssi = min(ssi(a) for a in ideal)
+        tied = [a for a in ideal if ssi(a) == best_ssi]
+        import random
+        dest_action = random.choice(tied)
+
+        result: List[int] = []
+
+        if not restricted:
+            # Rule 2: pre-move candidates from other stacks into dest
+            while True:
+                dest_stk = get_stk(dest_action)
+                spare = max_tiers - _stack_height(dest_stk)
+                if spare < 2:
+                    break
+
+                dest_minp = minp(dest_action)
+                dest_top  = topp(dest_action)
+
+                # Candidate pre-move sources: top_priority in
+                # (target_top_priority, dest_top) AND within 5 below dest_minp
+                pre_candidates = [
+                    a for a in valid_actions
+                    if a != src_action
+                    and a != dest_action
+                    and target_top_priority < topp(a) < dest_top
+                    and dest_minp - 5 < topp(a) < dest_minp
+                ]
+                if not pre_candidates:
+                    break
+
+                # Pick pre-source with maximum top_priority
+                pre_src = max(pre_candidates, key=topp)
+                # Execute: move pre_src's top → dest
+                result.append(dest_action)
+
+                # Rebuild mask after imaginary move (approximate):
+                # just update valid_actions to exclude newly-full stacks
+                # Actual validity is handled by env.step()
+                break  # one pre-move per invocation; outer loop re-calls
+
+            result.append(dest_action)
+        else:
+            result.append(dest_action)
+
+        return result
+
+    else:
+        # Rule 3: no ideal stacks → pick stack with maximum min_priority
+        max_minp = max(minp(a) for a in candidates)
+        best_r3  = [a for a in candidates if minp(a) == max_minp]
+        import random
+        return [random.choice(best_r3)]

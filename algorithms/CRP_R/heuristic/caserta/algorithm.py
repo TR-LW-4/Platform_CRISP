@@ -101,8 +101,8 @@ class CasertaHeuristic(BaseAlgorithm):
                     file=sys.stderr,
                     flush=True,
                 )
-                # 若要堆场「形状」：
-                print(env.yard, file=sys.stderr, flush=True)   # 可能很长
+                # Uncomment to also print the full yard layout (can be verbose):
+                print(env.yard, file=sys.stderr, flush=True)
                 solution.append(action)
 
 

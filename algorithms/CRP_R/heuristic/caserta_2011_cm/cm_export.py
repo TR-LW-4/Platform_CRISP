@@ -1,0 +1,63 @@
+"""
+Convert the platform's Yard / ProblemConfig to the Corridor Method (CM) input
+format expected by the brp_cm binary.
+
+CM input format (containers.cpp, read_problem_data)
+----------------------------------------------------
+Line 1:  m nels
+  m    = number of stacks  (num_bays × num_rows)
+  nels = total number of containers
+
+Remaining m lines, one per stack (left-to-right, bay-major order):
+  k item1 item2 ...  (bottom-to-top; items are priority values 1..nels)
+  k = number of containers currently in this stack
+  Empty stacks are written as a single "0" on their line.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from core.base_problem import ProblemConfig
+
+
+def yard_to_cm_instance(cfg: "ProblemConfig", yard) -> str:
+    """
+    Convert the current yard state to a CM input string.
+
+    Parameters
+    ----------
+    cfg  : ProblemConfig with num_bays, num_rows, num_containers
+    yard : core.yard.Yard instance
+
+    Returns
+    -------
+    Multi-line string ready to be written to a temp file.
+    """
+    nb = int(cfg.num_bays)
+    nr = int(cfg.num_rows)
+    m  = nb * nr
+    n  = int(cfg.num_containers)
+
+    lines: List[str] = [f"{m} {n}"]
+
+    placed = 0
+    for idx in range(m):
+        bay = idx // nr + 1
+        row = idx % nr + 1
+        stk = yard.stacks.get((bay, row))
+        if stk is None or stk.is_empty:
+            lines.append("0")
+        else:
+            items = [int(c.priority) for c in stk.containers]  # bottom → top
+            placed += len(items)
+            lines.append(f"{len(items)} " + " ".join(str(p) for p in items))
+
+    if placed != n:
+        raise ValueError(
+            f"CM export: yard holds {placed} containers but "
+            f"ProblemConfig.num_containers={n}."
+        )
+
+    return "\n".join(lines) + "\n"

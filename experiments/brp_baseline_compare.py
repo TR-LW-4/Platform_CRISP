@@ -45,7 +45,7 @@ from core.plan import simulate_plan
 from problems.CRP_R import CRP_R
 
 from algorithms.CRP_R.heuristic.kim_hong.scoring   import select_action as kim_select
-from algorithms.CRP_R.heuristic.lan.planner        import build_lan_plan
+from algorithms.CRP_R.heuristic.lan_2013.planner   import build_lan_plan
 from algorithms.CRP_Time.heuristic.lee_lee.phase1      import phase1_greedy
 from algorithms.CRP_Time.heuristic.lee_lee.phase2      import phase2_reduce_moves
 

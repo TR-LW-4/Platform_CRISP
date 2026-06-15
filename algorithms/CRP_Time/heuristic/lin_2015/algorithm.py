@@ -11,22 +11,16 @@ Role on the platform
 --------------------
 Main target problem: ``CRP-Time`` (multi-bay RMGC, Lee & Lee kinematics).
 Shin et al. (TRC 2026) use this rule — with ``P_r = 30`` and
-``P_b = 300`` — as the strongest classical baseline for the CRP.  The
-degenerate ``num_bays = 1`` case makes it usable on ``CRP-R`` too.
+``P_b = 300`` — as the strongest classical baseline for the CRP.
 
-Per-step decision flow (see ``scoring.lin_select_action``)
+Per-step decision flow (see ``scoring.lin_compute_moves``)
 ----------------------------------------------------------
-1. Read the current blocker above the priority-based target.
-2. Score every admissible destination stack:
-
-       score(s) = P_b * 1[not well_placed] + P_r * severity + carry_time
-
-3. Pick the argmin.  The platform then calls ``env.step(action)`` which
-   records a ``Movement`` via `CRP_Time._hook_after_relocate` and feeds
-   it to ``compute_crane_time`` on terminal step.
-
-Seed loop matches the other rule-based baselines (``caserta``,
-``kim_hong``) so Experiment / Compare Tabs can plot it side-by-side.
+1. Find the target stack (contains the minimum-priority container).
+2. Identify ideal stacks (min_priority(s) > target_top_priority, not full).
+3a. If ideal stacks exist: score by SSI = min_prio + P_r·row + P_b·|bay−bay_target|.
+    Optionally prepend Rule-2 pre-moves (restricted=False).
+3b. If no ideal stacks: pick stack with max min_priority (Rule 3).
+4. Execute the returned action list via env.step().
 """
 
 from __future__ import annotations
@@ -37,7 +31,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from .scoring import lin_select_action
+from .scoring import lin_compute_moves
 
 
 class Lin2015Heuristic(BaseAlgorithm):
@@ -46,11 +40,11 @@ class Lin2015Heuristic(BaseAlgorithm):
     category            = "Heuristic"
     description         = (
         "[native multi-bay]  "
-        "Lin, Lee & Lee (TRC 2015) priority-rule heuristic for CRP-Time. "
-        "Composite score per candidate destination: "
-        "P_b·(not-well-placed) + P_r·severity + carry-time "
-        "(Lee–Lee RMGC kinematics).  Defaults P_r=30, P_b=300 follow "
-        "Shin et al. (TRC 2026).  Also usable on CRP-R (single-bay)."
+        "Lin, Lee & Lee (TRC 2015) SSI heuristic for CRP-Time. "
+        "Rule 1: ideal stacks scored by SSI = min_prio + P_r·row + P_b·bay_dist. "
+        "Rule 2 (unrestricted): pre-moves into dest before main relocation. "
+        "Rule 3: no ideal stacks → max min_priority destination. "
+        "Defaults P_r=30, P_b=300 follow Shin et al. (TRC 2026)."
     )
     compatible_problems = ["CRP-Time", "CRP-R"]
     step_label          = "Seed"
@@ -68,11 +62,12 @@ class Lin2015Heuristic(BaseAlgorithm):
         result_queue:    mp.Queue,
         stop_event:      mp.Event,
     ) -> None:
-        cfg      = self.config
-        rng_seed = cfg.seed
-        n_seeds  = max(1, cfg.num_eval_seeds)
-        P_r      = float(cfg.extra.get("P_r", 30.0))
-        P_b      = float(cfg.extra.get("P_b", 300.0))
+        cfg        = self.config
+        rng_seed   = cfg.seed
+        n_seeds    = max(1, cfg.num_eval_seeds)
+        P_r        = float(cfg.extra.get("P_r",        30.0))
+        P_b        = float(cfg.extra.get("P_b",        300.0))
+        restricted = bool (cfg.extra.get("restricted", False))
 
         all_metrics: List[Dict] = []
 
@@ -88,17 +83,26 @@ class Lin2015Heuristic(BaseAlgorithm):
             done = False
 
             while not done:
-                mask   = info.get("action_mask")
-                action = lin_select_action(env, mask, P_r=P_r, P_b=P_b)
-                _, _, done, _, info = env.step(action)
-                solution.append(int(action))
+                mask  = info.get("action_mask")
+                moves = lin_compute_moves(env, mask, P_r=P_r, P_b=P_b,
+                                          restricted=restricted)
+
+                if not moves:
+                    # Nothing to do (target already on top; env will
+                    # auto-retrieve on next step with a dummy action 0)
+                    _, _, done, _, info = env.step(0)
+                    solution.append(0)
+                    continue
+
+                for action in moves:
+                    _, _, done, _, info = env.step(action)
+                    solution.append(int(action))
+                    if done:
+                        break
 
             metrics = env.get_metrics()
             all_metrics.append(metrics)
 
-            # Primary metric: crane_time when the problem is CRP-Time,
-            # otherwise fall back to relocations.  This keeps the "best"
-            # comparison aligned with the problem's own objective.
             primary = float(
                 metrics.get("crane_time", metrics.get("relocations", 0.0))
             )
@@ -114,7 +118,8 @@ class Lin2015Heuristic(BaseAlgorithm):
                 metrics  = metrics,
                 progress = (seed_idx + 1) / n_seeds,
                 snapshot = env.get_state_snapshot(),
-                extra    = {"P_r": P_r, "P_b": P_b, "seed": seed_idx},
+                extra    = {"P_r": P_r, "P_b": P_b,
+                            "restricted": restricted, "seed": seed_idx},
             )
 
         if all_metrics:
@@ -152,19 +157,26 @@ class Lin2015Heuristic(BaseAlgorithm):
             },
             "P_r": {
                 "type": "float", "default": 30.0, "min": 0.0, "max": 10_000.0,
-                "label": "P_r (severity weight)",
+                "label": "P_r (row-index weight)",
                 "help": (
-                    "Weight on severity = max(0, blocker_priority - min_priority(dst)). "
+                    "SSI row weight: added as P_r * row_index(dest). "
                     "Default 30 follows Shin et al. (TRC 2026)."
                 ),
             },
             "P_b": {
                 "type": "float", "default": 300.0, "min": 0.0, "max": 100_000.0,
-                "label": "P_b (not-well-placed weight)",
+                "label": "P_b (bay-distance weight)",
                 "help": (
-                    "Penalty when the blocker would NOT be well-placed at the "
-                    "chosen stack (= needs re-relocation later). "
+                    "SSI bay weight: added as P_b * |bay(dest) - bay(target)|. "
                     "Default 300 follows Shin et al. (TRC 2026)."
+                ),
+            },
+            "restricted": {
+                "type": "bool", "default": False,
+                "label": "Restricted (skip Rule 2 pre-moves)",
+                "help": (
+                    "If True, skip Rule-2 pre-moves and only execute the "
+                    "direct blocker relocation (restricted retrieval sequence)."
                 ),
             },
         })

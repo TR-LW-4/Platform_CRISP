@@ -137,6 +137,8 @@ def get_algorithm_info() -> List[Dict]:
             "category":             getattr(cls, "category", "Unknown"),
             "description":          getattr(cls, "description", ""),
             "compatible_problems":  getattr(cls, "compatible_problems", []),
+            "requires_solver":      getattr(cls, "requires_solver", False),
+            "solver_backend":       getattr(cls, "solver_backend", None),
         })
     return sorted(out, key=lambda d: (d["category"], d["name"]))
 

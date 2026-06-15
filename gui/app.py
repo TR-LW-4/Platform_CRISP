@@ -56,6 +56,15 @@ from core.zhu_benchmark import (
     parse_zhu_folder_name,
     problem_config_for_zhu_txt,
 )
+from core.zhu_dup_benchmark import (
+    ZHU_DUP_ALPHAS,
+    ZHU_DUP_HEIGHT_WHITELIST,
+    collect_paths_from_zhu_dup_queue,
+    index_sn_pairs_by_height_dup,
+    merge_zhu_dup_queue_item,
+    parse_zhu_dup_folder_name,
+    problem_config_for_zhu_dup_txt,
+)
 
 # ── Visualisation ─────────────────────────────────────────────────── #
 from visualization.bay_renderer import yard_figure, vessel_figure, metrics_figure
@@ -104,8 +113,10 @@ def _init_state():
         "step_label":      "Iteration", # semantic label for one step
         "caserta_instance_queue": [],  # list[{"h": int, "ws": [int, ...]}] for Test tab
         "zhu_instance_queue": [],  # list[{"h": int, "sn_pairs": [[s,n], ...]}]
+        "zhu_dup_instance_queue": [],  # list[{"h": int, "sn_pairs": [[s,n], ...]}] for ZhuDup
+        "zhu_dup_alpha": ZHU_DUP_ALPHAS[0],  # selected alpha subdirectory
         "bench_pause_waiting": False,
-        "bench_pause_payload": None,  # dict: paths, next_idx, run_zhu, problem, algorithm, params…
+        "bench_pause_payload": None,  # dict: paths, next_idx, run_zhu, run_zhu_dup, problem, algorithm, params…
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -123,6 +134,14 @@ def _caserta_ws_map_cached(root_str: str) -> Tuple[List[int], Dict[int, List[int
 @st.cache_data(show_spinner=False)
 def _zhu_sn_map_cached(root_str: str) -> Tuple[List[int], Dict[int, List[Tuple[int, int]]]]:
     m = index_sn_pairs_by_height(Path(root_str))
+    return sorted(m.keys()), m
+
+
+@st.cache_data(show_spinner=False)
+def _zhu_dup_sn_map_cached(
+    root_str: str, alpha: str
+) -> Tuple[List[int], Dict[int, List[Tuple[int, int]]]]:
+    m = index_sn_pairs_by_height_dup(Path(root_str), alpha)
     return sorted(m.keys()), m
 
 
@@ -145,6 +164,7 @@ def _schema_defaults(prob_schema: Dict[str, Any]) -> Dict[str, Any]:
 BENCH_RANDOM = "Random Layout (schema defaults)"
 BENCH_CASERTA = "Caserta Benchmark (select H, pick w values, add to list)"
 BENCH_ZHU = "Zhu Benchmark (sub-folder H-S-N: select H, pick sizes, add to list)"
+BENCH_ZHU_DUP = "Zhu Dup Benchmark (dup_dataset: select alpha, H, S-N pairs)"
 
 _BASE_ALGO_KEYS = frozenset({
     "max_iterations", "seed", "report_interval", "num_eval_seeds",
@@ -167,14 +187,24 @@ def _benchmark_shape_messages(
     prob_cfg: ProblemConfig,
     fpath: Path,
     run_zhu_batch: bool,
+    run_zhu_dup_batch: bool = False,
 ) -> Tuple[str, str]:
     """Return (stderr line, markdown block) describing layout size / shape."""
     nb, nr, mt = prob_cfg.num_bays, prob_cfg.num_rows, prob_cfg.max_tiers
     nc = prob_cfg.num_containers
-    rel = fpath.parent.name + "/" + fpath.name if run_zhu_batch else fpath.name
+    is_subfolder_batch = run_zhu_batch or run_zhu_dup_batch
+    rel = fpath.parent.name + "/" + fpath.name if is_subfolder_batch else fpath.name
     meta_plain = ""
     meta_md = ""
-    if run_zhu_batch:
+    if run_zhu_dup_batch:
+        # path: dup_dataset/alpha=X/H-S-N/file.txt
+        z = parse_zhu_dup_folder_name(fpath.parent.name)
+        alpha_tag = fpath.parent.parent.name
+        if z:
+            h_, s_, n_ = z
+            meta_plain = f"{alpha_tag} H-S-N=({h_},{s_},{n_}) "
+            meta_md = f"**{alpha_tag}**, Sub-folder **H-S-N** = ({h_}, {s_}, {n_}); "
+    elif run_zhu_batch:
         z = parse_zhu_folder_name(fpath.parent.name)
         if z:
             h_, s_, n_ = z
@@ -203,6 +233,7 @@ def _run_one_benchmark_file(
     *,
     fpath: Path,
     run_zhu_batch: bool,
+    run_zhu_dup_batch: bool = False,
     selected_problem: str,
     selected_algo: str,
     algo_params: Dict[str, Any],
@@ -221,7 +252,8 @@ def _run_one_benchmark_file(
     """Train on one layout file, append progress, save_run — mirrors batch loop body."""
     import multiprocessing as mp
 
-    rel = fpath.parent.name + "/" + fpath.name if run_zhu_batch else fpath.name
+    is_subfolder = run_zhu_batch or run_zhu_dup_batch
+    rel = fpath.parent.name + "/" + fpath.name if is_subfolder else fpath.name
     status_txt.caption(f"Running {batch_index + 1}/{batch_total}: `{rel}` …")
     if terminal_detail:
         print(
@@ -238,12 +270,16 @@ def _run_one_benchmark_file(
         f"not stored — recomputed from your queue each run)"
     )
     trace_layout(f"gui benchmark current file: {fpath.resolve()}")
-    if run_zhu_batch:
+    if run_zhu_dup_batch:
+        prob_cfg = problem_config_for_zhu_dup_txt(fpath, {})
+    elif run_zhu_batch:
         prob_cfg = problem_config_for_zhu_txt(fpath, {})
     else:
         prob_cfg = problem_config_for_caserta_dat(fpath, {})
 
-    stderr_line, md_shape = _benchmark_shape_messages(prob_cfg, fpath, run_zhu_batch)
+    stderr_line, md_shape = _benchmark_shape_messages(
+        prob_cfg, fpath, run_zhu_batch, run_zhu_dup_batch
+    )
     print(stderr_line, file=sys.stderr, flush=True)
 
     algo_cfg = _algorithm_config_from_gui_params(algo_params)
@@ -407,11 +443,29 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # ── Solver filter ────────────────────────────────────────────── #
+    show_solver_only = st.checkbox(
+        "🔑 仅显示求解器算法 (Gurobi)",
+        key="solver_filter",
+        help="只显示需要 Gurobi 等外部商业/学术求解器才能运行的算法。"
+             "请确保已安装 gurobipy 并激活有效 license。",
+    )
+
     # ── Step 3: Specific Algorithm ───────────────────────────────── #
     st.markdown("**③ Algorithm**")
     algos_in_cat = cat_to_algos.get(selected_category, [])
+
+    if show_solver_only:
+        algos_in_cat = [
+            a for a in algos_in_cat
+            if algo_info.get(a, {}).get("requires_solver", False)
+        ]
+
     if not algos_in_cat:
-        st.warning(f"No {selected_category} algorithms available for this problem.")
+        if show_solver_only:
+            st.info(f"当前类别 **{selected_category}** 下没有需要求解器的算法。")
+        else:
+            st.warning(f"No {selected_category} algorithms available for this problem.")
         selected_algo = list(algo_info.keys())[0]
     else:
         selected_algo = st.selectbox(
@@ -424,6 +478,17 @@ with st.sidebar:
     desc = algo_info.get(selected_algo, {}).get("description", "")
     if desc:
         st.caption(desc[:120] + ("…" if len(desc) > 120 else ""))
+
+    # ── Solver requirement badge ──────────────────────────────────── #
+    if algo_info.get(selected_algo, {}).get("requires_solver", False):
+        backend = algo_info.get(selected_algo, {}).get("solver_backend") or "外部求解器"
+        st.warning(
+            f"⚠️ **此算法需要 {backend.upper()} license**  \n"
+            "请确保已完成以下步骤：  \n"
+            "① `pip install gurobipy`  \n"
+            "② 激活学术 Named-User License（`grbgetkey <key>`）或 WLS License。  \n"
+            "未安装或 license 无效时算法将报错退出。"
+        )
 
 # ================================================================ #
 #  Tabs                                                              #
@@ -447,7 +512,13 @@ with tab_test:
     _step_label = getattr(algo_cls, "step_label", "Iteration") if algo_cls else "Iteration"
 
     caserta_root = Path(__file__).resolve().parent.parent / "benchmark" / "Caserta_dataset"
-    zhu_root = Path(__file__).resolve().parent.parent / "benchmark" / "Zhu_dataset"
+    zhu_root     = Path(__file__).resolve().parent.parent / "benchmark" / "Zhu_dataset"
+    dup_root     = Path(__file__).resolve().parent.parent / "benchmark" / "dup_dataset"
+
+    # Problems sharing the Caserta / Zhu file format
+    _BENCH_PROBLEMS     = {"CRP-R", "CRP-U"}
+    # Problems supporting ZhuDup benchmark
+    _BENCH_DUP_PROBLEMS = {"CRP-D"}
 
     ws_by_height: Dict[int, List[int]] = {}
     if caserta_root.is_dir():
@@ -460,11 +531,22 @@ with tab_test:
     height_options_caserta = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
     height_options_zhu = [h for h in ZHU_HEIGHT_WHITELIST if h in zhu_sn_by_height]
 
+    # ZhuDup alpha / index
+    _dup_alpha = st.session_state.get("zhu_dup_alpha", ZHU_DUP_ALPHAS[0])
+    _dup_sn_by_height: Dict[int, List[Tuple[int, int]]] = {}
+    if dup_root.is_dir() and selected_problem in _BENCH_DUP_PROBLEMS:
+        _, _dup_sn_by_height = _zhu_dup_sn_map_cached(str(dup_root), _dup_alpha)
+    _height_options_dup = [
+        h for h in ZHU_DUP_HEIGHT_WHITELIST if h in _dup_sn_by_height
+    ]
+
     bench_opts: List[str] = [BENCH_RANDOM]
-    if ws_by_height:
+    if ws_by_height and selected_problem in _BENCH_PROBLEMS:
         bench_opts.append(BENCH_CASERTA)
-    if height_options_zhu:
+    if height_options_zhu and selected_problem in _BENCH_PROBLEMS:
         bench_opts.append(BENCH_ZHU)
+    if _height_options_dup and selected_problem in _BENCH_DUP_PROBLEMS:
+        bench_opts.append(BENCH_ZHU_DUP)
 
     prob_params = _schema_defaults(prob_schema)
 
@@ -473,11 +555,12 @@ with tab_test:
     bench_source = BENCH_RANDOM
     all_caserta_paths: List[Path] = []
     all_zhu_paths: List[Path] = []
+    all_zhu_dup_paths: List[Path] = []
 
     # ── Right: benchmark + placeholders ───────────────────────────── #
     with col_right:
         st.subheader("Benchmark")
-        if selected_problem == "CRP-R" and len(bench_opts) > 1:
+        if selected_problem in _BENCH_PROBLEMS and len(bench_opts) > 1:
             if not os.environ.get("CRISP_TRACE_LAYOUT"):
                 st.caption(
                     "To enable layout trace logs in the terminal: run "
@@ -485,19 +568,26 @@ with tab_test:
                     "then restart with `streamlit run gui/app.py`. "
                     "Logs appear on **stderr**, not in the browser."
                 )
-        if selected_problem == "CRP-R" and len(bench_opts) > 1:
+        _bench_eligible = (
+            selected_problem in _BENCH_PROBLEMS
+            or selected_problem in _BENCH_DUP_PROBLEMS
+        )
+        if _bench_eligible and len(bench_opts) > 1:
             bench_source = st.radio(
                 "Instance Source",
                 bench_opts,
                 horizontal=False,
                 key=f"bench_src_{selected_problem}",
             )
-        elif selected_problem != "CRP-R":
-            st.caption("Caserta / Zhu filtering is only supported for **CRP-R**; please select CRP-R in the sidebar.")
+        elif not _bench_eligible:
+            st.caption(
+                "Caserta / Zhu benchmark is only supported for **CRP-R** and **CRP-U**; "
+                "ZhuDup benchmark is only supported for **CRP-D**."
+            )
         elif len(bench_opts) == 1:
-            st.caption("No Caserta (`dataH-w-id.dat`) or Zhu (`H-S-N/*.txt`) benchmark data found.")
+            st.caption("No benchmark data found for this problem.")
 
-        if selected_problem == "CRP-R" and bench_source == BENCH_CASERTA and ws_by_height:
+        if selected_problem in _BENCH_PROBLEMS and bench_source == BENCH_CASERTA and ws_by_height:
             st.caption(
                 "Filename format: `data[H]-[w]-[id].dat`. "
                 "First **select a single height H** (whitelist {3,4,5,6,10} intersected with dataset), "
@@ -550,7 +640,7 @@ with tab_test:
             all_caserta_paths = collect_paths_from_hw_queue(caserta_root, q_c)
             st.info(f"Caserta list contains **{len(all_caserta_paths)}** `.dat` files in total (will run sequentially).")
 
-        elif selected_problem == "CRP-R" and bench_source == BENCH_ZHU and height_options_zhu:
+        elif selected_problem in _BENCH_PROBLEMS and bench_source == BENCH_ZHU and height_options_zhu:
             st.caption(
                 "Sub-folder name format: **`H-S-N`** (H = height label, S = stacks, N = containers). "
                 "First **select a single H** (Zhu whitelist **3,4,5,6,7,10** intersected with dataset), "
@@ -606,6 +696,95 @@ with tab_test:
                 f"(will run sequentially; all instances in each selected `H-S-N` folder are included)."
             )
 
+        elif (
+            selected_problem in _BENCH_DUP_PROBLEMS
+            and bench_source == BENCH_ZHU_DUP
+            and _height_options_dup
+        ):
+            st.caption(
+                "Directory layout: `dup_dataset/{alpha}/{H-S-N}/{file}.txt`. "
+                "**Step 1**: select an alpha value (duplicate ratio). "
+                "**Step 2**: select height H, then one or more (S, N) size pairs. "
+                "Each `H-S-N` folder contains **100** instances."
+            )
+
+            # Alpha selector
+            alpha_choice = st.selectbox(
+                "Duplicate ratio α",
+                options=list(ZHU_DUP_ALPHAS),
+                index=list(ZHU_DUP_ALPHAS).index(_dup_alpha),
+                format_func=lambda x: x.replace("alpha=", "α = "),
+                key=f"dup_alpha_{selected_problem}",
+            )
+            if alpha_choice != _dup_alpha:
+                st.session_state.zhu_dup_alpha = alpha_choice
+                st.session_state.zhu_dup_instance_queue = []
+                st.rerun()
+
+            # Re-load index for chosen alpha (may differ from cached _dup_alpha)
+            _, _dup_sn_cur = _zhu_dup_sn_map_cached(str(dup_root), alpha_choice)
+            _h_opts_cur = [h for h in ZHU_DUP_HEIGHT_WHITELIST if h in _dup_sn_cur]
+
+            cur_hd = st.selectbox(
+                "Height H (single select)",
+                options=_h_opts_cur,
+                format_func=lambda x: f"H = {x}",
+                key=f"dup_H_single_{selected_problem}",
+            )
+            sn_list_d = _dup_sn_cur.get(cur_hd, [])
+            sn_labels_d = [f"{s}-{n}" for s, n in sn_list_d]
+            sel_sn_d_str = st.multiselect(
+                f"Scale S-N (H={cur_hd}, S=stacks, N=containers; multi-select)",
+                options=sn_labels_d,
+                format_func=lambda lab: f"S={lab.split('-')[0]}, N={lab.split('-')[1]}",
+                key=f"dup_sn_pick_{selected_problem}_{cur_hd}",
+            )
+            sel_pairs_d: List[Tuple[int, int]] = []
+            for lab in sel_sn_d_str:
+                a, _, b = lab.partition("-")
+                if a and b:
+                    sel_pairs_d.append((int(a), int(b)))
+
+            db_add, db_clr = st.columns(2)
+            with db_add:
+                dup_add = st.button(
+                    "➕ Add to Instance List", key=f"add_dup_hw_{selected_problem}"
+                )
+            with db_clr:
+                dup_clr = st.button(
+                    "🗑 Clear Instance List", key=f"clr_dup_hw_{selected_problem}"
+                )
+
+            if dup_clr:
+                st.session_state.zhu_dup_instance_queue = []
+                st.rerun()
+            if dup_add:
+                if not sel_pairs_d:
+                    st.warning("Please select at least one scale (S, N).")
+                else:
+                    merge_zhu_dup_queue_item(
+                        st.session_state.zhu_dup_instance_queue, cur_hd, sel_pairs_d
+                    )
+                    st.rerun()
+
+            q_d = st.session_state.zhu_dup_instance_queue
+            if q_d:
+                st.markdown("**Current Instance List (ZhuDup)**")
+                for idx_d, block_d in enumerate(q_d):
+                    pairs_s_d = ", ".join(
+                        f"({p[0]},{p[1]})" for p in block_d["sn_pairs"]
+                    )
+                    st.write(f"{idx_d + 1}. **H = {block_d['h']}**: {pairs_s_d}")
+
+            all_zhu_dup_paths = collect_paths_from_zhu_dup_queue(
+                dup_root, q_d, alpha_choice
+            )
+            st.info(
+                f"ZhuDup list contains **{len(all_zhu_dup_paths)}** `.txt` files "
+                f"(α = {alpha_choice.replace('alpha=', '')}, "
+                "all instances in each selected `H-S-N` folder are included)."
+            )
+
         st.markdown("---")
         st.subheader("Yard Visualisation")
         status_placeholder  = st.empty()
@@ -650,8 +829,10 @@ with tab_test:
                 )
 
         show_pause_opt = (
-            selected_problem == "CRP-R"
-            and (len(all_caserta_paths) > 0 or len(all_zhu_paths) > 0)
+            (selected_problem in _BENCH_PROBLEMS
+             and (len(all_caserta_paths) > 0 or len(all_zhu_paths) > 0))
+            or (selected_problem in _BENCH_DUP_PROBLEMS
+                and len(all_zhu_dup_paths) > 0)
         )
         first_instance_only = False
         pause_each_file = False
@@ -715,15 +896,24 @@ with tab_test:
         algo_cls_p = get_algorithm_class(sa)
         algo_params_p: Dict[str, Any] = pay["algo_params"]
         prob_params_p: Dict[str, Any] = pay["prob_params"]
-        run_zhu_p = bool(pay["run_zhu"])
+        run_zhu_p     = bool(pay.get("run_zhu", False))
+        run_zhu_dup_p = bool(pay.get("run_zhu_dup", False))
         algo_cat_p = algo_info.get(sa, {}).get("category", "")
-        src_tag_p = "zhu_batch" if run_zhu_p else "caserta_batch"
-        batch_label_p = "Zhu" if run_zhu_p else "Caserta"
+        if run_zhu_dup_p:
+            src_tag_p = "zhu_dup_batch"
+            batch_label_p = "ZhuDup"
+        elif run_zhu_p:
+            src_tag_p = "zhu_batch"
+            batch_label_p = "Zhu"
+        else:
+            src_tag_p = "caserta_batch"
+            batch_label_p = "Caserta"
         progress_bar_p = st.progress(idx / max(len(paths_bp), 1))
         status_txt_p = st.empty()
         _run_one_benchmark_file(
             fpath=paths_bp[idx],
             run_zhu_batch=run_zhu_p,
+            run_zhu_dup_batch=run_zhu_dup_p,
             selected_problem=sp,
             selected_algo=sa,
             algo_params=algo_params_p,
@@ -758,40 +948,62 @@ with tab_test:
 
         run_caserta_batch = (
             bench_source == BENCH_CASERTA
-            and selected_problem == "CRP-R"
+            and selected_problem in _BENCH_PROBLEMS
             and len(all_caserta_paths) > 0
         )
         run_zhu_batch = (
             bench_source == BENCH_ZHU
-            and selected_problem == "CRP-R"
+            and selected_problem in _BENCH_PROBLEMS
             and len(all_zhu_paths) > 0
         )
+        run_zhu_dup_batch = (
+            bench_source == BENCH_ZHU_DUP
+            and selected_problem in _BENCH_DUP_PROBLEMS
+            and len(all_zhu_dup_paths) > 0
+        )
 
-        if bench_source == BENCH_CASERTA and selected_problem != "CRP-R":
-            st.error("Caserta benchmark only supports **CRP-R**; please switch the problem in the sidebar.")
+        if bench_source == BENCH_CASERTA and selected_problem not in _BENCH_PROBLEMS:
+            st.error("Caserta benchmark requires **CRP-R** or **CRP-U**.")
             st.stop()
-        if bench_source == BENCH_ZHU and selected_problem != "CRP-R":
-            st.error("Zhu benchmark only supports **CRP-R**; please switch the problem in the sidebar.")
+        if bench_source == BENCH_ZHU and selected_problem not in _BENCH_PROBLEMS:
+            st.error("Zhu benchmark requires **CRP-R** or **CRP-U**.")
             st.stop()
-        if bench_source == BENCH_CASERTA and selected_problem == "CRP-R" and not all_caserta_paths:
+        if bench_source == BENCH_ZHU_DUP and selected_problem not in _BENCH_DUP_PROBLEMS:
+            st.error("ZhuDup benchmark requires **CRP-D**.")
+            st.stop()
+        if bench_source == BENCH_CASERTA and selected_problem in _BENCH_PROBLEMS and not all_caserta_paths:
             st.error("Please add instances first: **select height H + select stack count w** (click 'Add to Instance List').")
             st.stop()
-        if bench_source == BENCH_ZHU and selected_problem == "CRP-R" and not all_zhu_paths:
+        if bench_source == BENCH_ZHU and selected_problem in _BENCH_PROBLEMS and not all_zhu_paths:
             st.error(
                 "Please add instances first: **select height H + select scale (S, N)** (click 'Add to Instance List')."
+            )
+            st.stop()
+        if bench_source == BENCH_ZHU_DUP and selected_problem in _BENCH_DUP_PROBLEMS and not all_zhu_dup_paths:
+            st.error(
+                "Please add instances first: **select α, height H + select scale (S, N)** (click 'Add to Instance List')."
             )
             st.stop()
 
         algo_cfg = _algorithm_config_from_gui_params(algo_params)
 
-        if run_caserta_batch or run_zhu_batch:
+        if run_caserta_batch or run_zhu_batch or run_zhu_dup_batch:
             if not pause_each_file:
                 st.session_state.bench_pause_waiting = False
                 st.session_state.bench_pause_payload = None
 
-            batch_paths = all_caserta_paths if run_caserta_batch else all_zhu_paths
-            src_tag = "caserta_batch" if run_caserta_batch else "zhu_batch"
-            batch_label = "Caserta" if run_caserta_batch else "Zhu"
+            if run_zhu_dup_batch:
+                batch_paths = all_zhu_dup_paths
+                src_tag = "zhu_dup_batch"
+                batch_label = "ZhuDup"
+            elif run_caserta_batch:
+                batch_paths = all_caserta_paths
+                src_tag = "caserta_batch"
+                batch_label = "Caserta"
+            else:
+                batch_paths = all_zhu_paths
+                src_tag = "zhu_batch"
+                batch_label = "Zhu"
 
             algo_cat = algo_info.get(selected_algo, {}).get("category", "")
 
@@ -810,6 +1022,7 @@ with tab_test:
                 _run_one_benchmark_file(
                     fpath=first_path,
                     run_zhu_batch=run_zhu_batch,
+                    run_zhu_dup_batch=run_zhu_dup_batch,
                     selected_problem=selected_problem,
                     selected_algo=selected_algo,
                     algo_params=algo_params,
@@ -846,6 +1059,7 @@ with tab_test:
                     "paths": [str(p) for p in batch_paths],
                     "next_idx": 0,
                     "run_zhu": run_zhu_batch,
+                    "run_zhu_dup": run_zhu_dup_batch,
                     "problem": selected_problem,
                     "algorithm": selected_algo,
                     "algo_params": dict(algo_params),
@@ -856,6 +1070,7 @@ with tab_test:
                 _run_one_benchmark_file(
                     fpath=batch_paths[0],
                     run_zhu_batch=run_zhu_batch,
+                    run_zhu_dup_batch=run_zhu_dup_batch,
                     selected_problem=selected_problem,
                     selected_algo=selected_algo,
                     algo_params=algo_params,
@@ -888,6 +1103,7 @@ with tab_test:
                     _run_one_benchmark_file(
                         fpath=fpath,
                         run_zhu_batch=run_zhu_batch,
+                        run_zhu_dup_batch=run_zhu_dup_batch,
                         selected_problem=selected_problem,
                         selected_algo=selected_algo,
                         algo_params=algo_params,

@@ -135,8 +135,16 @@ def cmd_run(problem: str, algo: str, iterations: int):
         print(f"Unknown algorithm: {algo}")
         return
 
+    import pathlib, inspect
     cfg_p = ProblemConfig()
     cfg_a = AlgorithmConfig(max_iterations=iterations, report_interval=max(1, iterations // 20))
+    cfg_a.extra["num_iterations"] = iterations   # PG-FGB reads extra["num_iterations"]
+    # 模型保存到算法自己的目录下（而不是 Platform_CRISP 根目录）
+    _algo_file = inspect.getfile(acls)
+    _save_dir  = pathlib.Path(_algo_file).parent / "trained_models"
+    _save_dir.mkdir(exist_ok=True)
+    _model_name = f"{algo.lower().replace(' ', '_').replace('-', '_')}_policy.pt"
+    cfg_a.extra["save_path"] = str(_save_dir / _model_name)
     inst  = acls(cfg_a)
     q     = mp.Queue()
     ev    = mp.Event()
@@ -151,12 +159,28 @@ def cmd_run(problem: str, algo: str, iterations: int):
     while proc.is_alive():
         try:
             r = q.get(timeout=1.0)
-            print(f"  step={r.step:5d}  metric={r.metric:.4f}  progress={r.progress*100:.1f}%")
+            m = r.metrics
+            shifters      = m.get("shifters",         r.metric)
+            best_shifters = m.get("best_shifters",    float("inf"))
+            policy_loss   = m.get("policy_loss",      float("nan"))
+            entropy       = m.get("entropy",          float("nan"))
+            bl_updates    = m.get("baseline_updates", 0)
+            mean_adv      = m.get("mean_advantage",   float("nan"))
+            print(
+                f"  step={r.step:5d}/{cfg_a.extra.get('num_iterations', cfg_a.max_iterations)}"
+                f"  shifters={shifters:.2f}  best={best_shifters:.2f}"
+                f"  loss={policy_loss:.4f}  entropy={entropy:.4f}"
+                f"  adv={mean_adv:+.4f}  bl_updates={int(bl_updates)}"
+                f"  [{r.progress*100:.1f}%]"
+            )
         except Exception:
             pass
 
     proc.join()
     ev.set()
+    _pt = cfg_a.extra.get("save_path", "")
+    if _pt and pathlib.Path(_pt).exists():
+        print(f"[{algo}] Model saved → {_pt}")
     print("Done.")
 
 

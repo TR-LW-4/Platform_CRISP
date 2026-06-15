@@ -1,0 +1,10 @@
+Apr 27 2016 1.01
+  - New version is released.
+
+Apr 27 2016
+  - fprintf format is changed from "%Lu" to "%llu".
+    (solve.c)
+  - Comments are slightly modified.
+    (solve.c)
+  - Stack numbers now starts from 1, not from 0.
+    (print.c)

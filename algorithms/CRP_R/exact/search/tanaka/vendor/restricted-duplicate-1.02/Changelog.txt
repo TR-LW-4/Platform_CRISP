@@ -1,0 +1,14 @@
+Aug 22 2016 1.02
+  - [bugfix] Initialization of bi[0].min_priority2 was missing.
+    (solution.c)
+
+Apr 27 2016 1.01
+  - New version is released.
+
+Apr 27 2016
+  - fprintf format is changed from "%Lu" to "%llu".
+    (solve.c)
+  - Comments are slightly modified.
+    (solve.c)
+  - Stack numbers now starts from 1, not from 0.
+    (print.c)
