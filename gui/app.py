@@ -1485,8 +1485,6 @@ with tab_about:
     ### Algorithms
     | Name | Category | Description |
     |---|---|---|
-    | **REINFORCE** | RL | Policy gradient with greedy baseline |
-    | **PPO** | RL | Proximal Policy Optimization (Actor-Critic) |
     | **Genetic Algorithm** | Evolutionary | Chromosome = action sequence, uniform crossover |
     | **Caserta (2012) HEUR** | Heuristic | Caserta et al. 2012 fixed-order destination-stack rule |
 

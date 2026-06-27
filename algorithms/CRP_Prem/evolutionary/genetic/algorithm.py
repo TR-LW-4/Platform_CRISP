@@ -29,7 +29,6 @@ class GeneticAlgorithm(BaseAlgorithm):
                    "Uniform crossover, random mutation, tournament selection.")
     compatible_problems = [
         "CRP-Time",
-        "BRP-NonFixed",
         "CRP-Prem",
         "CRP-Stow",
         "CRP-Stoch",

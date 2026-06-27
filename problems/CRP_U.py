@@ -10,8 +10,8 @@ Semantics (aligned with literature rBRP vs uBRP)
   non-full stack — not only blockers sitting on the **target** stack
   (restricted BRP).
 
-This is **not** “free choice of retrieval order” (that variant remains
-``BRPNonFixed`` in ``brp_nonfixed.py``).
+This is **not** “free choice of retrieval order” (where the agent freely
+chooses which container to retrieve next).
 """
 
 from __future__ import annotations

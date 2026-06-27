@@ -1,38 +1,74 @@
 """
-Kim (2016) multi-case heuristic for CRP-Time.
+Yongmin Kim, Taeho Kim, HongChul Lee (2016)
+Heuristic algorithm for retrieving containers.
+Computers & Industrial Engineering, 101, 352–360.
+https://doi.org/10.1016/j.cie.2016.08.022
+
+CRP-Time (multi-bay RMGC working-time) implementation.
 
 Reference
 ---------
-Shin et al. (TRC 2026) ``baselines/kim2016.py`` — the implementation used
-as Kim2016 baseline in the paper's benchmark evaluation.
+Y. Kim, T. Kim, H. Lee.
+"Heuristic algorithm for retrieving containers."
+Computers & Industrial Engineering 101 (2016) 352–360.
 
-Algorithm (4 cases, matches paper code exactly)
-------------------------------------------------
-Case 1:  auto-retrieve all accessible containers.
+The paper presents a 4-case heuristic (ideal / unideal / critical stacks)
+that decides where to relocate the current blocker of cmin and, in
+unrestricted settings, performs pre-relocations of tops from other
+critical stacks into the chosen destination before moving the immediate
+blocker.
 
-Case 2 (no ideal stacks):
-    Dest = valid stack with max min_priority.
+Platform adaptation (restricted model)
+--------------------------------------
+The platform CRP-Time inherits the *restricted* relocation model from
+CRP_R: at every relocation step only the direct top container above the
+current target (cmin) may be relocated. True pre-relocations of
+non-blocking critical stacks (as described in the paper's Case 3/4)
+cannot be executed.
 
-Case 3 (ideal stacks exist, some beat target_top_priority):
-    Candidate ideal stacks: ideal AND top_priority > target_top_priority.
-    Dest = candidate with min top_priority (random tie-break).
-    [Unrestricted] Before main move: pull containers from *critical* stacks
-    (stacks where every container below the top is larger than the top, i.e.
-    the top is not the smallest — a definition of "critical") whose top
-    priority lies in (target_top_priority, selected_top_priority) into dest.
+We therefore reproduce the paper's *destination selection logic*
+exactly:
+- Case 1: cmin on top → no relocation decision (return []).
+- Case 2: no ideal stack → dest = stack with maximum min_priority.
+- Case 3: ideal stacks exist with top > tnccmin (candidate stacks) →
+  choose the candidate with *minimum* top priority (deterministic tie-break:
+  smallest action index).
+- Case 4: ideal stacks exist but none qualify as candidate →
+  choose the ideal stack with *maximum* top priority (deterministic tie-break).
 
-Case 4 (ideal stacks exist but none beat target_top_priority):
-    Dest = ideal stack with max top_priority (no tie-break).
-    [Unrestricted] Same critical-stack pre-move loop as Case 3.
+After the chosen relocation (and auto-retrievals), the caller re-invokes
+the heuristic so that the situation is re-identified for the same cmin
+(possibly with a new blocker). This mirrors the paper's outer loop
+structure ("return to identify the circumstance of the container yard
+and continue the heuristic algorithm to retrieve the same cmin").
 
-An "ideal stack" is a non-decreasing sequence from top to bottom
-(every element ≥ the element above it), i.e. the stack is sorted.
+Definitions (paper → platform)
+------------------------------
+- Ideal stack: empty or specified retrieval order ascending from top
+  to bottom (earlier containers above later ones). In platform terms:
+  priorities strictly increase from top to bottom.
+- Critical stack: unideal stack containing at least one container that
+  must be retrieved before at least one container above it.
+- cmin: container with the smallest priority still present.
+- tnccmin / target_top_priority: priority of the current top of cmin's
+  stack (the container that must be relocated right now).
+- Candidate stack: an ideal stack whose top priority > target_top_priority.
+
+The implementation follows the case criteria in the paper (Fig. 3) and
+the structure of the pseudo-code in Appendix A, adapted to the
+restricted setting and the platform's action encoding (destination stack
+only).
+
+Randomness
+----------
+No randomness is used for destination selection (deterministic tie-break
+by smallest action index). This improves reproducibility compared with
+"random tie" variants.
 """
 
 from __future__ import annotations
 
 import multiprocessing as mp
-import random
 from typing import Callable, Dict, List, Optional, Set
 
 import numpy as np
@@ -99,10 +135,21 @@ def _is_critical_stack(stk) -> bool:
 def kim2016_compute_moves(
     env,
     mask,
-    restricted: bool = False,
+    restricted: bool = False,  # kept for API compatibility; no effect in restricted model
 ) -> List[int]:
     """
-    Return a (possibly multi-action) list for one Kim2016 decision step.
+    Decide the destination for the *current forced relocation* (the top
+    container above cmin) according to the 4 cases in Kim et al. (2016).
+
+    Because the platform CRP-Time uses the restricted model (only the
+    direct blocker above the current target may be relocated), we cannot
+    literally execute the paper's pre-relocations of other critical stacks.
+    We apply the paper's case logic to select the best destination for the
+    relocation that *must* happen now.
+
+    Returns a list containing at most one destination action index.
+    The caller executes it and then re-invokes this function, allowing
+    re-identification of the yard state (matching the paper's loop).
     """
     target = env._get_target_container()
     if target is None:
@@ -110,13 +157,16 @@ def kim2016_compute_moves(
 
     src_stack = env.yard._find_stack(target)
     if src_stack is None or src_stack.top == target:
+        # Case 1 in paper: cmin is already on top → nothing to relocate here.
+        # The outer loop will handle retrieval via step(0).
         return []
 
+    # tnccmin in paper = priority of the current top of cmin's stack
     target_top_priority = _top_priority(src_stack)
-    n_bays    = env.config.num_bays
-    n_rows    = env.config.num_rows
-    max_tiers = env.config.max_tiers
-    n_cont    = env.config.num_containers
+
+    n_bays = env.config.num_bays
+    n_rows = env.config.num_rows
+    n_cont = env.config.num_containers
 
     n_stacks = n_bays * n_rows
     valid_actions: List[int] = (
@@ -133,70 +183,53 @@ def kim2016_compute_moves(
     def get_stk(action: int):
         return env.yard.stacks.get(env._action_to_stack(action))
 
-    def height(a):      return _stack_height(get_stk(a))
-    def topp(a):        return _top_priority(get_stk(a), float(n_cont * 10))
-    def minp(a):        return _min_priority(get_stk(a), float("inf"))
-    def is_ideal(a):    return _is_non_increasing(get_stk(a))
-    def is_critical(a): return _is_critical_stack(get_stk(a))
+    def topp(a): return _top_priority(get_stk(a), float(n_cont * 10))
+    def minp(a): return _min_priority(get_stk(a), float("inf"))
+    def is_ideal(a): return _is_non_increasing(get_stk(a))
 
-    # Check for any ideal stacks
     ideal_candidates = [a for a in candidates if is_ideal(a)]
 
     if ideal_candidates:
         top_priorities = {a: topp(a) for a in ideal_candidates}
-        above_target   = [a for a in ideal_candidates
-                          if top_priorities[a] > target_top_priority]
+        above_target = [a for a in ideal_candidates
+                        if top_priorities[a] > target_top_priority]
 
         if above_target:
-            # Case 3: ideal AND top > target_top_priority → min top, random tie
+            # Case 3 (paper):
+            # There exists at least one ideal stack whose TN > tnccmin.
+            # Choose the one with the *smallest* such TN (min top priority).
             min_top = min(top_priorities[a] for a in above_target)
             best_set = [a for a in above_target if top_priorities[a] == min_top]
-            selected = random.choice(best_set)
+            # Deterministic tie-break (PlatEMO style): smallest action index
+            selected = min(best_set)
         else:
-            # Case 4: ideal stacks exist but none with top > target → max top
-            max_top  = max(top_priorities[a] for a in ideal_candidates)
-            best_set = [a for a in ideal_candidates
-                        if top_priorities[a] == max_top]
-            selected = best_set[0]  # no tie-break needed per paper
+            # Case 4 (paper):
+            # Ideal stacks exist, but none with TN > tnccmin.
+            # Choose the ideal stack with the *largest* TN.
+            max_top = max(top_priorities[a] for a in ideal_candidates)
+            best_set = [a for a in ideal_candidates if top_priorities[a] == max_top]
+            selected = min(best_set)  # deterministic on ties
 
-        selected_top = topp(selected)
-        result: List[int] = []
-
-        if not restricted:
-            # Pre-move critical-stack containers into dest
-            while True:
-                spare = max_tiers - height(selected)
-                if spare < 2:
-                    break
-                # critical stacks with top in (target_top, selected_top)
-                if above_target:
-                    crits = [a for a in candidates
-                             if a != selected
-                             and is_critical(a)
-                             and target_top_priority < topp(a) < selected_top]
-                else:
-                    crits = [a for a in candidates
-                             if a != selected
-                             and is_critical(a)
-                             and topp(a) < selected_top]
-
-                if not crits:
-                    break
-
-                # highest top_priority among critical
-                max_crit_top = max(topp(a) for a in crits)
-                src_crit = [a for a in crits if topp(a) == max_crit_top][0]
-                result.append(selected)      # dest receives the pre-move
-                break  # one pre-move per invocation
-
-        result.append(selected)
-        return result
+        # In the paper's unrestricted setting we would now:
+        #   - (Case 3) move tops of critical stacks with tnccmin < TNC < TN_selected
+        #     (in descending TNC order) into the selected stack,
+        #   - then move the current blocker (top of cmin's stack) into it.
+        # Because we are in the restricted model we can only relocate the
+        # current forced blocker. We therefore return the destination chosen
+        # according to the paper's rule for this case.
+        return [selected]
 
     else:
-        # Case 2: no ideal stacks → pick valid stack with max min_priority
+        # Case 2 (paper):
+        # No ideal stack at all. Move the current blocker to the (unideal)
+        # stack that has the largest "minimum movement priority"
+        # (i.e. the stack whose smallest priority is the largest).
+        if not candidates:
+            return []
         max_minp = max(minp(a) for a in candidates)
         best_set = [a for a in candidates if minp(a) == max_minp]
-        return [best_set[0]]
+        selected = min(best_set)  # deterministic
+        return [selected]
 
 
 # ================================================================ #
@@ -208,11 +241,16 @@ class Kim2016Heuristic(BaseAlgorithm):
     name                = "Kim (2016) Multi-Case Heuristic"
     category            = "Heuristic"
     description         = (
-        "[native multi-bay]  "
-        "Kim (2016) 4-case heuristic for CRP-Time. "
-        "Case 3/4: use ideal (non-increasing) stacks with pre-move loop "
-        "for critical stacks. Case 2: fallback to max min-priority dest. "
-        "Matches baselines/kim2016.py in Shin et al. (TRC 2026)."
+        "Kim, Kim & Lee (C&IE 2016) 4-case heuristic for CRP-Time. "
+        "Case 1: retrieve when cmin on top. "
+        "Case 2: no ideal stack → dest with max min_priority. "
+        "Case 3: candidate ideal (top > tnccmin) exists → dest = min-TN candidate. "
+        "Case 4: ideal exists but no candidate → dest = max-TN ideal. "
+        "Deterministic tie-breaking. "
+        "Adapted to the platform's restricted relocation model "
+        "(only the direct blocker above the current target can be moved); "
+        "the paper's literal pre-relocations of other critical stacks are not "
+        "executable here but the destination-selection logic follows the paper."
     )
     compatible_problems = ["CRP-Time"]
     step_label          = "Seed"

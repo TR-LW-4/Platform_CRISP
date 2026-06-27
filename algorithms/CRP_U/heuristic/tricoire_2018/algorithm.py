@@ -41,6 +41,39 @@ Computers & Operations Research 89 (2018) 127–139.
 https://doi.org/10.1016/j.cor.2017.08.009
 
 C++ codebase: https://github.com/ftricoire/block-relocation-master
+
+Platform configuration (extra parameters)
+------------------------------------------
+mode          : str   'SmSEQ-2' (default) | 'SM-1' | 'SM-2' | 'SmSEQ-1'
+                      | 'RakeSearch' | 'PilotMethod'
+condensation  : str   'improved' (default, Tricoire) | 'classic' (Jin) | 'none'
+                      Applied only to SmSEQ modes and as completion step in
+                      RakeSearch / PilotMethod.
+width         : int   100 (default). BFS width for RakeSearch; outer width for
+                      PilotMethod.  Larger → better quality, slower.
+hub_width     : int   2 (default). RakeSearch width used as look-ahead hub
+                      inside PilotMethod.
+verbose       : bool  False (default). Print per-seed relocation counts.
+
+Correspondence to the original C++ command-line flags (README.txt)
+------------------------------------------------------------------
+  -m SM-1 / SM-2 / SmSEQ-1 / SmSEQ-2   ←→  mode = '...'
+  -m RS-<N>                              ←→  mode = 'RakeSearch', width = N
+  -m PM-<N>                             ←→  mode = 'PilotMethod', width = N
+  -hub RS-<N>                           ←→  hub_width = N
+  -cp none / jin / tricoire             ←→  condensation = 'none' / 'classic' / 'improved'
+  -m DFBB / BB                          ←→  (not implemented; platform has stronger exact solvers)
+
+Excluded from this port (deliberately)
+----------------------------------------
+  Exact algorithms  – DFBB, Branch-and-Bound (dfbb.cpp / branchandbound.cpp).
+                      The platform already provides stronger exact solvers at
+                      CRP_U/exact/ (Tanaka & Mizuno 2018, Jin & Tanaka 2023).
+  Baselines         – GLAH (→ CRP_U/heuristic/glah/),
+                      LA-N  (→ CRP_U/heuristic/lan_*/),
+                      JZW, ZHU (not in Platform_CRISP scope).
+  SubsequencePolicy – plain 'SSEQ' mode; superseded by SmSEQ variants which
+                      are used in all main experiments and FastMeta.
 """
 
 from __future__ import annotations

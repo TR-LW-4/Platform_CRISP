@@ -17,15 +17,14 @@ Phase 3: Record best solution found during Phase 2 (updated whenever
 
 Platform interface
 ------------------
-Packaged for **CRP-U** (uBRP: fixed order, unrestricted relocation moves) and
-**BRP-NonFixed** (free retrieval order). The GLAH *procedure* is the fixed-order
+Packaged for **CRP-U** (uBRP: fixed order, unrestricted relocation moves).
+The GLAH *procedure* is the fixed-order
 2015 **restricted** BRP port; on **CRP-U** it is only a **baseline** (valid moves
 are a subset of uBRP).  Uses GlahLayout internally; outputs RelocationPlan via
 evaluate_plan().
 
-NOTE:  Sibling copies: ``algorithms/CRP_D/heuristic/glah``, ``algorithms/CRP_Time/heuristic/glah``.
-Physical home for **CRP-U** is this folder (not ``brp_nonfixed``).
-Keep in sync or symlink.
+NOTE:  Sibling copy: ``algorithms/CRP_Time/heuristic/glah``.
+Physical home for **CRP-U** is this folder.
 """
 
 from __future__ import annotations
@@ -64,7 +63,7 @@ class GLAHHeuristic(BaseAlgorithm):
         "Greedy Look-Ahead Heuristic (Jin, Zhu & Lim, EJOR 2015); fixed-order "
         "procedure — baseline only on free-order problems."
     )
-    compatible_problems = ["CRP-U", "BRP-NonFixed"]
+    compatible_problems = ["CRP-U"]
     step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

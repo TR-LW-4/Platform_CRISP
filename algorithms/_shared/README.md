@@ -10,5 +10,3 @@ these so the user sees them from any problem view.
 | Folder | Type | Notes |
 |---|---|---|
 | `evolutionary/genetic/` | GA | chromosome = action sequence, uniform crossover + random mutation |
-| `rl/ppo/` | RL | actor-critic with clipped surrogate loss |
-| `rl/reinforce/` | RL | policy gradient with greedy baseline |

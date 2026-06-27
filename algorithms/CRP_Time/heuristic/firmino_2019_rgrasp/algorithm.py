@@ -336,7 +336,6 @@ def _local_search_phase(
                 loc_at_i[p] = key
 
         cur_t = 1
-        ptr   = 0
         for j in range(i):
             cj, _srcj, dstj = best_moves[j]
             src_j = loc_at_i[cj]
@@ -404,7 +403,6 @@ def _local_search_phase(
                 rng=random.Random(0),
             )
 
-            # Adjust suffix: targets already retrieved in prefix should be skipped
             candidate_moves = prefix + suffix
             cand_ct = _crane_time_from_moves(candidate_moves, stacks_init, n_total, kin)
 
@@ -529,11 +527,9 @@ class FirminoRGRASP(BaseAlgorithm):
 
                 # ── Reactive α update ─────────────────────────────── #
                 if ct < prev_ct:
-                    # solution improved → continue current direction
-                    pass
+                    pass  # solution improved → continue current direction
                 else:
-                    # solution worsened → reverse direction
-                    direction = -direction
+                    direction = -direction  # solution worsened → reverse direction
 
                 alpha = max(0.0, min(1.0, alpha + direction * delta_v))
                 prev_ct = ct
@@ -558,7 +554,7 @@ class FirminoRGRASP(BaseAlgorithm):
 
             # ── Seed done: compile plan, get full metrics ─────────── #
             if best_moves:
-                plan    = _plan_from_moves(best_moves, stacks_init, n_total)
+                plan     = _plan_from_moves(best_moves, stacks_init, n_total)
                 ct_final = float(compute_crane_time(plan, kin))
                 relocs_final = float(
                     sum(1 for m in plan.movements if not m.is_retrieval)

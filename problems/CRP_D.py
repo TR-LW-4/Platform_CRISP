@@ -1,21 +1,41 @@
 """
-CRP-D – Duplicate-priority unrestricted Block Relocation Problem.
+CRP-D – Duplicate-priority Block Relocation Problem (restricted OR unrestricted).
 
 Semantics
 ---------
-- Containers are assigned to **groups** (duplicate priorities).  All containers
-  in group 1 must leave before group 2, etc. — but within a group the retrieval
-  order is free (any accessible container of the current group may be taken).
-- Relocation is **unrestricted**: the crane may move the **top container of
-  any stack** to any other non-full stack (same rule as CRP-U).
-- Objective: minimise total relocations.
+Containers are assigned to **groups** (duplicate priorities).  All containers
+in group 1 must leave before group 2, etc. — within a group the retrieval
+order is free (any accessible container of the current group may be taken).
+Objective: minimise total relocations.
+
+Relocation mode — controlled by ``extra["restricted_relocation"]``:
+
+  False (default) — **Unrestricted** (CRP-Du):
+      The crane may move the top container of ANY non-empty stack to any
+      other non-full stack.  Same rule as CRP-U with duplicate priorities.
+
+  True            — **Restricted** (CRP-Dr):
+      Only the top container of the stack that is currently *blocking* the
+      most accessible target-group member may be relocated.  This mirrors
+      the restricted rule from Tanaka & Takii (2016): among all stacks that
+      contain a target-group block with a non-target blocker on top, the
+      one with the fewest blockers above its topmost target-group item is
+      selected as the unique relocatable stack.  After each relocation the
+      selection is recomputed.
+
+Action encoding (identical for both modes)
+------------------------------------------
+  action = src_idx * S + dst_idx   where S = num_bays * num_rows.
+
+  In restricted mode the action mask ensures src_idx is always the
+  currently relocatable stack, so the effective choice is dst_idx only.
 
 Benchmark files
 ---------------
 When ``extra["layout_file_path"]`` points to a ZhuDup ``.txt`` file the
-episode loads containers from that file.  Otherwise a random duplicate-priority
-layout is generated using ``config.num_groups`` distinct group IDs spread over
-``config.num_containers`` containers.
+episode loads containers from that file.  Otherwise a random
+duplicate-priority layout is generated using ``config.num_groups`` distinct
+group IDs spread over ``config.num_containers`` containers.
 
 This class is completely standalone.  It imports nothing from CRP_U or
 CRP_Stow.
@@ -37,10 +57,13 @@ from core.benchmark_keys import layout_path_from_extra
 
 class CRP_D(BaseProblem):
     """
-    Duplicate-priority unrestricted BRP.
+    Duplicate-priority BRP — supports both unrestricted (default) and
+    restricted relocation modes via ``extra["restricted_relocation"]``.
 
     Action space : Discrete(S * S) where S = num_bays * num_rows.
-                   Action k = src_idx * S + dst_idx (any top → any non-full).
+                   Action k = src_idx * S + dst_idx.
+                   In restricted mode the mask constrains src_idx to the
+                   unique relocatable stack; effective choice = dst_idx.
     Observation  : flat yard tensor (S * max_tiers * 5 attrs) + current target
                    group ID (1 scalar) → length S*T*5 + 1.
     Reward       : −1 per relocation, 0 otherwise; terminal when all groups
@@ -49,13 +72,17 @@ class CRP_D(BaseProblem):
 
     name        = "CRP-D"
     description = (
-        "Duplicate-priority unrestricted BRP. "
+        "Duplicate-priority BRP (restricted OR unrestricted). "
         "Groups of containers must be retrieved in group-ID order; within a "
-        "group any accessible container counts.  Any stack-top may be relocated "
-        "(unrestricted).  Loads ZhuDup benchmark files when "
-        "``layout_file_path`` is set; otherwise uses random duplicate layout."
+        "group any accessible container counts. "
+        "Set extra['restricted_relocation']=True for restricted mode "
+        "(only the blocker above the best target-group member may be moved); "
+        "default is unrestricted (any stack-top relocatable). "
+        "Loads ZhuDup benchmark files when ``layout_file_path`` is set; "
+        "otherwise uses random duplicate layout."
     )
-    tags         = ["crp", "duplicate", "unrestricted", "fixed-group-order", "yard-only"]
+    tags         = ["crp", "duplicate", "unrestricted", "restricted-optional",
+                    "fixed-group-order", "yard-only"]
     metric_names = ["relocations", "steps", "time"]
 
     # ---------------------------------------------------------------- #
@@ -173,6 +200,52 @@ class CRP_D(BaseProblem):
             slot += 1
 
     # ---------------------------------------------------------------- #
+    # Restricted-mode helpers                                           #
+    # ---------------------------------------------------------------- #
+
+    def _is_restricted(self) -> bool:
+        return bool((self.config.extra or {}).get("restricted_relocation", False))
+
+    def _get_relocatable_stack_idx(self) -> Optional[int]:
+        """
+        Restricted mode: return the src stack index whose top may be moved.
+
+        Among all stacks that contain a target-group member with a
+        non-target-group block on top, select the one whose topmost
+        target-group block has the fewest blockers above it (ties broken
+        by ascending stack index).  Returns None when no blockers exist
+        (all target-group blocks are directly accessible).
+        """
+        tg = self._current_target_group()
+        if tg is None:
+            return None
+
+        S       = self.config.num_bays * self.config.num_rows
+        best_si = None
+        best_cnt: float = float("inf")
+
+        for si in range(S):
+            key = self._idx_to_stack(si)
+            stk = self.yard.stacks.get(key)
+            if stk is None or stk.is_empty:
+                continue
+            if stk.top.priority == tg:
+                continue   # directly accessible → will be auto-retrieved
+            # Does this stack contain any target-group block?
+            tg_positions = [
+                i for i, c in enumerate(stk.containers) if c.priority == tg
+            ]
+            if not tg_positions:
+                continue
+            top_tg_pos = max(tg_positions)
+            n_blockers = len(stk.containers) - 1 - top_tg_pos
+            if n_blockers < best_cnt:
+                best_cnt = n_blockers
+                best_si  = si
+
+        return best_si
+
+    # ---------------------------------------------------------------- #
     # Auto-retrievals                                                    #
     # ---------------------------------------------------------------- #
 
@@ -242,8 +315,16 @@ class CRP_D(BaseProblem):
             or dst_stk is None or dst_stk.is_full
         ):
             reward = -0.5
+        elif self._is_restricted():
+            rel_si = self._get_relocatable_stack_idx()
+            if rel_si is None or src_idx != rel_si:
+                reward = -0.5
+            else:
+                self.yard.relocate(src, dst)
+                self._total_relocations += 1
+                reward = -1.0
         elif tg is not None and src_stk.top.priority == tg:
-            # Agent chose to relocate the target itself — penalise.
+            # Unrestricted mode: do not relocate a directly accessible target.
             reward = -0.5
         else:
             self.yard.relocate(src, dst)
@@ -300,6 +381,21 @@ class CRP_D(BaseProblem):
     def _build_action_mask(self) -> np.ndarray:
         n    = self.config.num_bays * self.config.num_rows
         mask = np.zeros(n * n, dtype=np.bool_)
+
+        if self._is_restricted():
+            rel_si = self._get_relocatable_stack_idx()
+            if rel_si is None:
+                return mask   # nothing to move (all targets directly accessible)
+            for di in range(n):
+                if di == rel_si:
+                    continue
+                dst = self._idx_to_stack(di)
+                ds  = self.yard.stacks.get(dst)
+                if ds is not None and not ds.is_full:
+                    mask[rel_si * n + di] = True
+            return mask
+
+        # Unrestricted mode (default)
         tg   = self._current_target_group()
         for si in range(n):
             src = self._idx_to_stack(si)
@@ -333,4 +429,18 @@ class CRP_D(BaseProblem):
     @classmethod
     def config_schema(cls) -> Dict:
         schema = super().config_schema()
+        schema.update({
+            "restricted_relocation": {
+                "type":    "bool",
+                "default": False,
+                "label":   "Restricted relocation (CRP-Dr)",
+                "help": (
+                    "False (default): any stack-top may be relocated "
+                    "(unrestricted, CRP-Du). "
+                    "True: only the top blocker of the most accessible "
+                    "target-group stack may be relocated (restricted, CRP-Dr, "
+                    "Tanaka & Takii 2016 rule)."
+                ),
+            },
+        })
         return schema

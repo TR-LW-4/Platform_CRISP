@@ -49,7 +49,6 @@ python main.py test
 
 # 运行单个实验
 python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 200
-python main.py run --problem "CRP-R" --algo REINFORCE --iterations 500
 ```
 
 ---
@@ -108,8 +107,6 @@ python main.py run --problem "CRP-R" --algo REINFORCE --iterations 500
 
 | 算法 | 类型 | 适用问题 | 说明 |
 |------|------|---------|------|
-| **REINFORCE** | 强化学习 | 全部 | 策略梯度 + 贪心基线，适合所有问题 |
-| **PPO** | 强化学习 | 全部 | Actor-Critic + GAE，更稳定 |
 | **Genetic Algorithm** | 进化算法 | 全部 | 染色体=动作序列，均匀交叉+随机变异 |
 | **Kim–Hong (2006) ENAR** | 启发式 | CRP-R, CRP-Time | Kim & Hong 2006, COR 33 – 经典单贝翻箱规则 |
 | **Caserta (2012) HEUR** | 启发式 | CRP-R, CRP-Time | Caserta, Schwarze & Voß 2012, EJOR – min-priority 目的栈规则 |
@@ -122,6 +119,7 @@ python main.py run --problem "CRP-R" --algo REINFORCE --iterations 500
 | **Tanaka (2018) B&B** | 精确 / B&B | **CRP-R** | Tanaka ``restricted-distinct-1.11``（2018 修订）— 对 priority 做秩压缩，因此同时兼容 duplicate / non-duplicate；封装 vendor ``brp_bb`` |
 | **Lee–Lee (2010) Retrieval** | 启发式 | CRP-Time | Lee & Lee 2010, COR – 三阶段启发式（含起重机时间）；实现位于 `algorithms/CRP_Time/heuristic/lee_lee` |
 | **Lin–Lee–Lee (2015) Rule** | 启发式 | **CRP-Time**, CRP-R | Lin, Lee & Lee 2015, TRC – 位置优先级规则：`P_b·(not-well-placed) + P_r·severity + carry-time`；默认 `P_r=30, P_b=300`（Shin 2026 参数）|
+| **López-Plata et al. (2019) Operating-Cost Heuristic** | 启发式 (A*+expansion) | **CRP-Time**, CRP-R | López-Plata, Expósito-Izquierdo & Moreno-Vega 2019, C&IE – 最小化作业成本（非仅移动次数）；有限深度 A* 找 promising partial + expansion + 去 temporary move 后处理；支持可配置线性成本权重。|
 | **Cifuentes–Riff (2020) G-CREM** | 启发式 / GRASP | **CRP-Time** | Cifuentes & Riff 2020, ASOC – 多贝 GRASP：构造用 myopic `H−N_j` + size-adaptive RCL，局部搜索以 RIL 修复（Wu & Ting 2010）；目标 `α·moves + β·crane_time`，默认 `α=0.3, β=0.005, k=3` |
 | **Ðurasević–Ðumić (2024) GP** | 启发式 / GP hyper-heuristic | **CRP-Time**, CRP-R | Ðurasević & Ðumić 2024, ASOC – 用 Genetic Programming **自动进化** Priority Function（表达式树），配合 restricted RS；terminals = `SH/EMP/CUR/RI/AVG/DIFF (+ DIS/DUR)`；**第一阶段部署：多贝 distinct + restricted RS**（unrestricted 与 container-groups 留给未来 `CRP-Groups` 问题类）|
 | **Ðurasević–Ðumić–Gil-Gala (2025) MGP** | 启发式 / Multitask GP | **CRP-Time** | Ðurasević, Ðumić & Gil-Gala 2025, EAAI – **多任务 GP**：同时进化 `S_P` 个子种群（每个子种群对应一个 CRP 任务），通过 cross-subpop crossover / ring-topology migration 共享知识；scenarios = `max_tiers` / `objective`（论文 Table 7 红利）/ `layout` / `load`；复用 2024 GP 的 `gp_core / terminals / rs_restricted` |
@@ -132,7 +130,7 @@ python main.py run --problem "CRP-R" --algo REINFORCE --iterations 500
 >
 > - `[native multi-bay]` — 原文本身就是多贝 CRP（Lee–Lee 2010 / Lin 2015 / G-CREM 2020）；`CRP-Time` 的推荐主力。
 > - `[single-bay origin]` — 原文只做单贝受限翻箱（Kim–Hong 2006 / Caserta 2012 / LA-N 2013 / GLAH 2015）；在 `CRP-Time`（多贝）上可跑，作为 **退化 baseline** 用，时间目标通常次优。
-> - `[general]` — 问题无关的通用求解器（GA / REINFORCE / PPO）。
+> - `[general]` — 问题无关的通用求解器（GA）。
 
 ---
 

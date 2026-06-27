@@ -217,7 +217,7 @@ def _relocate_H6(env, src_key: Tuple[int, int], k: int,
       P1: first-kind (gmin > k)   → smallest gmin, tie-break (bay, row)
       P2: empty stacks            → smallest (bay, row)
       P3: sub-first-kind (gmin=k) → smallest (bay, row)
-      Fallback (gmin < k)         → smallest BI, tie-break largest gmin
+      Fallback (gmin < k)         → largest gmin (closest to k), tie-break smallest BI
     """
     first: List[Tuple] = []
     empty: List[Tuple] = []
@@ -235,7 +235,7 @@ def _relocate_H6(env, src_key: Tuple[int, int], k: int,
         else:
             stk = env.yard.stacks[key]
             bi  = _BI(stk, stk_extra)
-            last.append((bi, -gm, bay, row, act))
+            last.append((-gm, bi, bay, row, act))
 
     if first: first.sort(); return first[0][3]
     if empty: empty.sort(); return empty[0][2]

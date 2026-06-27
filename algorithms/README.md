@@ -11,7 +11,6 @@ problem, or as a symlink for cross-problem support).
 algorithms/
 ├── _shared/                  # universal algorithms (physical home)
 │   ├── evolutionary/genetic/
-│   └── rl/{ppo,reinforce}/
 │
 ├── CRP_D/                # duplicate-group stowage (CRP-D scaffold)
 │   ├── heuristic/
@@ -30,8 +29,7 @@ algorithms/
 │   ├── exact/
 │   │   ├── tanaka/            ← physical (Tanaka 2016 B&B + vendor C)
 │   │   └── tanaka_2018/       ← physical (Tanaka 2018 B&B + vendor C)
-│   ├── evolutionary/genetic/ → symlink
-│   └── rl/{ppo,reinforce}/   → symlinks
+│   └── evolutionary/genetic/ → symlink
 │
 ├── CRP_Time/                 # multi-bay CRP with crane-time objective
 │   ├── heuristic/
@@ -44,16 +42,14 @@ algorithms/
 │   │   ├── caserta/          → symlink
 │   │   ├── lan/              → symlink
 │   │   └── glah/             ← physical (CRP-Time packaging; sync with CRP_D / CRP_U)
-│   ├── evolutionary/genetic/ → symlink
-│   └── rl/{ppo,reinforce}/   → symlinks
+│   └── evolutionary/genetic/ → symlink
 │
 ├── CRP_U/                # free-order CRP (same env as BRP-NonFixed)
 │   └── heuristic/
 │       └── glah/             ← physical (Jin 2015 GLAH — CRP-U packaging)
 │
-├── brp_nonfixed/             # free-order BRP (GA / RL only; see also CRP_U/)
-│   ├── evolutionary/genetic/ → symlink
-│   └── rl/{ppo,reinforce}/   → symlinks
+├── brp_nonfixed/             # free-order BRP (GA only; see also CRP_U/)
+│   └── evolutionary/genetic/ → symlink
 │
 ├── CRP_Prem/               # pre-marshalling (CRP-Prem)
 ├── CRP_Stow/               # stowage (CRP-Stow)
@@ -67,8 +63,7 @@ algorithms/
   algorithm's `compatible_problems`.  No file duplication, no sync
   trouble.
 * **`_shared/`** holds algorithms that are not tied to any specific
-  problem (GA, PPO, REINFORCE).  They appear under **every**
-  problem dir via symlink.
+  problem (GA).  They appear under **every** problem dir via symlink.
 * **`core/gp/`** (not inside `algorithms/`) hosts the platform-level
   GP engine (tree, operators, CRP terminals, restricted RS).  Any GP
   paper imports from `core.gp.*`, never from another paper's folder.

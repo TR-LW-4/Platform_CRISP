@@ -44,9 +44,13 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
     description         = (
         "[native multi-bay]  "
         "Three-phase heuristic for CRP-Time (Lee & Lee, COR 2010).  "
-        "Phase 1: greedy feasible sequence.  "
-        "Phase 2: iterative path shortening (move reduction).  "
-        "Phase 3: crane-time reduction via alternate waypoints."
+        "Phase 1: greedy feasible sequence (faithful to paper).  "
+        "Phase 2: iterative path shortening via random single-container "
+        "neighbourhood search (approximates the paper's BIP).  "
+        "Phase 3: crane-time reduction via alternate waypoints "
+        "(approximates the paper's MIP).  "
+        "Note: Phase 2/3 do not call any solver; paper Table 1/3 "
+        "numerics cannot be reproduced with this implementation."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
     step_label          = "Seed"

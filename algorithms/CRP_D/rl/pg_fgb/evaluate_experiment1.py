@@ -174,9 +174,9 @@ def _run_rl_episode(env: CRP_D, policy: CrpdPolicyNetwork, greedy_high: bool) ->
 
 
 def _run_glah_episode(env: CRP_D, depth: int = 3) -> int:
-    from algorithms.CRP_D.heuristic.glah.layout import GlahLayout, GlahState, lower_bound
-    from algorithms.CRP_D.heuristic.glah.evaluate import evaluation_heuristic
-    from algorithms.CRP_D.heuristic.glah.lookahead import Lookahead
+    from algorithms.CRP_U.heuristic.glah.layout import GlahLayout, GlahState, lower_bound
+    from algorithms.CRP_U.heuristic.glah.evaluate import evaluation_heuristic
+    from algorithms.CRP_U.heuristic.glah.lookahead import Lookahead
 
     env.reset()
     initial_yard = copy.deepcopy(env.yard)
