@@ -10,8 +10,8 @@ File format
 -----------
 {
   "problem":    "CRP-Stow",
-  "algorithm":  "REINFORCE",
-  "category":   "RL",
+  "algorithm":  "Caserta (2012) HEUR",
+  "category":   "Heuristic",
   "seed":       0,
   "timestamp":  "2026-04-21T14:30:00",
   "prob_config": {...},

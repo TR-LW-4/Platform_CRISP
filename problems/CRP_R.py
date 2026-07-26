@@ -119,7 +119,7 @@ class CRP_R(BaseProblem):
         ``options["skip_auto_retrieve"]``: when truthy, the yard keeps **all**
         containers after layout load (opening retrieves remain explicit in batch
         plans). Typical batch workflow: ``reset(..., skip)``, clone ``yard``,
-        then ``_finish_reset_after_layout_loaded()`` for RL-aligned snapshots.
+        then ``_finish_reset_after_layout_loaded()`` for step-interface snapshots.
         """
         super().reset(seed=seed)
         if seed is not None:

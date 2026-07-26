@@ -21,7 +21,6 @@ Multi-bay yard, fixed retrieval order, Lee–Lee (2010) RMGC kinematics
 | `heuristic/lan/` | look-ahead | Petering & Hussein 2013, EJOR | symlink (native: CRP_R) |
 | `heuristic/glah/` | metaheuristic | Jin, Zhu & Lim 2015, EJOR | **native** (CRP-Time packaging; keep in sync with `CRP_D` / `CRP_U` copies) |
 | `evolutionary/genetic/` | GA | — | symlink (`_shared/`) |
-| `rl/shin_2026/` | Scale-Diverse DRL | **Shin, Choi, Cho & Kim 2026, TRC** | **native** (multi-bay CRP-Time; pretrained model included) |
 
 Symlinked `CRP_R` papers are usable as degenerate baselines here
 (their scoring ignores `γ_bay`/`γ_acc`, so they are generally suboptimal

@@ -5,7 +5,7 @@ crane working time (RMGC model in core.objectives, Lee & Lee style defaults).
 Dynamics match CRP-R: strict priorities 1…N, relocate only the top
 blocker when the target is buried, auto-retrieve when the target is on top.
 
-RL: sparse terminal reward = negative total crane time (seconds); invalid
+Step interface: terminal reward = negative total crane time (seconds); invalid
 destination actions use a small −0.5 penalty. Episode trajectory is recorded
 as a RelocationPlan via hooks on CRP_R for compute_crane_time().
 """

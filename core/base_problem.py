@@ -4,7 +4,7 @@ Abstract base class for all container relocation problems.
 Design contract
 ---------------
 Every problem:
-  1. Extends gymnasium.Env  → RL algorithms can use it directly
+  1. Extends gymnasium.Env  → standard step-wise simulation / validation
   2. Provides evaluate(solution) → metrics dict  → EA can evaluate solutions
   3. Uses Yard as the internal state engine
   4. Declares class-level metadata (name, tags, …) for GUI auto-discovery
@@ -60,6 +60,11 @@ class ProblemConfig:
     vessel_bays:  int = 2
     vessel_rows:  int = 2
     vessel_tiers: int = 3
+
+    # ── Rolled containers (POCRP-RC / CRP-Stow only, Wang et al. 2026) ── #
+    # Fraction of containers marked as Rolled Containers (RCs): they stay
+    # in the yard forever and are non-retrievable.  0.0 → classic POCRP.
+    rc_ratio: float = 0.0
 
     # ── Problem-specific extras ───────────────────────────────────── #
     extra: Dict[str, Any] = field(default_factory=dict)

@@ -1,5 +1,5 @@
 """
-Abstract base class for all algorithms (RL and Evolutionary).
+Abstract base class for all algorithm implementations.
 
 Design
 ------
@@ -33,15 +33,6 @@ class AlgorithmConfig:
     seed:           int   = 0
     report_interval: int  = 10    # push to queue every N iterations
     num_eval_seeds:  int  = 5     # seeds used for evaluation (EA)
-
-    # ── RL-specific ───────────────────────────────────────────────── #
-    total_timesteps: int   = 200_000
-    learning_rate:   float = 3e-4
-    gamma:           float = 0.99
-    num_envs:        int   = 4
-    num_steps:       int   = 256   # steps per rollout
-    batch_size:      int   = 64
-    hidden_dim:      int   = 128
 
     # ── Evolutionary-specific ─────────────────────────────────────── #
     population_size:   int   = 50
@@ -91,7 +82,7 @@ class BaseAlgorithm(ABC):
     Class-level metadata (override in subclass)
     ────────────────────────────────────────────
     name                : str  – display name in GUI
-    category            : str  – "RL" | "Evolutionary" | "Heuristic"
+    category            : str  – "Exact" | "Evolutionary" | "Heuristic" | ...
     description         : str
     compatible_problems : list – problem class *names*; empty = all problems
     """

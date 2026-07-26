@@ -4,9 +4,6 @@
 numpy>=1.24
 gymnasium>=0.29
 
-# RL (optional but needed for REINFORCE/PPO)
-torch>=2.0
-
 # GUI
 streamlit>=1.32
 

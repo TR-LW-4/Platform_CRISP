@@ -2,7 +2,8 @@
 
 **Container Relocation & Stowage Platform**
 
-一个专为集装箱堆场管理问题设计的研究平台，类似 PlatEMO，支持进化算法和强化学习，带实时可视化界面。
+一个专为集装箱堆场管理问题设计的研究平台，类似 PlatEMO，支持启发式、精确算法、进化算法和可复现实验，带实时可视化界面。
+各问题类保留 Gymnasium-compatible 的 `reset` / `step` 环境接口，用于逐步仿真、解验证、GUI 回放和未来可选的学习型方法扩展。
 
 ---
 
@@ -18,7 +19,7 @@ pip install streamlit imageio
 验证安装：
 ```bash
 conda activate rl
-python -c "import streamlit, matplotlib, torch, gymnasium; print('All OK')"
+python -c "import streamlit, matplotlib, gymnasium; print('All OK')"
 ```
 
 ---
@@ -62,7 +63,7 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 1. **左侧边栏**选择问题（Problem）和算法（Algorithm）
 2. **左侧面板**调整参数：
    - 问题参数：堆场大小（num_bays/num_rows/max_tiers）、集装箱数量、组数、吊机数量等
-   - 算法参数：迭代次数、学习率（RL）、种群大小（GA）等
+   - 算法参数：迭代次数、种群大小（GA）、时间限制等
 3. 点击 **▶ Start** 开始训练
 4. 右侧实时显示：
    - 堆场状态彩色图（每种颜色代表一个 group/目的港）
@@ -96,8 +97,8 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 | **CRP-Time** | 与 CRP-R 规则相同，主目标为场桥总作业时间（秒） | time / crane_time（兼看 relocations） |
 | **BRP-NonFixed** | 自由选择取箱顺序，优化总搬移次数 | relocations |
 | **CRP-Prem** | 开船前重排堆场，使所有栈有序 | moves |
-| **CRP-Stow** | 堆场→船舶配载，考虑分组约束 | shifters |
-| **CRP-Stoch** | 随机型 CRP（当前与 CRP-Time 同构，可扩展随机性） | time / crane_time |
+| **CRP-Stow** | 堆场→船舶配载，考虑分组约束；可选 `rc_ratio>0` 开启 **POCRP-RC**（Rolled Container） | shifters / relocations |
+| **CRP-Stoch** | 随机 CRP（SCRP：批次化、批内均匀随机、揭示时承诺）；`batch_size=1` 时等价 CRP-R | expected_relocations / relocations |
 | **CRP-U** | 无约束翻箱（uBRP）：取箱顺序固定 1→…→N，翻箱可从**任意栈顶**搬到**任意未满栈** | relocations |
 | **CRP-D** | 重复箱组配载（当前与 CRP-Stow 同构，可扩展生成） | shifters |
 
@@ -123,6 +124,7 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 | **Cifuentes–Riff (2020) G-CREM** | 启发式 / GRASP | **CRP-Time** | Cifuentes & Riff 2020, ASOC – 多贝 GRASP：构造用 myopic `H−N_j` + size-adaptive RCL，局部搜索以 RIL 修复（Wu & Ting 2010）；目标 `α·moves + β·crane_time`，默认 `α=0.3, β=0.005, k=3` |
 | **Ðurasević–Ðumić (2024) GP** | 启发式 / GP hyper-heuristic | **CRP-Time**, CRP-R | Ðurasević & Ðumić 2024, ASOC – 用 Genetic Programming **自动进化** Priority Function（表达式树），配合 restricted RS；terminals = `SH/EMP/CUR/RI/AVG/DIFF (+ DIS/DUR)`；**第一阶段部署：多贝 distinct + restricted RS**（unrestricted 与 container-groups 留给未来 `CRP-Groups` 问题类）|
 | **Ðurasević–Ðumić–Gil-Gala (2025) MGP** | 启发式 / Multitask GP | **CRP-Time** | Ðurasević, Ðumić & Gil-Gala 2025, EAAI – **多任务 GP**：同时进化 `S_P` 个子种群（每个子种群对应一个 CRP 任务），通过 cross-subpop crossover / ring-topology migration 共享知识；scenarios = `max_tiers` / `objective`（论文 Table 7 红利）/ `layout` / `load`；复用 2024 GP 的 `gp_core / terminals / rs_restricted` |
+| **Wang (2026) GRASP** | 启发式 / GRASP | **CRP-Stow** (`rc_ratio>0` = POCRP‑RC) | Wang, Ma, Yang & Hu 2026, C&OR 191:107434 – 论文主算法。构造阶段的 `TR`（min NBC → max DC → min BC+RCB → 优先制造 empty/rolled sink）与 RC‑感知的 `RR`（Task 1 for RCs / Task 2 for OCs），加 LNS+ 四条 poor‑move 判据（CMM/CMB 借用 Jovanović 2019；poor‑target 2.1/2.2 为本文原创）。要求 `rc_ratio>0` 才能真正展开 RC 逻辑，`rc_ratio=0` 时相当于纯 POCRP。 |
 
 > **Baseline 部署约定**：同一问题族共享一套 `ProblemConfig` 变量（`num_bays, num_rows, max_tiers, num_containers` 等）与统一指标（`crane_time` / `relocations` / `lb_ratio`）。新增论文的算法仅放入 `algorithms/<category>/<paper_key>/`，通过 `compatible_problems` 声明挂到哪些问题上，**问题定义与目标保持不动**，变的只有方法。
 >
@@ -139,28 +141,29 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 在 `algorithms/` 下任意子目录新建 `.py` 文件：
 
 ```python
-# algorithms/rl/my_dqn.py
+# algorithms/CRP_R/heuristic/my_rule/algorithm.py
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 import multiprocessing as mp
 
-class MyDQN(BaseAlgorithm):
-    name     = "My DQN"        # GUI 下拉菜单中显示的名字
-    category = "RL"            # "RL" / "Evolutionary" / "Heuristic"
-    description = "自定义 DQN 算法"
+class MyRule(BaseAlgorithm):
+    name     = "My Rule"       # GUI 下拉菜单中显示的名字
+    category = "Heuristic"     # "Exact" / "Evolutionary" / "Heuristic"
+    description = "自定义启发式算法"
+    compatible_problems = ["CRP-R"]
 
     def train(self, problem_factory, result_queue, stop_event):
         env = problem_factory()
         obs, info = env.reset()
-        
-        # ↓ 在这里写你的算法逻辑
+
+        # ↓ 在这里写你的算法逻辑。问题环境负责验证动作、更新堆场和计算指标。
         for step in range(self.config.max_iterations):
             if stop_event.is_set():
                 break
-            
-            action = env.action_space.sample()  # 替换成你的策略
+
+            action = env.action_space.sample()  # 替换成你的规则
             obs, reward, done, _, info = env.step(action)
             if done:
-                obs, info = env.reset()
+                break
             
             # 每隔 report_interval 步，推送进度给 GUI
             if step % self.config.report_interval == 0:
@@ -235,11 +238,14 @@ crp_platform/
 │   ├── base_problem.py   问题抽象基类
 │   ├── base_algorithm.py 算法抽象基类（子进程训练框架）
 │   └── registry.py       自动注册系统
-├── problems/             5 个问题（可无限扩展）
-├── algorithms/           4 个算法（可无限扩展）
-│   ├── rl/               强化学习
-│   ├── evolutionary/     进化算法
-│   └── heuristic/        启发式
+├── problems/             问题环境：Gymnasium-compatible 仿真 / 验证接口
+├── algorithms/           算法库（可无限扩展）
+│   ├── CRP_R/
+│   ├── CRP_U/
+│   ├── CRP_D/
+│   ├── CRP_Time/
+│   ├── CRP_Stow/
+│   └── CRP_Prem/
 ├── visualization/        可视化渲染
 ├── gui/app.py            Streamlit 界面
 ├── main.py               CLI 入口

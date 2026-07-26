@@ -92,7 +92,6 @@ st.markdown("""
     }
     .metric-value { font-size: 1.4em; font-weight: bold; color: #4E79A7; }
     .metric-label { font-size: 0.8em; color: #666; }
-    .algo-badge-RL   { background:#4E79A7; color:white; border-radius:4px; padding:2px 8px; }
     .algo-badge-Evolutionary { background:#59A14F; color:white; border-radius:4px; padding:2px 8px; }
     .algo-badge-Heuristic { background:#F28E2B; color:white; border-radius:4px; padding:2px 8px; }
 </style>
@@ -168,8 +167,6 @@ BENCH_ZHU_DUP = "Zhu Dup Benchmark (dup_dataset: select alpha, H, S-N pairs)"
 
 _BASE_ALGO_KEYS = frozenset({
     "max_iterations", "seed", "report_interval", "num_eval_seeds",
-    "total_timesteps", "learning_rate", "gamma", "num_envs",
-    "num_steps", "batch_size", "hidden_dim",
     "population_size", "crossover_rate", "mutation_rate",
     "tournament_size", "elite_count",
 })
@@ -407,7 +404,6 @@ with st.sidebar:
 
     # Group by category
     CAT_COLOURS  = {
-        "RL":           "#4E79A7",
         "Evolutionary": "#59A14F",
         "Heuristic":    "#F28E2B",
         "Exact":        "#9333EA",
@@ -419,7 +415,6 @@ with st.sidebar:
 
     all_categories   = sorted(cat_to_algos.keys())
     category_labels  = {
-        "RL":           "🤖 Reinforcement Learning",
         "Evolutionary": "🧬 Evolutionary Algorithm",
         "Heuristic":    "⚡ Heuristic",
         "Exact":        "✓ Exact / Optimal",
@@ -1349,114 +1344,179 @@ with tab_exp:
 
 with tab_compare:
     st.header("📈 Algorithm Comparison")
-    st.caption("Load saved results from any previous run and overlay them on the same chart.")
 
     import pandas as pd
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    # ── Load saved runs from disk ─────────────────────────────────── #
+    # ── Load ALL saved runs from disk ─────────────────────────────── #
     saved_runs = list_saved_runs()
 
     if not saved_runs:
         st.info("No saved results yet. Run Test or Experiment first – results are saved automatically.")
     else:
-        # Build a display label for each saved run
-        run_labels = [
-            f"{r['problem']}  ×  {r['algorithm']}  [seed={r['seed']}]  {r['timestamp'][:16]}"
-            for r in saved_runs
-        ]
-        selected_labels = st.multiselect(
-            "Select runs to compare (pick 2 or more):",
-            options=run_labels,
-            default=run_labels[:min(4, len(run_labels))],
-        )
 
-        if not selected_labels:
-            st.info("Select at least one run above.")
-        else:
-            selected_files = [
-                saved_runs[run_labels.index(lbl)]["file"]
-                for lbl in selected_labels
-            ]
-            loaded = load_runs_for_compare(selected_files)
-
-            # ── Final metrics table ───────────────────────────────── #
-            st.subheader("Final Metrics")
+        # ── Helper: build df_raw from a list of loaded run dicts ──── #
+        def _build_df_raw(run_list):
             rows = []
-            for r in loaded:
+            for r in run_list:
+                pc  = r.get("prob_config") or {}
+                lp  = pc.get("layout_file_path") or pc.get("caserta_dat_path") or ""
+                hw  = parse_caserta_filename(Path(lp)) if lp else None
                 row = {
                     "Problem":   r["problem"],
                     "Algorithm": r["algorithm"],
-                    "Seed":      r["seed"],
+                    "H":         hw[0] if hw else None,
+                    "w":         hw[1] if hw else None,
                 }
                 row.update(r.get("metrics", {}))
                 rows.append(row)
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True)
+            return pd.DataFrame(rows)
 
-            # ── Bar chart: final metric per algorithm ─────────────── #
-            metric_cols = [c for c in df.columns if c not in ("Problem", "Algorithm", "Seed")]
-            if metric_cols:
-                chosen_metric = st.selectbox("Metric for bar chart:", metric_cols)
-                agg = (
-                    df.groupby(["Problem", "Algorithm"])[chosen_metric]
-                    .agg(["mean", "std"])
+        def _grouped_table(df_raw):
+            metric_cols = [c for c in df_raw.columns
+                           if c not in ("Problem", "Algorithm", "H", "w")]
+            has_hw = df_raw["H"].notna().any()
+            group_keys = ["Problem", "Algorithm", "H", "w"] if has_hw else ["Problem", "Algorithm"]
+            if not metric_cols:
+                return pd.DataFrame(), group_keys, metric_cols, has_hw
+            agg_parts = []
+            for i, mc in enumerate(metric_cols):
+                sub = (
+                    df_raw.groupby(group_keys)[mc]
+                    .agg(mean="mean", std="std", count="count")
                     .reset_index()
                 )
-                problems_u = agg["Problem"].unique()
-                colours    = ["#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F", "#EDC948"]
-                fig_bar, axes = plt.subplots(
-                    1, len(problems_u),
-                    figsize=(5 * len(problems_u), 4),
-                    squeeze=False,
+                sub.rename(columns={
+                    "mean":  f"{mc} (avg)",
+                    "std":   f"{mc} (std)",
+                    "count": "N" if i == 0 else f"_cnt_{mc}",
+                }, inplace=True)
+                agg_parts.append(sub)
+            df_g = agg_parts[0]
+            for extra in agg_parts[1:]:
+                df_g = df_g.merge(
+                    extra.drop(columns=[c for c in extra.columns if c.startswith("_cnt_")]),
+                    on=group_keys,
                 )
-                for pi, pname in enumerate(problems_u):
-                    ax  = axes[0][pi]
-                    sub = agg[agg["Problem"] == pname]
-                    ax.bar(
-                        sub["Algorithm"], sub["mean"],
-                        yerr=sub["std"], color=colours[:len(sub)], capsize=4,
-                    )
-                    ax.set_title(pname, fontsize=10)
-                    ax.set_ylabel(chosen_metric)
-                    ax.tick_params(axis="x", rotation=20)
-                    ax.grid(axis="y", alpha=0.3)
-                fig_bar.suptitle(f"Mean {chosen_metric} (lower is better)", fontsize=11)
-                fig_bar.tight_layout()
-                st.pyplot(fig_bar)
+            order = group_keys + ["N"] + [c for c in df_g.columns if c not in group_keys + ["N"]]
+            df_g = df_g[[c for c in order if c in df_g.columns]]
+            return df_g, group_keys, metric_cols, has_hw
 
-            # ── Convergence curves overlay ────────────────────────── #
-            st.subheader("Convergence Curves")
-            curve_metric = st.selectbox("Metric for curves:", metric_cols, key="curve_metric") if metric_cols else None
-            if curve_metric:
-                fig_curve, ax_c = plt.subplots(figsize=(9, 4))
-                colours = ["#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F", "#EDC948"]
-                for i, r in enumerate(loaded):
-                    history = r.get("history", [])
-                    if not history:
-                        continue
-                    steps   = [h["step"] for h in history]
-                    vals    = [h["metrics"].get(curve_metric, h["metric"]) for h in history]
-                    label   = f"{r['algorithm']} / {r['problem']} s{r['seed']}"
-                    ax_c.plot(steps, vals, label=label,
-                              color=colours[i % len(colours)], linewidth=1.8)
-                ax_c.set_xlabel("Step")
-                ax_c.set_ylabel(curve_metric)
-                ax_c.set_title(f"Convergence: {curve_metric}")
-                ax_c.legend(fontsize=8, loc="upper right")
-                ax_c.grid(True, alpha=0.3)
-                fig_curve.tight_layout()
-                st.pyplot(fig_curve)
+        # ════════════════════════════════════════════════════════════ #
+        #  SECTION 1 – Benchmark Summary (ALL results, auto-grouped)  #
+        # ════════════════════════════════════════════════════════════ #
+        st.subheader("📊 Benchmark Class Summary")
 
-            # ── Delete runs ───────────────────────────────────────── #
-            with st.expander("🗑 Delete selected runs"):
-                if st.button("Delete selected runs", type="secondary"):
-                    for fp in selected_files:
-                        delete_run(fp)
-                    st.success("Deleted. Refresh the page.")
-                    st.rerun()
+        dedup = st.checkbox(
+            "Deduplicate: keep only the **latest run** per (layout file × algorithm)",
+            value=True,
+            help=(
+                "If you ran Start multiple times on the same instances, "
+                "each run saved 40 separate JSON files. "
+                "With this option ON, only the most recent result for each "
+                "layout file is used, so N = number of unique instances (e.g. 40). "
+                "Turn it OFF to include all runs (N may be 80, 120, …)."
+            ),
+        )
+
+        all_loaded_raw = load_runs_for_compare([r["file"] for r in saved_runs])
+
+        if dedup:
+            # Keep only the latest timestamp per (layout_file_path, algorithm, problem)
+            seen: dict = {}
+            for r in all_loaded_raw:
+                pc  = r.get("prob_config") or {}
+                lp  = pc.get("layout_file_path") or pc.get("caserta_dat_path") or ""
+                key = (r["problem"], r["algorithm"], lp)
+                ts  = r.get("timestamp", "")
+                if key not in seen or ts > seen[key][0]:
+                    seen[key] = (ts, r)
+            all_loaded = [v for _, v in seen.values()]
+        else:
+            all_loaded = all_loaded_raw
+
+        df_all = _build_df_raw(all_loaded)
+        n_total = len(all_loaded)
+        n_dedup = len(all_loaded_raw)
+        if dedup and n_dedup != n_total:
+            st.caption(
+                f"Showing **{n_total}** unique instances "
+                f"(deduplicated from {n_dedup} total saved runs). "
+                "Turn off deduplication above to include all."
+            )
+        else:
+            st.caption(
+                f"Automatically groups all **{n_total}** saved results "
+                "by (Problem, Algorithm, H, w). No manual selection needed."
+            )
+        df_grouped_all, gkeys_all, mcols_all, has_hw_all = _grouped_table(df_all)
+
+        if df_grouped_all.empty:
+            st.info("No results to summarise yet.")
+        else:
+            st.dataframe(df_grouped_all.round(4), use_container_width=True)
+            st.caption(
+                "**N** = instances averaged · **avg** = mean · **std** = std-dev"
+                + (" · H/w from Caserta filename `data{H}-{w}-{id}.dat`" if has_hw_all else "")
+            )
+
+
+        st.markdown("---")
+
+        # ════════════════════════════════════════════════════════════ #
+        #  SECTION 2 – Detailed comparison (manual selection)         #
+        # ════════════════════════════════════════════════════════════ #
+        with st.expander("🔍 Detailed run comparison (select specific runs)", expanded=False):
+            run_labels = [
+                f"{r['problem']}  ×  {r['algorithm']}  [seed={r['seed']}]  {r['timestamp'][:16]}"
+                for r in saved_runs
+            ]
+            selected_labels = st.multiselect(
+                "Select runs to compare:",
+                options=run_labels,
+                default=[],
+                key="detail_select",
+            )
+
+            if not selected_labels:
+                st.info("Select runs above to see per-instance metrics.")
+            else:
+                selected_files = [
+                    saved_runs[run_labels.index(lbl)]["file"]
+                    for lbl in selected_labels
+                ]
+                loaded = load_runs_for_compare(selected_files)
+                df_raw = _build_df_raw(loaded)
+                df_grouped, group_keys, metric_cols, has_hw = _grouped_table(df_raw)
+
+                if not df_grouped.empty:
+                    st.subheader("Grouped Summary (selected runs)")
+                    st.dataframe(df_grouped.round(4), use_container_width=True)
+
+                with st.expander("📋 Raw per-instance results"):
+                    df_show = df_raw.copy()
+                    df_show.insert(2, "Seed", [r["seed"] for r in loaded])
+                    st.dataframe(df_show, use_container_width=True)
+
+                # ── Delete selected runs ───────────────────────────── #
+                with st.expander("🗑 Delete selected runs"):
+                    if st.button("Delete selected runs", type="secondary"):
+                        for fp in selected_files:
+                            delete_run(fp)
+                        st.success("Deleted. Refresh the page.")
+                        st.rerun()
+
+        # ── Delete ALL runs ──────────────────────────────────────────── #
+        st.markdown("---")
+        with st.expander("🗑 Delete ALL saved results"):
+            st.warning("This will permanently delete every JSON file under `results/`.")
+            if st.button("Delete ALL results", type="secondary", key="del_all"):
+                for r in saved_runs:
+                    delete_run(r["file"])
+                st.success("All results deleted.")
+                st.rerun()
 
 # ================================================================ #
 #  TAB 4: About                                                      #
@@ -1478,7 +1538,7 @@ with tab_about:
     | **CRP-R** | Block Relocation Problem – fixed retrieval order |
     | **CRP-Prem** | Pre-marshalling: rearrange yard before ship arrival (sorting) |
     | **CRP-Stow** | Container stowage planning – yard → vessel loading |
-    | **CRP-Stoch** | Stochastic CRP (extends CRP-Time scaffold) |
+    | **CRP-Stoch** | Stochastic CRP (SCRP: batched retrievals, uniform intra-batch order, commitment on reveal; batch_size=1 degenerates to CRP-R) |
     | **CRP-U** | Unrestricted BRP: fixed retrieval order 1→…→N, relocations may take the **top** of **any** stack to any non-full stack (uBRP; Jovanović, Tuba & Voß 2019, EJOR) |
     | **CRP-D** | Duplicate-group stowage (extends CRP-Stow scaffold) |
 
@@ -1517,7 +1577,7 @@ with tab_about:
         st.write("**Algorithms**")
         for info in get_algorithm_info():
             c = info["category"]
-            colour = {"RL":"#4E79A7","Evolutionary":"#59A14F","Heuristic":"#F28E2B"}.get(c,"#999")
+            colour = {"Evolutionary":"#59A14F","Heuristic":"#F28E2B","Exact":"#9333EA"}.get(c,"#999")
             st.markdown(
                 f"- <span style='background:{colour};color:white;border-radius:3px;"
                 f"padding:1px 6px;font-size:0.75em'>{c}</span> **{info['name']}**",

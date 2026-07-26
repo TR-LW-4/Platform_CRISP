@@ -1,21 +1,27 @@
 """
-CRP-Stow — Blocks Relocation Problem with Stowage Plan (BRLP)
+CRP-Stow — Blocks Relocation Problem with Stowage Plan (BRLP / POCRP / POCRP-RC)
 
-Problem (Jovanović et al. 2019; Ji et al. 2015)
-------------------------------------------------
+Problem (Jovanović et al. 2019; Ji et al. 2015; Wang et al. 2026)
+-----------------------------------------------------------------
 - N containers occupy a 1-D yard bay: YS stacks each at most YT tiers high.
 - A vessel bay has VS stacks; vessel stack s has a maximum tier H_v[s].
-- Every container c has a designated vessel position:
+- Every ORDINARY container (OC) c has a designated vessel position:
       vs(c)  – vessel stack index  (stored as c.group,    0-based, A=0 B=1 …)
       vt(c)  – vessel tier index   (stored as c.priority, 0-based, bottom = 0)
-- Container c is RETRIEVABLE (cdd(c) == 0) iff its vessel tier equals the
-  number of containers already loaded into vessel stack vs(c).  In other words,
-  the containers within each vessel stack must be loaded bottom-up by tier.
+- OC c is RETRIEVABLE (cdd(c) == 0) iff its vessel tier equals the
+  number of OCs already loaded into vessel stack vs(c).  In other words,
+  the OCs within each vessel stack must be loaded bottom-up by tier.
+- (Optional, Wang et al. 2026) ROLLED CONTAINERS (RCs): a fraction ``rc_ratio``
+  of containers are RCs.  They have LOWER priority than every OC and are
+  NEVER retrieved — they stay in the yard forever.  RCs are flagged via
+  ``c.attrs["is_rolled"] = True``; algorithms can query it through
+  ``env._is_rc(c)``.  ``rc_ratio == 0.0`` reduces the problem to plain POCRP
+  (=  original CRP-Stow behaviour, fully backward-compatible).
 - Only the TOP container of each yard stack can be accessed.
 - When the target is buried, every blocker above it must be relocated to
   another yard stack first — each relocation costs +1.
-- Once retrieved to the vessel a container cannot be moved again.
-- Objective: minimise total yard relocations.
+- Once retrieved to the vessel an OC cannot be moved again.
+- Objective: minimise total yard relocations while retrieving all OCs.
 
 Two-phase Gym interface
 -----------------------
@@ -43,8 +49,8 @@ Set extra["layout_file_path"] = "/path/to/Bay-A-VS-YS-YT_seed.pro"
 to load a Jovanović / Ji benchmark .pro instance.  The problem config is
 updated in-place from the file (YS, YT, VS, H_v).
 
-For RL training without a .pro file set num_bays=YS, max_tiers=YT,
-num_groups=VS (num_rows is always forced to 1).
+For generated simulation instances without a .pro file set num_bays=YS,
+max_tiers=YT, num_groups=VS (num_rows is always forced to 1).
 """
 
 from __future__ import annotations
@@ -162,7 +168,7 @@ class CRP_Stow(BaseProblem):
         ".pro files via extra[\"layout_file_path\"]."
     )
     tags         = ["relocation", "stowage", "brlp", "vessel",
-                    "two-phase", "jovanovic-2019"]
+                    "two-phase", "jovanovic-2019", "pocrp-rc", "wang-2026"]
     metric_names = ["relocations", "steps", "vessel_utilisation"]
 
     # ---------------------------------------------------------------- #
@@ -247,7 +253,12 @@ class CRP_Stow(BaseProblem):
             self._build_random_episode()
 
     def _load_pro_file(self, path: Path) -> None:
-        """Populate yard and vessel config from a Jovanović .pro file."""
+        """
+        Populate yard and vessel config from a Jovanović .pro file.
+        If ``config.rc_ratio > 0`` a fraction of containers is randomly
+        flagged as Rolled Containers (POCRP-RC, Wang et al. 2026 §6.1)
+        and remaining OC priorities are re-ranked to stay contiguous.
+        """
         data = parse_pro_file(path)
         YS, YT, VS    = data["YS"], data["YT"], data["VS"]
         H_v           = data["H_v"]
@@ -259,9 +270,6 @@ class CRP_Stow(BaseProblem):
         self.config.max_tiers  = YT
         self.config.num_groups = VS
         self.yard = Yard(YS, 1, YT)
-
-        self._vessel_loaded   = [0] * VS
-        self._vessel_max_tier = list(H_v)
 
         # Build Container objects (group=vs, priority=vt).
         self.containers = []
@@ -284,11 +292,17 @@ class CRP_Stow(BaseProblem):
             for vs, vt in raw_stack:
                 self.yard.place(bay, 1, c_map[(vs, vt)])
 
+        # Optionally mark some containers as RCs (Wang 2026 §6.1).
+        self._inject_rolled_containers(seed=self.config.seed)
+
+        # Re-derive vessel loading counters based on the remaining OCs only.
+        self._reset_vessel_counters(VS, H_v)
+
         # Rebuild Gym spaces to reflect new dimensions.
         self._setup_spaces()
 
     def _build_random_episode(self) -> None:
-        """Generate a random BRLP instance (used for RL training)."""
+        """Generate a random BRLP / POCRP-RC instance for simulation and smoke tests."""
         cfg = self.config
         rng = np.random.RandomState(cfg.seed)
         VS  = max(1, cfg.num_groups)
@@ -305,9 +319,6 @@ class CRP_Stow(BaseProblem):
             vt_count[vs] += 1
             self.containers.append(Container(id=i, group=vs, priority=vt))
 
-        self._vessel_loaded   = [0] * VS
-        self._vessel_max_tier = [max(vt_count[s], 1) for s in range(VS)]
-
         # Place containers randomly into yard stacks.
         order      = rng.permutation(len(self.containers)).tolist()
         stack_keys = sorted(self.yard.stacks.keys())
@@ -317,12 +328,107 @@ class CRP_Stow(BaseProblem):
             if not stk.is_full:
                 self.yard.place(*key, self.containers[idx])
 
+        # Optionally mark some containers as RCs (Wang 2026 §6.1).
+        # Use a distinct sub-seed so RC selection is reproducible but
+        # independent of the initial placement RNG state.
+        self._inject_rolled_containers(seed=cfg.seed + 10_007)
+
+        # Re-derive vessel loading counters using remaining OCs only.
+        self._reset_vessel_counters(VS, vt_count)
+
+    # ---------------------------------------------------------------- #
+    # RC (Rolled Container) helpers                                     #
+    # ---------------------------------------------------------------- #
+
+    @staticmethod
+    def _is_rc(c: Container) -> bool:
+        """True iff container c is a Rolled Container (POCRP-RC, Wang 2026)."""
+        return bool(c.attrs.get("is_rolled", False))
+
+    def _oc_remaining_in_yard(self) -> int:
+        """Number of Ordinary Containers still sitting in the yard."""
+        return sum(
+            1
+            for stk in self.yard.stacks.values()
+            for c in stk.containers
+            if not self._is_rc(c)
+        )
+
+    def _inject_rolled_containers(self, seed: int) -> None:
+        """
+        Mark ⌊rc_ratio · N⌋ containers as RCs (``attrs["is_rolled"] = True``)
+        and re-rank remaining OC priorities within each vessel stack so that
+        they stay contiguous 0..K-1.  RC priorities are preserved verbatim
+        (they are never used).
+
+        No-op when ``config.rc_ratio <= 0`` — the problem remains classic
+        POCRP (fully backward-compatible with existing baselines).
+        """
+        ratio = float(getattr(self.config, "rc_ratio", 0.0) or 0.0)
+        if ratio <= 0.0:
+            for c in self.containers:
+                c.attrs.pop("is_rolled", None)
+            return
+        ratio = min(ratio, 1.0)
+
+        rng    = np.random.RandomState(int(seed))
+        n_rc   = int(round(ratio * len(self.containers)))
+        # Never RC-mark all containers — keep at least one OC so the episode
+        # is non-trivially retrievable.
+        n_rc   = min(n_rc, max(0, len(self.containers) - 1))
+        if n_rc <= 0:
+            for c in self.containers:
+                c.attrs.pop("is_rolled", None)
+            return
+
+        rc_ids = set(int(x) for x in rng.choice(
+            len(self.containers), size=n_rc, replace=False
+        ))
+        for c in self.containers:
+            if c.id in rc_ids:
+                c.attrs["is_rolled"] = True
+            else:
+                c.attrs.pop("is_rolled", None)
+
+        # Compress OC priorities per vessel stack so cdd(c) == 0 still means
+        # "c is the smallest remaining OC priority in its vessel stack".
+        oc_by_grp: Dict[int, List[Container]] = {}
+        for c in self.containers:
+            if self._is_rc(c):
+                continue
+            oc_by_grp.setdefault(c.group, []).append(c)
+        for _grp, ocs in oc_by_grp.items():
+            ocs.sort(key=lambda c: c.priority)
+            for rank, c in enumerate(ocs):
+                c.priority = rank
+
+    def _reset_vessel_counters(
+        self,
+        VS:                int,
+        original_vt_count: List[int],
+    ) -> None:
+        """Re-count vessel-stack capacity to reflect the current OC subset."""
+        oc_per_grp = [0] * VS
+        for c in self.containers:
+            if self._is_rc(c):
+                continue
+            if 0 <= c.group < VS:
+                oc_per_grp[c.group] += 1
+        self._vessel_loaded   = [0] * VS
+        self._vessel_max_tier = [oc_per_grp[s] for s in range(VS)]
+
     # ---------------------------------------------------------------- #
     # Retrieval helpers                                                  #
     # ---------------------------------------------------------------- #
 
     def _is_retrievable(self, c: Container) -> bool:
-        """cdd(c) == 0: c.priority equals the number already loaded for vs(c)."""
+        """
+        Rolled containers are NEVER retrievable (POCRP-RC).
+        For OCs: cdd(c) == 0  ⟺  c.priority equals the number already loaded
+        for vs(c).
+        """
+        if self._is_rc(c):
+            return False
         if c.group >= len(self._vessel_loaded):
             return False
         return c.priority == self._vessel_loaded[c.group]
@@ -340,6 +446,7 @@ class CRP_Stow(BaseProblem):
         """
         Repeatedly scan all yard stacks and retrieve any top container with
         cdd == 0 until no more automatic retrievals are possible.
+        Terminates when every OC has been retrieved (RCs may remain).
         """
         changed = True
         while changed:
@@ -353,8 +460,8 @@ class CRP_Stow(BaseProblem):
                     changed = True
                     break   # restart scan after each retrieval
 
-        # Check termination after all cascaded retrievals.
-        if all(stk.is_empty for stk in self.yard.stacks.values()):
+        # Terminate once every OC is retrieved (RCs stay in the yard).
+        if self._oc_remaining_in_yard() == 0:
             self._done = True
 
     # ---------------------------------------------------------------- #
@@ -456,13 +563,17 @@ class CRP_Stow(BaseProblem):
     # ---------------------------------------------------------------- #
 
     def get_metrics(self) -> Dict[str, float]:
-        total_capacity = max(sum(self._vessel_max_tier), 1) if self._vessel_max_tier else 1
+        total_capacity = (
+            max(sum(self._vessel_max_tier), 1) if self._vessel_max_tier else 1
+        )
+        rc_count = sum(1 for c in self.containers if self._is_rc(c))
         return {
             "relocations":        float(self._total_relocations),
             "steps":              float(self._total_steps),
             "time":               float(self._total_relocations),
             "vessel_utilisation": self._total_retrieved / total_capacity,
             "retrieved":          float(self._total_retrieved),
+            "rc_count":           float(rc_count),
         }
 
     # ---------------------------------------------------------------- #
@@ -546,6 +657,9 @@ class CRP_Stow(BaseProblem):
         snap["mode"]          = self._mode
         snap["vessel_loaded"] = list(self._vessel_loaded)
         snap["vessel_max"]    = list(self._vessel_max_tier)
+        snap["rc_ids"]        = sorted(
+            c.id for c in self.containers if self._is_rc(c)
+        )
         return snap
 
     # ---------------------------------------------------------------- #
@@ -568,6 +682,15 @@ class CRP_Stow(BaseProblem):
                 "type": "int", "default": 5, "min": 1, "max": 26,
                 "label": "Vessel stacks (VS)",
                 "help":  "Number of vessel stacks; containers are assigned A=0, B=1, … Z=25.",
+            },
+            "rc_ratio": {
+                "type": "float", "default": 0.0, "min": 0.0, "max": 0.9,
+                "label": "Rolled-container ratio (RC ratio)",
+                "help":  (
+                    "Fraction of containers marked as Rolled Containers "
+                    "(Wang et al. 2026 POCRP-RC). 0.0 → classic POCRP "
+                    "(fully backward-compatible with existing baselines)."
+                ),
             },
         })
         # Remove vessel_bays / vessel_rows / vessel_tiers — not used in BRLP

@@ -32,9 +32,14 @@ def _discover_subclasses(
         return result
 
     prefix = package.__name__ + "."
+    # onerror swallows import/syntax errors raised inside walk_packages
+    # itself (e.g. legacy modules that use newer syntax than the current
+    # interpreter supports).  Without it, a single unimportable file
+    # would abort the entire scan.
     for _importer, modname, _ispkg in pkgutil.walk_packages(
         path=package.__path__,
         prefix=prefix,
+        onerror=lambda _name: None,
     ):
         try:
             module = importlib.import_module(modname)
