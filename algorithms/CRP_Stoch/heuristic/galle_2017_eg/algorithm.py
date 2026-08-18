@@ -51,8 +51,6 @@ class ExpectedGroupAssignment(BaseAlgorithm):
         "al. SCRP reference implementation."
     )
     compatible_problems = ["CRP-Stoch"]
-    step_label = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -88,13 +86,12 @@ class ExpectedGroupAssignment(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict[str, float]] = []
         for seed in range(n_seeds):
             if stop_event.is_set():
                 break
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
             rng = np.random.RandomState(seed)
             metrics = self._run_one(env, rng)
@@ -132,13 +129,6 @@ class ExpectedGroupAssignment(BaseAlgorithm):
         base = super().config_schema()
         base.update(
             {
-                "num_eval_seeds": {
-                    "type": "int",
-                    "default": 5,
-                    "min": 1,
-                    "max": 200,
-                    "label": "Evaluation seeds",
-                },
                 "num_samples": {
                     "type": "int",
                     "default": 5000,

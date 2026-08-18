@@ -1,33 +1,12 @@
 """
-Jovanović & Voß (2014) Min–Max, Chain, and Chain-F heuristic scoring.
+Min–Max / Chain / Chain-F scoring helpers for JovanovicVoss2014Chain.
 
-Notation follows the paper exactly:
-  p(i)      = min priority value in stack i (= most urgent block, lowest number)
-              Empty stack → N + 1
-  d(i, r)   = p(i) − r
-              > 0  ⟹  placing block r on stack i creates NO new deadlock
-              ≤ 0  ⟹  a deadlock would be created
-
-Min–Max (Eq. 4)
-  • If ∃ i : d(i,r) > 0  →  s* = argmin_i d(i,r)  (no-deadlock stack, tightest fit)
-  • Otherwise             →  s* = argmax_i d(i,r)  (least-bad deadlock)
-
-Chain-F correction (Eq. 5, bad-case only)
-  When placing block r on a stack i that would become FULL (height = max_tiers),
-  substitute p(i) ← −N − p(i) so that such stacks are never chosen.
-
-Extended Min–Max f*(r, se, Bay) (Eq. 6)
-  Same as above but with an additional excluded stack se.
-
-Chain heuristic (Eqs. 7–11)
-  After computing sD = fMinMax(rn), if p(rn) < p(rn+1) evaluate the
-  "reverse-order" scenario and optionally override sD with sR.
-
-Reference
----------
-R. Jovanović, S. Voß,
-"A chain heuristic for the Blocks Relocation Problem",
-Computers & Industrial Engineering 75 (2014) 79–86.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

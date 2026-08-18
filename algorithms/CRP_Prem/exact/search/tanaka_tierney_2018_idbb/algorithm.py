@@ -57,7 +57,6 @@ class TanakaTierney2018IDBB(BaseAlgorithm):
         "upper-bound seeding); no MIP solver required."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = False
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -74,7 +73,7 @@ class TanakaTierney2018IDBB(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         time_limit_s = float(cfg.extra.get("time_limit_s", 30.0))
 
         all_metrics: List[Dict[str, float]] = []
@@ -84,7 +83,6 @@ class TanakaTierney2018IDBB(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -162,11 +160,6 @@ class TanakaTierney2018IDBB(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Each seed runs its own exact IDBB search; keep small for large instances.",
-            },
             "time_limit_s": {
                 "type": "float", "default": 30.0, "min": 1.0, "max": 3600.0,
                 "label": "Per-instance time limit (s)",

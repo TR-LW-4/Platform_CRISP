@@ -1,57 +1,21 @@
 """
-Tang, Jiang, Liu & Dong (2015) H1 / H2 reshuffling heuristics for CRP-R.
+TangEtAl2015
+<2015> <heuristic> <restricted> <single-bay> <CRP-R>
+H1/H2 reshuffling rules with optional full-sequence extended choice
+rule --- H2 --- Base rule: H1 reshuffle-index or H2 blocking-index
+use_extended --- True --- Evaluate destinations by remaining-sequence rollout
 
-Paper contribution
-------------------
-The paper proposes five construction heuristics (H1–H5) and five extended
-variants (H1-E – H5-E) for the static container reshuffling problem.
-
-Why only H1 and H2 are implemented here
------------------------------------------
-H1 and H2 are the two foundational rules from which H3, H4, and H5 are
-derived:
-  • H3 = H1 with a modified decision order and a same-column restriction in
-         a narrow special case. Paper results show only marginal improvement.
-  • H4 = H1 with adjusted RI values that account for already-assigned blockers
-         when multiple blockers share the same relocation stage.
-  • H5 = H4 using BI (like H2) instead of RI.
-H3/H4/H5 add algorithmic complexity while the performance gap is small (see
-Tables 2 and 3 in the paper). H1 and H2 already represent the RI-based and
-BI-based design choices and, together with the Extended variant, reproduce
-the paper's best results. H3–H5 can be added later as additional `rule`
-options without changing the architecture.
-
-Why H2-E is the default
-------------------------
-From the paper's experiments:
-  • Static problem (Table 2):
-      – H2 is best at ~80% bay utilisation (the common case in practice).
-      – H1 is best at 100% utilisation.
-  • Extended variants (Table 3): H1-E and H2-E both perform near-optimally;
-    H2-E has a slight edge in more cases.
-  • Dynamic simulation (Table 5): H2-E achieves the best average across ALL
-    tested bay configurations (6-column, 2–5 tiers), with negligible extra
-    computation time compared with the base heuristic.
-H2-E therefore offers the best overall performance for CRP-R benchmarks and
-is the most practically relevant configuration for a research baseline.
-
-Config
-------
-  rule         : "H1" | "H2"   (dropdown in GUI)
-  use_extended : bool           (checkbox in GUI, default True → *-E variant)
-  num_eval_seeds : int
-
-Compatible problems
--------------------
-  CRP-R
-
-Reference
----------
+------------------------------- Reference --------------------------------
 L. Tang, W. Jiang, J. Liu, Y. Dong,
 "Research into container reshuffling and stacking problems in container
  terminal yards",
-IIE Transactions, 47(7), 751–766, 2015.
-https://doi.org/10.1080/0740817X.2014.971201
+IIE Transactions 47 (2015) 751–766.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -81,8 +45,6 @@ class TangEtAl2015(BaseAlgorithm):
         "best average performance across all tested bay configurations."
     )
     compatible_problems = ["CRP-R"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -97,7 +59,7 @@ class TangEtAl2015(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg          = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         rule         = str(cfg.extra.get("rule", "H2"))
         use_extended = bool(cfg.extra.get("use_extended", True))
         all_metrics: List[Dict] = []
@@ -112,7 +74,6 @@ class TangEtAl2015(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             solution: List[int] = []
@@ -164,14 +125,6 @@ class TangEtAl2015(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 10,
-                "min":     1,
-                "max":     200,
-                "label":   "Evaluation seeds",
-                "help":    "Number of random initial layouts to evaluate.",
-            },
             "rule": {
                 "type":    "str",
                 "default": "H2",

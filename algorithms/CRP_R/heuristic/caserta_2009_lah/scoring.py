@@ -1,42 +1,12 @@
 """
-Caserta, Schwarze, Voß (2009) — scoring primitives for the Look-Ahead Heuristic.
+Greedy simulation and roulette-wheel helpers for CasertaLAH.
 
-Stack representation
---------------------
-  stacks : Dict[Any, List[int]]
-    key       = any hashable stack identifier (e.g. (bay, row))
-    List[int] = container priorities bottom-to-top; smaller = more urgent
-
-Core heuristic rule (Section 3 of the paper)
----------------------------------------------
-Let r = priority of the container to be relocated.
-Let mins = minimum priority in stack s  (N+1 for empty).
-
-  1. (No new deadlock)  ∃ s : r < mins  → choose s minimising mins
-  2. (New deadlock inevitable) → choose s maximising mins
-
-This is the same rule as Caserta et al. (2012) Eq.(11) / the Min–Max heuristic.
-It is used here as the *greedy score function g(A')* for the look-ahead.
-
-Look-ahead mechanism (Section 4 / Matrix-Algorithm)
-----------------------------------------------------
-For the current blocker j above the target, enumerate every feasible destination
-stack s' ∈ S.  For each resulting configuration A', compute g(A') by running
-the deterministic greedy heuristic to completion and counting relocations.
-The resulting count is the score of that neighbour.
-
-Selection (roulette-wheel)
---------------------------
-The score g(A') measures *undesirability* (more relocations = worse).
-We convert to attractiveness  q(A') = max_g − g(A') + 1  so that higher is better,
-then sample proportionally.
-
-Reference
----------
-M. Caserta, S. Schwarze, S. Voß,
-"A New Binary Description of the Blocks Relocation Problem and Benefits
- in a Look Ahead Heuristic",
-EvoCOP 2009, LNCS 5482, pp. 37–48, Springer, 2009.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -64,7 +34,7 @@ def _greedy_select(
     all_keys:  List[Any],
 ) -> Optional[Any]:
     """
-    Deterministic Min–Max destination selection (Section 3 / Caserta 2012 Eq.11).
+    Deterministic Min–Max destination selection.
     Returns the best destination key, or None if no valid stack.
     """
     best_good_key: Optional[Any] = None

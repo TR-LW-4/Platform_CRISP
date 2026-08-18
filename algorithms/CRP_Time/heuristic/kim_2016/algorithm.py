@@ -253,8 +253,6 @@ class Kim2016Heuristic(BaseAlgorithm):
         "executable here but the destination-selection logic follows the paper."
     )
     compatible_problems = ["CRP-Time"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -266,7 +264,7 @@ class Kim2016Heuristic(BaseAlgorithm):
     ) -> None:
         cfg        = self.config
         rng_seed   = cfg.seed
-        n_seeds    = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         restricted = bool(cfg.extra.get("restricted", False))
 
         all_metrics: List[Dict] = []
@@ -337,10 +335,6 @@ class Kim2016Heuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-            },
             "restricted": {
                 "type": "bool", "default": False,
                 "label": "Restricted (skip pre-moves)",

@@ -67,7 +67,7 @@ class HottungTierney2016BRKGA(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_seed_metrics: List[Dict[str, float]] = []
 
         pop_size = int(cfg.extra.get("population_size", 80))
@@ -88,7 +88,6 @@ class HottungTierney2016BRKGA(BaseAlgorithm):
             rng = random.Random(int(cfg.seed) + seed)
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -250,10 +249,6 @@ class HottungTierney2016BRKGA(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-            },
             "backend": {
                 "type": "str", "default": "auto",
                 "label": "Backend (auto/python/vendor)",

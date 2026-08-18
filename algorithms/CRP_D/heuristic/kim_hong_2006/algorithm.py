@@ -366,8 +366,6 @@ class KimHong2006GroupENAR(BaseAlgorithm):
         "COR 33 (2006) 940–954."
     )
     compatible_problems = ["CRP-D"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -378,7 +376,7 @@ class KimHong2006GroupENAR(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg     = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
         for seed in range(n_seeds):
@@ -420,15 +418,3 @@ class KimHong2006GroupENAR(BaseAlgorithm):
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 200,
-                "label": "Evaluation seeds",
-                "help": "Number of independent random layouts to evaluate.",
-            },
-        })
-        return base

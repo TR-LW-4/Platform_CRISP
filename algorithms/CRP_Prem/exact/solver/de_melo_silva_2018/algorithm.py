@@ -83,7 +83,6 @@ class DeMeloSilva2018PMP(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = True
     solver_backend = "gurobi"
 
@@ -101,7 +100,7 @@ class DeMeloSilva2018PMP(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
 
         lifo_strengthening = bool(cfg.extra.get("lifo_strengthening", True))
         flow_strengthening = bool(cfg.extra.get("flow_strengthening", True))
@@ -119,7 +118,6 @@ class DeMeloSilva2018PMP(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -211,11 +209,6 @@ class DeMeloSilva2018PMP(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Each seed solves its own MIP(s); keep small since this is an exact method.",
-            },
             "lifo_strengthening": {
                 "type": "bool", "default": True,
                 "label": "Section 3.2 LIFO strengthening (Eq. 15-18)",

@@ -1,157 +1,85 @@
 """
-Caserta et al. (2012) HEUR heuristic for CRP-R.
+CasertaHeuristic
+<2012> <heuristic> <restricted> <single-bay> <CRP-R>
+Destination-stack scoring by min priority
 
-Algorithm (Section 4, Algorithm 1)
-------------------------------------
-For each target block n = 1 … N:
-  While blocks R above n are non-empty:
-    r  ← topmost block in R
-    s* ← destination chosen by Eq. (11) scoring rule  (see scoring.py)
-    move r → s*
-  Retrieve block n
-
-Objective : minimise total RELOCATIONS.
-Interface : CRP_R.step()  (same as Kim–Hong, Greedy).
-Compatible: CRP-R only (assumption A1 — relocate only blocks
-            above the current target).
-
-Reference
----------
+------------------------------- Reference --------------------------------
 M. Caserta, S. Schwarze, S. Voß,
 "A mathematical formulation and complexity considerations for the
  blocks relocation problem",
 European Journal of Operational Research 219 (2012) 96–104.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
+
 
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import Callable, Dict, List, Optional
-
-import numpy as np
+from typing import Callable, List, Optional
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from core.layout_trace import trace_layout
+from core.move_export import attach_crane_time, export_yard_moves
 from .scoring import caserta_select_action
 
 
 class CasertaHeuristic(BaseAlgorithm):
 
-    name                = "Caserta (2012) HEUR"
-    category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Caserta et al. (EJOR 2012) stack-score heuristic for CRP-R. "
-        "Relocates blockers to the stack with the smallest min-priority "
-        "greater than the blocker (good fit), or the highest min-priority "
-        "if no good stack exists (delay re-relocation). "
-        "Average gap to optimum ≈1.9%; outperforms Kim–Hong."
-    )
+    name = "Caserta (2012) HEUR"
+    category = "Heuristic"
+    description = "Caserta et al. (EJOR 2012) min-priority stack-score heuristic."
     compatible_problems = ["CRP-R", "CRP-Time"]
-    step_label          = "Seed"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
-    # ---------------------------------------------------------------- #
-    # Train                                                              #
-    # ---------------------------------------------------------------- #
-
     def train(
         self,
         problem_factory: Callable,
-        result_queue:    mp.Queue,
-        stop_event:      mp.Event,
+        result_queue: mp.Queue,
+        stop_event: mp.Event,
     ) -> None:
-        cfg     = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
-        all_metrics: List[Dict] = []
+        if stop_event.is_set():
+            return
 
-        for seed in range(n_seeds):
+        env = problem_factory()
+        env.reset()
+
+        solution: List[int] = []
+        done = False
+        while not done:
             if stop_event.is_set():
                 break
+            info = env._get_info()
+            action = caserta_select_action(env, info.get("action_mask"))
+            _, _, done, _, _ = env.step(action)
+            solution.append(action)
 
-            trace_layout(
-                f"CasertaHeuristic.train: inner loop seed {seed + 1}/{n_seeds} "
-                f"(each seed ⇒ new env + reset(); same layout file while problem_factory is unchanged)"
-            )
+        metrics = attach_crane_time(
+            env.get_metrics(),
+            env.yard,
+            getattr(env.config, "extra", None) or {},
+        )
+        primary = float(metrics.get("relocations", 0.0))
+        self._best_solution = solution[:]
+        moves = export_yard_moves(env.yard)
 
-            env = problem_factory()
-            env.config.seed = seed
-            env.reset()
-
-
-
-            solution: List[int] = []
-            done = False
-
-            import sys
-            step_i = 0
-            while not done:
-                info = env._get_info()
-                action = caserta_select_action(env, info.get("action_mask"))
-                _, _, done, _, _ = env.step(action)
-                
-                step_i += 1
-                dst = env._action_to_stack(action)
-                m = env.get_metrics()
-                print(
-                    f"step={step_i}  action={action}  dst_stack={dst}  "
-                    f"relocations={m['relocations']}  steps={m['steps']}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                # Uncomment to also print the full yard layout (can be verbose):
-                print(env.yard, file=sys.stderr, flush=True)
-                solution.append(action)
-
-
-            # while not done:
-            #     info   = env._get_info()
-            #     action = caserta_select_action(env, info.get("action_mask"))
-            #     _, _, done, _, _ = env.step(action)
-            #     solution.append(action)
-
-            metrics = env.get_metrics()
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", 0.0))
-
-            if primary < self._best_metric:
-                self._best_solution = solution[:]
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = self._best_metric,
-                metrics  = agg,
-                progress = 1.0,
-            )
+        self._push(
+            result_queue,
+            step=1,
+            metric=primary,
+            metrics=metrics,
+            progress=1.0,
+            snapshot=env.get_state_snapshot(),
+            extra={
+                "moves": moves,
+                "solution": solution[:],
+            },
+        )
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
-            },
-        })
-        return base

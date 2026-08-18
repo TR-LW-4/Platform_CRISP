@@ -1,25 +1,20 @@
 """
-LA-N look-ahead heuristic for CRP-R (Petering & Hussein, EJOR 2013).
+LANHeuristic
+<2013> <heuristic> <restricted> <single-bay> <CRP-R>
+Look-ahead N with optional cleaning moves for upcoming targets
+N --- 2 --- Look-ahead depth for cleaning moves
 
-Algorithm family
-----------------
-LA-1  ≈  basic LA algorithm (no cleaning moves, only moves target-stack blocker)
-LA-N  (N > 1)  extends LA-1 with cleaning moves: containers on top of any
-       stack that holds one of the next N targets may be proactively relocated
-       if they can be placed "once and for all" without future re-relocation.
-
-Objective
----------
-Minimise total RELOCATIONS  (= total moves − C retrievals).
-Directly comparable with Kim–Hong (2006) and Lee–Lee (2010) on CRP-R.
-
-Implementation notes
---------------------
-- Uses RelocationPlan + CRP_R.step(); metrics report relocations, retrievals,
-  and total moves only (no crane-time model).
-- N is a GUI-configurable parameter; defaults to 2 (good for most sizes).
-- The algorithm is deterministic: different seeds produce different initial
-  yard layouts, so multi-seed evaluation gives a fair average.
+------------------------------- Reference --------------------------------
+M.E.H. Petering, M.I. Hussein,
+"A new mixed integer program and extended look-ahead heuristic algorithm
+ for the block relocation problem",
+European Journal of Operational Research 231 (2013) 120–130.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -55,8 +50,6 @@ class LANHeuristic(BaseAlgorithm):
         "Generally outperforms Kim–Hong and Lee–Lee on relocations."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None
@@ -73,7 +66,7 @@ class LANHeuristic(BaseAlgorithm):
     ) -> None:
         cfg      = self.config
         N        = int(cfg.extra.get("N", 2))
-        n_seeds  = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         rng_seed = cfg.seed
         all_metrics: List[Dict] = []
 
@@ -155,11 +148,6 @@ class LANHeuristic(BaseAlgorithm):
                     "N=S-1: maximum look-ahead (best for small/medium instances). "
                     "For very large instances (>40×40), N=1 is often best."
                 ),
-            },
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
             },
         })
         return base

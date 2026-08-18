@@ -1,16 +1,12 @@
 """
-Jovanović, Tuba, Voß (2019) — scoring and greedy primitives for ACO rBRP.
+Greedy Min–Max and attractiveness helpers for JovanovicACO_rBRP.
 
-All functions operate on a plain dict representation of the bay:
-  stacks : Dict[Any, List[int]]
-    key        = any hashable stack identifier (e.g. (bay, row) tuple)
-    List[int]  = container due-dates bottom-to-top; 1 = retrieved first
-
-Equations reference the paper:
-  R. Jovanović, M. Tuba, S. Voß,
-  "An efficient ant colony optimization algorithm for the blocks relocation problem",
-  European Journal of Operational Research 274 (2019) 78–90.
-  https://doi.org/10.1016/j.ejor.2018.09.038
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -24,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 def dd(stack_priorities: List[int], n_total: int) -> int:
     """
-    dd(S) — minimum due-date (most urgent container) in stack S.  Eq. 2.
+    dd(S) — minimum due-date (most urgent container) in stack S.
     Empty stack → N + 1  (sentinel: no container, never blocks anything).
     """
     if not stack_priorities:
@@ -52,7 +48,7 @@ def dd_star(stack_priorities: List[int], n_total: int, stack_1based_idx: int) ->
 
 def dif(c: int, d: int, n_total: int) -> int:
     """
-    Eq. 3 — undesirability of placing container c above a stack whose
+    Undesirability of placing container c above a stack whose
     minimum due-date is d.
 
     dif(c, d) ≤ N  →  c will be well-located (d > c, d retrieved after c)
@@ -76,7 +72,7 @@ def dif(c: int, d: int, n_total: int) -> int:
 
 def f_heuristic(c: int, d_val: int, n_total: int) -> float:
     """
-    Eq. 26 — ACO heuristic attractiveness of placing c in a stack with
+    ACO heuristic attractiveness of placing c in a stack with
     dd* = d_val.  Inverse of (1 + dif) so that higher is more attractive.
     """
     return 1.0 / (1.0 + dif(c, d_val, n_total))

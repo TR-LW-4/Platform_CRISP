@@ -202,8 +202,6 @@ class ForsterBortfeldt2012Retrieval(BaseAlgorithm):
         "group is removed. Objective: crane working time."
     )
     compatible_problems = ["CRP-Time"]
-    step_label = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -214,7 +212,7 @@ class ForsterBortfeldt2012Retrieval(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict[str, float]] = []
 
         for seed_idx in range(n_seeds):
@@ -284,11 +282,6 @@ class ForsterBortfeldt2012Retrieval(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random layouts to evaluate.",
-            },
             "per_bay_time_limit_s": {
                 "type": "float", "default": 3.0, "min": 0.1, "max": 120.0,
                 "label": "Per-bay solve time limit (s)",

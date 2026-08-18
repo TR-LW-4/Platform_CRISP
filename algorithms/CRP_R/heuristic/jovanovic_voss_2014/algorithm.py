@@ -1,33 +1,19 @@
 """
-Jovanović & Voß (2014) Chain heuristic for CRP-R.
+JovanovicVoss2014Chain
+<2014> <heuristic> <restricted> <single-bay> <CRP-R>
+Chain look-ahead over Min–Max destination choice
+use_chain_f --- True --- Enable Chain-F full-stack correction
 
-Algorithm overview
-------------------
-This heuristic improves the Min–Max rule (Caserta et al., 2012) by introducing
-a one-step look-ahead: when deciding where to relocate block rn, the algorithm
-also evaluates where block rn+1 would have to go, and chooses the order that
-yields a better combined outcome.
-
-Two variants are provided via the `use_chain_f` switch:
-  • Chain    (use_chain_f=False) – pure chain look-ahead (Eq. 11)
-  • Chain F  (use_chain_f=True)  – chain + correction for stacks about to become
-                                   full (Eq. 5), default; best in paper tables
-
-Config parameters
------------------
-  num_eval_seeds : int   – number of random seeds (layouts) to evaluate
-  use_chain_f    : bool  – enable Chain-F full-stack correction (default True)
-
-Compatible problems
--------------------
-  CRP-R only (restricted relocation, minimize total relocations)
-
-Reference
----------
+------------------------------- Reference --------------------------------
 R. Jovanović, S. Voß,
 "A chain heuristic for the Blocks Relocation Problem",
 Computers & Industrial Engineering 75 (2014) 79–86.
-https://doi.org/10.1016/j.cie.2014.06.010
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -55,8 +41,6 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
         "Chain F improves on Min–Max by ≈5% on average and up to 8% on large instances."
     )
     compatible_problems = ["CRP-R"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -71,7 +55,7 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg          = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         use_chain_f  = bool(cfg.extra.get("use_chain_f", True))
         all_metrics: List[Dict] = []
 
@@ -85,7 +69,6 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             solution: List[int] = []
@@ -138,21 +121,13 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 10,
-                "min":     1,
-                "max":     200,
-                "label":   "Evaluation seeds",
-                "help":    "Number of random initial layouts to evaluate.",
-            },
             "use_chain_f": {
                 "type":    "bool",
                 "default": True,
                 "label":   "Enable Chain-F correction",
                 "help": (
                     "When True (Chain F), penalises destination stacks that would "
-                    "become full when a deadlock is unavoidable (Eq. 5). "
+                    "become full when a deadlock is unavoidable. "
                     "Improves average relocations by ≈5% over plain Chain on large "
                     "instances. Set False for the basic Chain heuristic."
                 ),

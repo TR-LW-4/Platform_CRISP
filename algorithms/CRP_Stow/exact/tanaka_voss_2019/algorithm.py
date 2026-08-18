@@ -236,7 +236,7 @@ class TanakaBB2019Stow(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg_a   = self.config
-        n_seeds = max(1, cfg_a.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         extra   = cfg_a.extra or {}
 
         variant   = str(extra.get("variant", "unrestricted")).strip().lower()
@@ -254,7 +254,6 @@ class TanakaBB2019Stow(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(seed=seed)
 
             pro_path, is_temp = self._get_pro_path(env)
@@ -327,11 +326,6 @@ class TanakaBB2019Stow(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Any]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 200,
-                "label": "Number of instances",
-                "help": "Number of independent benchmark instances to solve.",
-            },
             "variant": {
                 "type": "str", "default": "unrestricted",
                 "label": "BRPSP variant",

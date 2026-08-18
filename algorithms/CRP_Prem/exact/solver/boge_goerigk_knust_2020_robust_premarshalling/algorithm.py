@@ -42,7 +42,6 @@ class BogeGoerigkKnust2020RobustPMP(BaseAlgorithm):
         "order using adjacent-swap uncertainty (EJOR 2020)."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = True
     solver_backend = "gurobi"
 
@@ -56,7 +55,7 @@ class BogeGoerigkKnust2020RobustPMP(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         delta = max(0, int(cfg.extra.get("robust_delta", 2)))
         exact_eval_max_classes = int(cfg.extra.get("exact_eval_max_classes", 9))
         exact_eval_max_scenarios = int(cfg.extra.get("exact_eval_max_scenarios", 100000))
@@ -68,7 +67,6 @@ class BogeGoerigkKnust2020RobustPMP(BaseAlgorithm):
             t0 = time.perf_counter()
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -183,10 +181,6 @@ class BogeGoerigkKnust2020RobustPMP(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-            },
             "robust_delta": {
                 "type": "int", "default": 2, "min": 0, "max": 100,
                 "label": "Uncertainty budget delta (adjacent swaps)",

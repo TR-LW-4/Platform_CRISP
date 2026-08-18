@@ -66,7 +66,6 @@ class WangJinLim2015TGH(BaseAlgorithm):
         "``has_dummy_stack``."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = False
     solver_backend = None
 
@@ -84,7 +83,7 @@ class WangJinLim2015TGH(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         has_dummy_stack = bool(cfg.extra.get("has_dummy_stack", False))
         max_moves = int(cfg.extra.get("max_moves", 10 ** 6))
 
@@ -95,7 +94,6 @@ class WangJinLim2015TGH(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -180,11 +178,6 @@ class WangJinLim2015TGH(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "TGH is deterministic per instance; multiple seeds vary the layout.",
-            },
             "has_dummy_stack": {
                 "type": "bool", "default": False,
                 "label": "CPMPDS: last stack is a dummy (transfer-lane) stack",

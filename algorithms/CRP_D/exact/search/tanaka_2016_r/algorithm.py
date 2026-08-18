@@ -76,7 +76,6 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
     ---------------------------------
     tanaka_time_limit_sec : int   CPU-time limit passed to brp_bb (default 600).
     tanaka_binary         : str   Path to brp_bb; empty = use bundled binary.
-    num_eval_seeds        : int   Number of independent instances to evaluate.
     """
 
     name                = "Tanaka (2016) B&B [CRP-D]"
@@ -89,8 +88,6 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
         "Primary metric = relocations; ``optimal_proven=1`` when opt= is reported."
     )
     compatible_problems = ["CRP-D"]
-    step_label          = "Seed"
-
     _OPT_RE  = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")
 
@@ -192,7 +189,7 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
     ) -> None:
         cfg_a   = self.config
         extra   = cfg_a.extra or {}
-        n_seeds = max(1, cfg_a.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         t_limit = int(extra.get("tanaka_time_limit_sec", 600))
 
         all_metrics: List[Dict[str, float]] = []
@@ -206,7 +203,6 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(seed=seed, options={"skip_auto_retrieve": True})
 
             text = yard_to_tanaka_instance(env.config, env.yard)
@@ -267,14 +263,6 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Any]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     100,
-                "label":   "Evaluation seeds",
-                "help":    "Number of independent instances to evaluate.",
-            },
             "tanaka_time_limit_sec": {
                 "type":    "int",
                 "default": 600,

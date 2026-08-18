@@ -53,8 +53,6 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
         "numerics cannot be reproduced with this implementation."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None
@@ -73,7 +71,7 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
         rng_seed    = cfg.seed
         max_p2      = int(cfg.extra.get("max_no_improve_p2", 200))
         max_p3      = int(cfg.extra.get("max_no_improve_p3", 500))
-        n_seeds     = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         total_steps = n_seeds * 3
         all_metrics: List[Dict] = []
 
@@ -86,7 +84,6 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
             np.random.seed(seed)
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             kin          = KinematicsModel.from_config_extra(env.config.extra)
@@ -191,11 +188,6 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
-            },
             "max_no_improve_p2": {
                 "type": "int", "default": 200, "min": 10, "max": 2000,
                 "label": "Phase 2 – max non-improving iters",

@@ -3,7 +3,7 @@
 **Container Relocation & Stowage Platform**
 
 一个专为集装箱堆场管理问题设计的研究平台，类似 PlatEMO，支持启发式、精确算法、进化算法和可复现实验，带实时可视化界面。
-各问题类保留 Gymnasium-compatible 的 `reset` / `step` 环境接口，用于逐步仿真、解验证、GUI 回放和未来可选的学习型方法扩展。
+各问题类保留 Gymnasium-compatible 的 `reset` / `step` 环境接口，用于逐步仿真、解验证、Web 回放和未来可选的学习型方法扩展。
 
 ---
 
@@ -13,34 +13,37 @@
 
 ```bash
 conda activate rl
-pip install streamlit imageio
+pip install -r requirements.txt
 ```
 
 验证安装：
 ```bash
 conda activate rl
-python -c "import streamlit, matplotlib, gymnasium; print('All OK')"
+python -c "import fastapi, gymnasium, matplotlib; print('All OK')"
 ```
 
 ---
 
-### 第二步：启动 GUI 界面
+### 第二步：启动 Web 工作台
 
 ```bash
 conda activate rl
-cd /home/liuw2/data1/crp_platform
-streamlit run gui/app.py
+cd Platform_CRISP
+
+python main.py web
+# 浏览器访问 http://127.0.0.1:8000
 ```
 
-浏览器会自动打开（或手动访问 `http://localhost:8501`）。
+React 界面由 FastAPI 直接托管；算法在独立 Python 进程中运行。关闭浏览器不会
+中断当前服务器进程中的任务。
 
 ---
 
-### 第三步：命令行使用（不需要 GUI）
+### 第三步：命令行使用（不需要浏览器）
 
 ```bash
 conda activate rl
-cd /home/liuw2/data1/crp_platform
+cd Platform_CRISP
 
 # 查看所有已注册的问题和算法
 python main.py list
@@ -54,38 +57,19 @@ python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 
 
 ---
 
-## GUI 界面使用说明
+## Web 工作台使用说明
 
-打开 `http://localhost:8501` 后，界面分 4 个 Tab：
+Web 工作台提供 Workbench、Jobs 和 Compare 页面。问题与算法由现有 registry 自动
+发现，参数控件由 `config_schema()` 自动生成；新增算法无需修改 React。任务
+在独立进程中执行，支持实时进度、停止、收敛曲线、堆场快照回放和结果保存。
 
-### 🔬 Test Tab（测试单个算法）
+修改前端源码后可重新构建：
 
-1. **左侧边栏**选择问题（Problem）和算法（Algorithm）
-2. **左侧面板**调整参数：
-   - 问题参数：堆场大小（num_bays/num_rows/max_tiers）、集装箱数量、组数、吊机数量等
-   - 算法参数：迭代次数、种群大小（GA）、时间限制等
-3. 点击 **▶ Start** 开始训练
-4. 右侧实时显示：
-   - 堆场状态彩色图（每种颜色代表一个 group/目的港）
-   - 收敛曲线（reward / fitness 随训练步数变化）
-   - 实时指标（shifters、relocations 等）
-5. 点击 **⏹ Stop** 随时停止
-
-### 📊 Experiment Tab（批量对比实验）
-
-1. 选择多个问题 + 多个算法
-2. 设置随机种子数量
-3. 点击 **🚀 Run Experiment**
-4. 自动运行所有组合，输出对比表格
-
-### 📈 Compare Tab（结果对比）
-
-- 运行 Experiment 后，这里显示柱状图对比
-- 可选择不同指标（shifters / relocations / time 等）
-
-### ℹ️ About Tab
-
-- 平台介绍和使用说明
+```bash
+cd web/frontend
+npm install
+npm run build
+```
 
 ---
 
@@ -179,7 +163,7 @@ class MyRule(BaseAlgorithm):
         return self._best_solution
 ```
 
-**保存文件，重启 GUI** → "My DQN" 自动出现在算法下拉菜单中。
+**保存文件，重启 GUI** → "My Rule" 自动出现在算法下拉菜单中。
 
 ---
 
@@ -246,9 +230,11 @@ crp_platform/
 │   ├── CRP_Time/
 │   ├── CRP_Stow/
 │   └── CRP_Prem/
-├── visualization/        可视化渲染
-├── gui/app.py            Streamlit 界面
-├── main.py               CLI 入口
+├── visualization/        可视化渲染（供环境 / Web 回放）
+├── web/
+│   ├── backend/          FastAPI catalog、任务与结果 API
+│   └── frontend/         React + TypeScript 界面
+├── main.py               CLI / Web 入口
 └── requirements.txt      依赖列表
 ```
 
@@ -256,8 +242,8 @@ crp_platform/
 
 ## 常见问题
 
-**Q: streamlit 启动后浏览器没有自动打开？**  
-A: 手动在浏览器访问 `http://localhost:8501`
+**Q: `python main.py web` 后浏览器没有自动打开？**  
+A: 手动在浏览器访问 `http://127.0.0.1:8000`
 
 **Q: 训练很慢？**  
 A: 减小 `max_iterations`，或用 `Caserta (2012) HEUR` 等轻量启发式先测试
@@ -266,4 +252,4 @@ A: 减小 `max_iterations`，或用 `Caserta (2012) HEUR` 等轻量启发式先�
 A: `problems/CRP_Stow.py` 已经基于你的原始 `stowage_gym.py` 逻辑重构，逻辑完全一致
 
 **Q: 如何保存训练结果？**  
-A: Experiment Tab 的结果会显示在表格中，后续可加 CSV 导出功能
+A: Workbench 运行结束后会写入 `results/`；Compare 页可汇总与导出 CSV

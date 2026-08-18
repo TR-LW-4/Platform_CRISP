@@ -1,8 +1,18 @@
 """
-Kim & Hong (2006) ENAR-style relocation heuristic for CRP-R.
+KimHong2006ENARHeuristic
+<2006> <heuristic> <restricted> <single-bay> <CRP-R>
+ENAR-style destination scoring with inversion and height tie-breaks
 
-Uses the scoring functions from scoring.py to choose the best destination
-stack for the current blocker at every step.
+------------------------------- Reference --------------------------------
+K.H. Kim, G.P. Hong,
+"A heuristic rule for relocating blocks",
+Computers & Operations Research 33 (2006) 940–954.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -40,7 +50,7 @@ class KimHong2006ENARHeuristic(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg     = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
         for seed in range(n_seeds):
@@ -53,7 +63,6 @@ class KimHong2006ENARHeuristic(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             print(
@@ -115,17 +124,3 @@ class KimHong2006ENARHeuristic(BaseAlgorithm):
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
-
-    step_label = "Seed"
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
-            },
-        })
-        return base

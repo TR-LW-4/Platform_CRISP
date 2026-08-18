@@ -908,8 +908,6 @@ class DeMeloSilva2018BRPGrouped(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-D"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 
@@ -925,7 +923,7 @@ class DeMeloSilva2018BRPGrouped(BaseAlgorithm):
         variant      = str(extra.get("variant",      "m1"))
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag  = int(extra.get("output_flag",   0))
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
         for seed in range(n_seeds):
@@ -933,7 +931,6 @@ class DeMeloSilva2018BRPGrouped(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(seed=seed, options={"skip_auto_retrieve": True})
 
             yard = env.yard
@@ -1023,10 +1020,6 @@ class DeMeloSilva2018BRPGrouped(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 20,
-                "label": "Seeds",
-            },
             "variant": {
                 "type": "str", "default": "m1", "options": ["m1", "m2"],
                 "label": "Model variant",
@@ -1073,8 +1066,6 @@ class DeMeloSilva2018RBRPGrouped(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-D"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 
@@ -1090,7 +1081,7 @@ class DeMeloSilva2018RBRPGrouped(BaseAlgorithm):
         variant      = str(extra.get("variant",      "m1"))
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag  = int(extra.get("output_flag",   0))
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
         for seed in range(n_seeds):
@@ -1098,7 +1089,6 @@ class DeMeloSilva2018RBRPGrouped(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(seed=seed, options={"skip_auto_retrieve": True})
 
             yard = env.yard
@@ -1188,10 +1178,6 @@ class DeMeloSilva2018RBRPGrouped(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 20,
-                "label": "Seeds",
-            },
             "variant": {
                 "type": "str", "default": "m1", "options": ["m1", "m2"],
                 "label": "Model variant",

@@ -4,12 +4,16 @@
 numpy>=1.24
 gymnasium>=0.29
 
-# GUI
-streamlit>=1.32
+# Web workbench
+fastapi>=0.140
+uvicorn[standard]>=0.46
 
 # Visualisation
 matplotlib>=3.7
 
 # Utilities
 imageio>=2.34    # for render_yard() → numpy array
-pandas>=2.0     # for Experiment tab comparison tables
+pandas>=2.0     # for result aggregation / comparison tables
+
+# Tests
+httpx>=0.28

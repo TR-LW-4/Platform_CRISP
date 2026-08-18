@@ -1,8 +1,12 @@
 """
-Kim & Hong (2006) ENAR scoring functions.
+ENAR destination scores and action helpers for KimHong2006ENARHeuristic.
 
-Separated from the algorithm class so they can be tested independently
-and reused by derived algorithms without importing the full training loop.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

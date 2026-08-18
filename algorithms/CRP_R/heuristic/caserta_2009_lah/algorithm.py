@@ -1,53 +1,21 @@
 """
-Caserta, Schwarze, Voß (2009) — Look-Ahead Heuristic (LAH) for CRP-R.
+CasertaLAH
+<2009> <heuristic> <restricted> <single-bay> <CRP-R>
+Randomised look-ahead over Min–Max with roulette-wheel restarts
+n_restarts --- 200 --- Number of trajectory restarts
 
-Algorithm overview
-------------------
-A randomised metaheuristic built on top of the Min–Max greedy heuristic.
-The key idea comes from the *pilot method*: instead of deterministically
-picking the best destination for the current blocker, the algorithm
-
-  1. Enumerates every feasible destination s' ∈ S  (at most W−1 options).
-  2. Evaluates each resulting configuration A' by running the deterministic
-     greedy heuristic (Min–Max) to completion — the resulting relocation
-     count is the *greedy score* g(A') (look-ahead depth = 1).
-  3. Selects the next move via *roulette-wheel* sampling where the
-     attractiveness of A' = max_g − g(A') + 1, so lower-score neighbours
-     are preferred but not exclusively chosen.
-
-The full algorithm (Matrix-Algorithm, Section 4) repeats this trajectory
-construction until a stopping criterion is met, keeping the best solution
-found across all restarts.  A *trajectory-fathoming* test abandons any
-partial trajectory whose current cost already equals or exceeds the best
-known upper bound.
-
-Relation to Caserta (2012) HEUR
----------------------------------
-The deterministic greedy rule used here (Section 3) is identical to
-Caserta et al. (2012) Eq.(11).  The 2009 paper wraps that rule in a
-randomised look-ahead framework, trading determinism for solution quality
-across multiple restarts.
-
-Why this belongs in CRP-R / Heuristic
---------------------------------------
-The algorithm is single-bay, restricted (Assumption A1), minimises
-relocations, and does not require training — it is a pure constructive
-metaheuristic, consistent with the other heuristics in this family.
-
-Config parameters
------------------
-  n_restarts     : int   — number of trajectory restarts (default 200)
-  num_eval_seeds : int   — independent runs per layout (default 1 for
-                           fixed benchmark; increase for random-layout mode)
-
-Reference
----------
+------------------------------- Reference --------------------------------
 M. Caserta, S. Schwarze, S. Voß,
 "A New Binary Description of the Blocks Relocation Problem and Benefits
  in a Look Ahead Heuristic",
 Evolutionary Computation in Combinatorial Optimization (EvoCOP 2009),
-LNCS 5482, pp. 37–48, Springer, Berlin Heidelberg, 2009.
-https://doi.org/10.1007/978-3-642-01009-5_4
+LNCS 5482, pp. 37–48, Springer, 2009.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -91,7 +59,7 @@ class CasertaLAH(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg         = self.config
-        n_seeds     = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         n_restarts  = int(cfg.extra.get("n_restarts", 200))
         report_every = max(1, n_restarts // 20)  # ~20 GUI pushes per seed
 
@@ -110,7 +78,6 @@ class CasertaLAH(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             n_total   = int(env.config.num_containers)
@@ -202,18 +169,6 @@ class CasertaLAH(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     50,
-                "label":   "Evaluation seeds",
-                "help": (
-                    "Number of independent runs per layout. "
-                    "Use 1 for fixed benchmark files. "
-                    "Increase for random-layout mode to assess stability."
-                ),
-            },
             "n_restarts": {
                 "type":    "int",
                 "default": 200,

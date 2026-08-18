@@ -30,9 +30,8 @@ class AlgorithmConfig:
 
     # ── Common ───────────────────────────────────────────────────── #
     max_iterations: int   = 500
-    seed:           int   = 0
+    seed:           int   = 0     # RNG seed for stochastic algorithms (not multi-instance eval)
     report_interval: int  = 10    # push to queue every N iterations
-    num_eval_seeds:  int  = 5     # seeds used for evaluation (EA)
 
     # ── Evolutionary-specific ─────────────────────────────────────── #
     population_size:   int   = 50

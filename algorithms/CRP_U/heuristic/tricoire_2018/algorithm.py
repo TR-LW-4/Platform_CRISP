@@ -68,7 +68,7 @@ Excluded from this port (deliberately)
 ----------------------------------------
   Exact algorithms  – DFBB, Branch-and-Bound (dfbb.cpp / branchandbound.cpp).
                       The platform already provides stronger exact solvers at
-                      CRP_U/exact/ (Tanaka & Mizuno 2018, Jin & Tanaka 2023).
+                      CRP_U/tree/ (Tanaka & Mizuno 2018, Jin & Tanaka 2023).
   Baselines         – GLAH (→ CRP_U/heuristic/glah/),
                       LA-N  (→ CRP_U/heuristic/lan_*/),
                       JZW, ZHU (not in Platform_CRISP scope).
@@ -131,8 +131,6 @@ class TricoireHeuristic(BaseAlgorithm):
         "DOI: 10.1016/j.cor.2017.08.009"
     )
     compatible_problems = ["CRP-U"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -147,7 +145,7 @@ class TricoireHeuristic(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg         = self.config
-        n_seeds     = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         mode        = str(cfg.extra.get("mode",         "SmSEQ-2"))
         cond_mode   = str(cfg.extra.get("condensation", "improved"))
         width       = int(cfg.extra.get("width",        100))
@@ -249,14 +247,6 @@ class TricoireHeuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     20,
-                "label":   "Evaluation seeds",
-                "help":    "Number of independent runs.",
-            },
             "mode": {
                 "type":    "str",
                 "default": "SmSEQ-2",

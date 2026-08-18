@@ -1,49 +1,26 @@
 """
-Jovanović, Tuba, Voß (2019) — Ant Colony Optimization for rBRP (CRP-R).
+JovanovicACO_rBRP
+<2019> <heuristic> <restricted> <single-bay> <CRP-R>
+Ant Colony System for restricted block relocation
+n_iterations --- 5000 --- Colony iterations per layout
+n_ants --- 10 --- Ants per iteration
+q0 --- 0.9 --- Exploitation rate
+rho --- 0.1 --- Global pheromone update rate
+phi --- 0.9 --- Local evaporation factor
+max_moves --- 10 --- Relocation-count depth in pheromone
+max_const_iter --- 100 --- Stagnation reinitialisation threshold
 
-Algorithm overview
-------------------
-An ACS-based (Ant Colony System) metaheuristic that builds relocation
-solutions using a probabilistic transition rule guided by:
-  • A heuristic attractiveness function  f(c, S) = 1 / (1 + dif(c, dd*(S)))
-  • A 4-dimensional pheromone matrix      τ[c][d][m_c][t]
-    where:
-      c   = due-date of the container being relocated   (1..N)
-      d   = dd*(destination stack) at relocation time   (1..N+W)
-      m_c = number of prior relocations of c            (0..MaxMoves)
-      t   = current target due-date                     (1..N)
-
-Each iteration: n_ants ants each independently reconstruct a full solution,
-applying the transition rule.  The best solution found deposits pheromone
-(global update); each ant's solution evaporates pheromone (local update).
-
-Performance optimisations (vs naïve implementation)
-----------------------------------------------------
-1. Location array  loc[c] = stack_key
-   O(1) lookup of the stack containing container c, replacing O(W×H) scans.
-
-2. Stack minimum array  stack_min[key] = min priority in that stack
-   Updated incrementally on every push/pop: allows O(1) dd*(S) computation
-   and O(1) f-heuristic evaluation, replacing min() calls over full stacks.
-
-3. Incremental lower-bound tracking
-   lb_current is updated after every individual relocation:
-     • −1 if the moved container was non-well-located in its source stack
-     • +1 if it becomes non-well-located in its destination stack
-   Eliminates the O(W×H) compute_lb() call that was invoked per relocation,
-   producing the dominant 30–50× speedup over the baseline implementation.
-
-Pheromone matrix size:  N × (N+W) × (MaxMoves+1) × N  (float32)
-  For N=39, W=8,  MaxMoves=10:  ≈ 793 K entries ≈ 3 MB
-  For N=100, W=10, MaxMoves=10: ≈ 12 M entries ≈ 48 MB
-
-Reference
----------
+------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
 "An efficient ant colony optimization algorithm for the blocks relocation
  problem",
-European Journal of Operational Research, 274(1), 78–90, 2019.
-https://doi.org/10.1016/j.ejor.2018.09.038
+European Journal of Operational Research 274 (2019) 78–90.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -70,8 +47,6 @@ class JovanovicACO_rBRP(BaseAlgorithm):
         "Outperforms corridor method on large instances; typically 20–30× faster."
     )
     compatible_problems = ["CRP-R"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -86,7 +61,7 @@ class JovanovicACO_rBRP(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         n_iters      = int(cfg.extra.get("n_iterations",   5000))
         n_ants       = int(cfg.extra.get("n_ants",         10))
         q0           = float(cfg.extra.get("q0",            0.9))
@@ -114,7 +89,6 @@ class JovanovicACO_rBRP(BaseAlgorithm):
 
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             n_total   = int(env.config.num_containers)
@@ -428,16 +402,6 @@ class JovanovicACO_rBRP(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": (
-                    "Number of independent ACO runs per layout. "
-                    "For fixed benchmark files (Caserta/Zhu) use 1 — the layout "
-                    "is identical across seeds. Use >1 only for random-layout mode "
-                    "where each seed produces a different initial configuration."
-                ),
-            },
             "n_iterations": {
                 "type": "int", "default": 5000, "min": 100, "max": 50000,
                 "label": "ACO iterations",

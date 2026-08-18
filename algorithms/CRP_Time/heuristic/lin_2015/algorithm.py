@@ -47,8 +47,6 @@ class Lin2015Heuristic(BaseAlgorithm):
         "Defaults P_r=30, P_b=300 follow Shin et al. (TRC 2026)."
     )
     compatible_problems = ["CRP-Time", "CRP-R"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -64,7 +62,7 @@ class Lin2015Heuristic(BaseAlgorithm):
     ) -> None:
         cfg        = self.config
         rng_seed   = cfg.seed
-        n_seeds    = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         P_r        = float(cfg.extra.get("P_r",        30.0))
         P_b        = float(cfg.extra.get("P_b",        300.0))
         restricted = bool (cfg.extra.get("restricted", False))
@@ -150,11 +148,6 @@ class Lin2015Heuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
-            },
             "P_r": {
                 "type": "float", "default": 30.0, "min": 0.0, "max": 10_000.0,
                 "label": "P_r (row-index weight)",

@@ -90,8 +90,6 @@ class FeillletLS(BaseAlgorithm):
         "DOI: 10.1016/j.cor.2019.04.005"
     )
     compatible_problems = ["CRP-U"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -106,7 +104,7 @@ class FeillletLS(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg      = self.config
-        n_seeds  = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         max_iter = int(cfg.extra.get("max_iter", 0))
         init_src = str(cfg.extra.get("init",     "greedy")).lower()
         verbose  = bool(cfg.extra.get("verbose",  False))
@@ -246,14 +244,6 @@ class FeillletLS(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     20,
-                "label":   "Evaluation seeds",
-                "help":    "Number of independent runs (with greedy init all runs are identical).",
-            },
             "max_iter": {
                 "type":    "int",
                 "default": 0,

@@ -1,20 +1,12 @@
 """
-Caserta et al. (2012) destination-stack scoring rule — Eq. (11).
+Destination-stack selection helpers for CasertaHeuristic.
 
-Given the topmost relocating block r (priority = r_priority), choose:
-  s* = argmin_{min(i) > r}  min(i)   if any stack qualifies
-  s* = argmax_{i}            min(i)   otherwise
-
-min(i) = priority of the lowest-numbered (earliest-retrieved) block
-         in stack i.  Empty stacks are treated as min(i) = N+1
-         (infinitely good — no future conflict).
-
-Reference
----------
-M. Caserta, S. Schwarze, S. Voß,
-"A mathematical formulation and complexity considerations for the
- blocks relocation problem",
-European Journal of Operational Research 219 (2012) 96–104.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -37,7 +29,7 @@ def _min_priority(stk, n_total: int) -> int:
 def caserta_select_action(env, mask: Optional[np.ndarray] = None) -> int:
     """
     Pick the destination stack index for the current topmost blocker
-    using Caserta et al. (2012) Eq. (11).
+    using Caserta et al. (2012) min-priority scoring.
 
     Returns a flat action index compatible with CRP_R.step().
     """
@@ -79,10 +71,6 @@ def caserta_select_action(env, mask: Optional[np.ndarray] = None) -> int:
 
     # Good stacks: min(i) > r_priority
     good = [a for a in candidates if min_i(a) > r_priority]
-
     if good:
-        # Choose good stack with LOWEST min(i) — conserve high-value slots
-        return min(good, key=lambda a: (min_i(a), int(a)))
-    else:
-        # No good stack — choose stack with HIGHEST min(i) — delay re-relocation
-        return max(candidates, key=lambda a: (min_i(a), -int(a)))
+        return min(good, key=min_i)
+    return max(candidates, key=min_i)

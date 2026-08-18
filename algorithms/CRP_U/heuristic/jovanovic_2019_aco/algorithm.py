@@ -65,8 +65,6 @@ class JovanovicACO_uBRP(BaseAlgorithm):
         "Outperforms EXP and FB on large instances; ~20–30× faster than FB."
     )
     compatible_problems = ["CRP-U"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -81,7 +79,7 @@ class JovanovicACO_uBRP(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         n_iters      = int(cfg.extra.get("n_iterations",  1000))
         n_ants       = int(cfg.extra.get("n_ants",          10))
         q0           = float(cfg.extra.get("q0",            0.9))
@@ -106,7 +104,6 @@ class JovanovicACO_uBRP(BaseAlgorithm):
 
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             n_total   = int(env.config.num_containers)
@@ -511,15 +508,6 @@ class JovanovicACO_uBRP(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": (
-                    "Number of independent ACO runs per layout. "
-                    "Use 1 for fixed benchmark files; increase for random-layout "
-                    "mode where each seed produces a different initial configuration."
-                ),
-            },
             "n_iterations": {
                 "type": "int", "default": 1000, "min": 100, "max": 50000,
                 "label": "ACO iterations",

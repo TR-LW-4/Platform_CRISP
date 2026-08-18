@@ -39,8 +39,6 @@ class HuangLin2012LabellingTypeA(BaseAlgorithm):
         "(R/W stack labelling; complete/deconstruct strategy with buffers)."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -51,7 +49,7 @@ class HuangLin2012LabellingTypeA(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         b = float(cfg.extra.get("b", 0.4))
         max_moves_factor = float(cfg.extra.get("max_moves_factor", 20.0))
         num_restarts = int(cfg.extra.get("num_restarts", 1))
@@ -61,7 +59,6 @@ class HuangLin2012LabellingTypeA(BaseAlgorithm):
             if stop_event.is_set():
                 break
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -147,10 +144,6 @@ class HuangLin2012LabellingTypeA(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-            },
             "b": {
                 "type": "float", "default": 0.4, "min": 0.05, "max": 0.99,
                 "label": "High-stack threshold ratio b",

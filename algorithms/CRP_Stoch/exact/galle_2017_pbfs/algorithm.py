@@ -48,7 +48,6 @@ from core.stoch.galle_2017_source import (
 class _PBFSBase(BaseAlgorithm):
     category = "Exact"
     compatible_problems = ["CRP-Stoch"]
-    step_label = "Seed"
     _mode = "batch_exact"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -114,13 +113,12 @@ class _PBFSBase(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict[str, float]] = []
         for seed in range(n_seeds):
             if stop_event.is_set():
                 break
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
             rng = np.random.RandomState(seed)
             metrics = self._run_one(env, rng)
@@ -158,13 +156,6 @@ class _PBFSBase(BaseAlgorithm):
         base = super().config_schema()
         base.update(
             {
-                "num_eval_seeds": {
-                    "type": "int",
-                    "default": 3,
-                    "min": 1,
-                    "max": 50,
-                    "label": "Evaluation seeds",
-                },
                 "lower_bound_type": {
                     "type": "int",
                     "default": 1,

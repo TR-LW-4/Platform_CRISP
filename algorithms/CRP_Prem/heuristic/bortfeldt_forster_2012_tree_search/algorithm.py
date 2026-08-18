@@ -57,7 +57,6 @@ class BortfeldtForster2012TreeSearch(BaseAlgorithm):
         "ablation switches V1-V4 exposed via config.extra."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = False
     solver_backend = None
 
@@ -75,7 +74,7 @@ class BortfeldtForster2012TreeSearch(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
 
         # Paper §7 parameters.
         n_succ = int(cfg.extra.get("n_succ", 5))
@@ -101,7 +100,6 @@ class BortfeldtForster2012TreeSearch(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -197,15 +195,6 @@ class BortfeldtForster2012TreeSearch(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": (
-                    "Number of independent random layouts (instances) to evaluate. "
-                    "BF (2012) is deterministic per instance, so a seed count > 1 "
-                    "is only meaningful when the layout distribution varies."
-                ),
-            },
             "n_succ": {
                 "type": "int", "default": 5, "min": 1, "max": 50,
                 "label": "n_succ (max branches per node)",

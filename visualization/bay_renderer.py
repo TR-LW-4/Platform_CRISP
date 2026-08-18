@@ -2,7 +2,7 @@
 Yard / vessel bay visualisation using matplotlib.
 
 render_yard(yard, config)   → RGB numpy array  (for gym render)
-yard_figure(yard, config)   → matplotlib Figure (for Streamlit)
+yard_figure(yard, config)   → matplotlib Figure
 render_vessel(vessel_state) → matplotlib Figure
 """
 

@@ -183,7 +183,6 @@ class _ZehendnerBase(BaseAlgorithm):
 
     category = "Heuristic"
     compatible_problems = ["CRP-Stoch"]
-    step_label = "Seed"
     _rule_key: str = "L"  # override in subclasses
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -199,7 +198,7 @@ class _ZehendnerBase(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict[str, float]] = []
         pick_fn = self._pick_fn()
 
@@ -212,7 +211,6 @@ class _ZehendnerBase(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             rng = np.random.RandomState(seed)
@@ -256,14 +254,6 @@ class _ZehendnerBase(BaseAlgorithm):
         base = super().config_schema()
         base.update(
             {
-                "num_eval_seeds": {
-                    "type": "int",
-                    "default": 5,
-                    "min": 1,
-                    "max": 200,
-                    "label": "Evaluation seeds",
-                    "help": "Number of random initial yards to evaluate.",
-                },
             }
         )
         return base

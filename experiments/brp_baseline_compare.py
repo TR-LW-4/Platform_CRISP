@@ -17,10 +17,10 @@ Output
 
 Usage
 -----
-cd crp_platform
-conda run -n rl python experiments/brp_baseline_compare.py
-conda run -n rl python experiments/brp_baseline_compare.py --bays 1 --rows 5 --tiers 6 --containers 20 --seeds 20
-conda run -n rl python experiments/brp_baseline_compare.py --help
+cd Platform_CRISP
+python experiments/brp_baseline_compare.py
+python experiments/brp_baseline_compare.py --bays 1 --rows 5 --tiers 6 --containers 20 --seeds 20
+python experiments/brp_baseline_compare.py --help
 """
 
 from __future__ import annotations

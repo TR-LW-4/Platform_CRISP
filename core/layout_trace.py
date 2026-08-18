@@ -4,7 +4,8 @@ Optional stderr tracing for Caserta / Zhu layout loading.
 Enable layout loading tracing::
 
     export CRISP_TRACE_LAYOUT=1
-    streamlit run gui/app.py
+    python main.py web
+    # or: python main.py layout-run ...
 
 Enable LA-N ``build_lan_plan`` move tracing (stderr)::
 
@@ -17,7 +18,9 @@ Typical order per benchmark instance:
 2. ``CRP_R.reset`` → ``_build_episode`` — reads that path from ``config.extra``.
 3. ``apply_caserta_file_to_yard`` — parses the same file again and places containers on the yard.
 
-Batch: the GUI outer loop calls ``train()`` once per layout file (paths from ``collect_paths_*``, session queue only stores which groups you picked). With ``num_eval_seeds=1``, inner seed loop runs once; **each reset loads exactly one file**. Eighty files ⇒ eighty outer iterations ⇒ eighty loads (not “stored 80 paths then popped”).
+Batch: the workbench / batch runner calls ``train()`` once per layout file (paths from
+``collect_paths_*``). Each ``train()`` does a single ``reset()`` that loads exactly
+one file. Eighty files ⇒ eighty outer iterations ⇒ eighty loads.
 """
 
 from __future__ import annotations

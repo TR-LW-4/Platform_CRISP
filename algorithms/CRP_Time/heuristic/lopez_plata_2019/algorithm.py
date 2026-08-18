@@ -490,8 +490,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         "other CRP-Time heuristics or the Lee-Lee kinematics model for its decisions."
     )
     compatible_problems = ["CRP-Time"]
-    step_label = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -538,7 +536,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     ) -> None:
         cfg = self.config
         rng_seed = cfg.seed
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
 
         delta = int(cfg.extra.get("delta", 3))
         max_nodes = int(cfg.extra.get("max_partial_nodes", 50))
@@ -562,7 +560,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             np.random.seed(seed)
 
             env = problem_factory()
-            env.config.seed = seed
             _, info = env.reset()
 
             # Snapshot initial yard for internal search
@@ -614,7 +611,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
                 # ----- Replay on real environment to get accurate metrics & plan -----
                 env2 = problem_factory()
-                env2.config.seed = seed
                 env2.reset()
                 total_cost = 0.0
                 actions: List[int] = []
@@ -643,7 +639,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
             # Final evaluation on the best solution
             env_final = problem_factory()
-            env_final.config.seed = seed
             env_final.reset()
             for a in best_solution:
                 if env_final._done:

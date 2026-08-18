@@ -87,7 +87,6 @@ class JovanovicTubaVoss2015MultiHeuristic(BaseAlgorithm):
         "move-sequence correction pass."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = False
     solver_backend = None
 
@@ -105,7 +104,7 @@ class JovanovicTubaVoss2015MultiHeuristic(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         safe_slack = int(cfg.extra.get("safe_slack", 1))
         full_search = bool(cfg.extra.get("full_48_search", True))
 
@@ -124,7 +123,6 @@ class JovanovicTubaVoss2015MultiHeuristic(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -204,11 +202,6 @@ class JovanovicTubaVoss2015MultiHeuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "The method is deterministic per instance; multiple seeds vary the layout.",
-            },
             "full_48_search": {
                 "type": "bool", "default": True,
                 "label": "Run the full 48-combination multi-heuristic search",

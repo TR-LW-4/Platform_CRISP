@@ -79,7 +79,6 @@ class ParrenoTorresAlvarezValdesRuiz2019IPS6(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = True
     solver_backend = "gurobi"
 
@@ -97,7 +96,7 @@ class ParrenoTorresAlvarezValdesRuiz2019IPS6(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
 
         transitive_move_breaking = bool(cfg.extra.get("transitive_move_breaking", True))
         fix_last_segment_vars = bool(cfg.extra.get("fix_last_segment_vars", True))
@@ -120,7 +119,6 @@ class ParrenoTorresAlvarezValdesRuiz2019IPS6(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -216,11 +214,6 @@ class ParrenoTorresAlvarezValdesRuiz2019IPS6(BaseAlgorithm):
     def config_schema(cls) -> Dict[str, Dict[str, Any]]:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Each seed solves its own MIP(s); keep small since this is an exact method.",
-            },
             "transitive_move_breaking": {
                 "type": "bool", "default": True,
                 "label": "Eq. (35)/(36) transitive-move + same-priority symmetry breaking",

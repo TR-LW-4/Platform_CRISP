@@ -64,8 +64,6 @@ class GLAHHeuristic(BaseAlgorithm):
         "procedure — baseline only on free-order problems."
     )
     compatible_problems = ["CRP-U"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan = None
@@ -81,7 +79,7 @@ class GLAHHeuristic(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg         = self.config
-        n_seeds     = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         rng_seed    = cfg.seed
         depth       = int(cfg.extra.get("D",        3))
         ftbg_n      = int(cfg.extra.get("n_ftbg",   5))
@@ -219,11 +217,6 @@ class GLAHHeuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate.",
-            },
             "D": {
                 "type": "int", "default": 3, "min": 1, "max": 6,
                 "label": "Look-ahead depth D",

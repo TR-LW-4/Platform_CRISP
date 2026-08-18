@@ -1,54 +1,21 @@
 """
-Caserta, Voß, Sniedovich (2011) — Corridor Method (CM) for CRP-R.
+CasertaCM
+<2011> <heuristic> <restricted> <single-bay> <CRP-R>
+Corridor Method: DP-inspired search in a local relocation corridor
+delta --- 2 --- Horizontal corridor half-width
+time_limit --- 5.0 --- Wall-clock limit per instance in seconds
+cm_binary --- "" --- Optional path override for the CM binary
 
-Algorithm overview
-------------------
-A DP-inspired metaheuristic that restricts the search space at each step by
-imposing a two-dimensional "corridor" around the current bay configuration:
-
-  Horizontal corridor (δ):  block r in stack i can only be relocated to
-    stacks within the range [i−δ, i+δ].  Smaller δ = faster but fewer
-    options explored per step.
-
-  Vertical corridor (λ):  sets the maximum height of a target stack.
-    The original paper uses λ = H + 2 (constant vertical corridor, -c 1).
-    This is fixed to H_max + 2 in the binary and passed via -n.
-
-Within each corridor, the algorithm evaluates the goodness of each feasible
-move using a greedy score (Kim–Hong / Min–Max heuristic applied until the bay
-is cleared from the proposed new state).  The move with the best score is
-selected (stochastically via roulette-wheel — not purely deterministic).
-The process repeats until all containers are retrieved.  Multiple trajectories
-are run until the time limit is reached.
-
-Why the CM is an important baseline
--------------------------------------
-Almost every paper on CRP-R benchmarks against CM.  It is the most widely
-cited comparison algorithm in the BRP/CRP literature and is significantly
-better than simple greedy heuristics (e.g., Kim–Hong) on large instances
-(Table 3 of the paper, 10×10: CM = 128.3 vs KH = 178.6 relocations).
-
-Config parameters
------------------
-  delta          : int   — horizontal corridor half-width (default 2)
-  time_limit     : float — per-instance wall-clock limit in seconds (default 60)
-  cm_binary      : str   — override path to compiled binary (optional)
-  num_eval_seeds : int   — 1 (CM is stochastic but time-limited; 1 seed/layout)
-
-Compatible problems
--------------------
-  CRP-R
-
-Reference
----------
+------------------------------- Reference --------------------------------
 M. Caserta, S. Voß, M. Sniedovich,
 "Applying the corridor method to a blocks relocation problem",
-OR Spectrum, 33, 915–929, 2011.
-https://doi.org/10.1007/s00291-009-0176-5
-
-Note: The C++ source (vendor/) is the 2017-revised version of the OR Spectrum
-code by Marco Caserta (marco.caserta@ie.edu), which fixes a height-limit bug
-present in the original 2009 implementation.
+OR Spectrum 33 (2011) 915–929.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -81,8 +48,6 @@ class CasertaCM(BaseAlgorithm):
         "by ~28% on 10×10 instances."
     )
     compatible_problems = ["CRP-R"]
-    step_label          = "Seed"
-
     _MOVES_RE = re.compile(r"CM\s*:\s*Solution found with\s*(\d+)\s*moves")
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -181,7 +146,7 @@ class CasertaCM(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg        = self.config
-        n_seeds    = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         delta      = int(cfg.extra.get("delta", 2))
         time_limit = float(cfg.extra.get("time_limit", 60.0))
         all_metrics: List[Dict] = []
@@ -196,7 +161,6 @@ class CasertaCM(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             max_height = int(env.config.max_tiers) + 2
@@ -249,17 +213,6 @@ class CasertaCM(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     20,
-                "label":   "Evaluation seeds",
-                "help": (
-                    "CM is stochastic — use 1 seed per fixed benchmark file. "
-                    "Increase only for random-layout mode."
-                ),
-            },
             "delta": {
                 "type":    "int",
                 "default": 2,

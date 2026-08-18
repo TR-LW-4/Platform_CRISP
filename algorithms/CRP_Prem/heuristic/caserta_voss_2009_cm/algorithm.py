@@ -44,7 +44,6 @@ Config parameters
                            the best fully-sorted solution is kept
   time_limit     : float — wall-clock budget (seconds) per instance,
                            shared across all restarts
-  num_eval_seeds : int   — number of independent random layouts (instances)
                            to evaluate
 
 Compatible problems
@@ -87,8 +86,6 @@ class CasertaVossCM(BaseAlgorithm):
         "fully-sorted solution found within the time budget."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -103,7 +100,7 @@ class CasertaVossCM(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg            = self.config
-        n_seeds        = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         delta          = int(cfg.extra.get("delta", 6))
         w0             = float(cfg.extra.get("w0", 0.4))
         w1             = float(cfg.extra.get("w1", 0.3))
@@ -123,7 +120,6 @@ class CasertaVossCM(BaseAlgorithm):
             )
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             n_total   = int(env.config.num_containers)
@@ -199,18 +195,6 @@ class CasertaVossCM(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 10,
-                "min":     1,
-                "max":     100,
-                "label":   "Evaluation seeds",
-                "help": (
-                    "Number of independent random layouts (instances) to "
-                    "evaluate. Each seed's own solve already uses multiple "
-                    "internal randomized restarts."
-                ),
-            },
             "delta": {
                 "type":    "int",
                 "default": 6,

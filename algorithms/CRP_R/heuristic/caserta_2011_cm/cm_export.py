@@ -1,17 +1,12 @@
 """
-Convert the platform's Yard / ProblemConfig to the Corridor Method (CM) input
-format expected by the brp_cm binary.
+Yard → Corridor Method binary input text for CasertaCM.
 
-CM input format (containers.cpp, read_problem_data)
-----------------------------------------------------
-Line 1:  m nels
-  m    = number of stacks  (num_bays × num_rows)
-  nels = total number of containers
-
-Remaining m lines, one per stack (left-to-right, bay-major order):
-  k item1 item2 ...  (bottom-to-top; items are priority values 1..nels)
-  k = number of containers currently in this stack
-  Empty stacks are written as a single "0" on their line.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

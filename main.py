@@ -3,8 +3,8 @@ CRP Platform – CLI entry point.
 
 Usage
 -----
-# Launch the Streamlit GUI
-python main.py gui
+# Launch the React + FastAPI Web workbench
+python main.py web
 
 # List registered problems and algorithms
 python main.py list
@@ -15,7 +15,7 @@ python main.py test
 # Run a single experiment from the command line
 python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 200
 
-# Run one benchmark layout (Caserta .dat or Zhu .txt) without the GUI — prints metrics
+# Run one benchmark layout (Caserta .dat or Zhu .txt) without the web UI — prints metrics
 python main.py layout-run --problem "CRP-R" --algo "Caserta (2012) HEUR" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat
 
@@ -25,10 +25,13 @@ python main.py layout-run --problem "CRP-R" --algo "LA-N Look-Ahead" \\
 
 # Exact solver (Tanaka B&B on bundled ``brp_bb``)
 python main.py layout-run --problem "CRP-R" --algo "Tanaka (2016) B&B" \\
-    --layout benchmark/Zhu_dataset/5-8-39/06101.txt --seeds 1
+    --layout benchmark/Zhu_dataset/5-8-39/06101.txt
 
-# Show recent saved result JSON files (same as GUI Test/Experiment writes under results/)
+# Show recent saved result JSON files (same as the web workbench writes under results/)
 python main.py results --limit 15
+
+# Class-wise mean±std over newest saved Caserta/Zhu runs (no npm; also /bench-summary in web)
+python main.py bench-summary --problem "CRP-R" --algo "Caserta (2012) HEUR" --limit 120
 """
 
 import sys
@@ -38,10 +41,14 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 
-def cmd_gui():
-    import subprocess
-    app_path = os.path.join(os.path.dirname(__file__), "gui", "app.py")
-    subprocess.run(["streamlit", "run", app_path])
+def cmd_web(host: str, port: int):
+    import uvicorn
+    uvicorn.run(
+        "web.backend.api:app",
+        host=host,
+        port=port,
+        reload=False,
+    )
 
 
 def cmd_list():
@@ -95,7 +102,7 @@ def cmd_test():
             continue
 
         acls = get_algorithm_class(pick)
-        algo = acls(AlgorithmConfig(num_eval_seeds=2, max_iterations=20))
+        algo = acls(AlgorithmConfig(max_iterations=20))
         q = mp.Queue()
         ev = mp.Event()
 
@@ -168,7 +175,7 @@ def cmd_run(problem: str, algo: str, iterations: int):
 
 
 _BASE_ALGO_KEYS = frozenset({
-    "max_iterations", "seed", "report_interval", "num_eval_seeds",
+    "max_iterations", "seed", "report_interval",
     "population_size", "crossover_rate", "mutation_rate",
     "tournament_size", "elite_count",
 })
@@ -202,14 +209,13 @@ def cmd_layout_run(
     layout: str,
     problem: str,
     algo: str,
-    seeds: int,
     save: bool,
     timeout: float,
     trace_lan: bool = False,
 ):
     """
     Run *one* registered algorithm on *one* Caserta (.dat) or Zhu (.txt) layout file.
-    No Streamlit — metrics go to stdout; optional JSON under results/.
+    Metrics go to stdout; optional JSON under results/.
     """
     if trace_lan:
         os.environ["CRISP_TRACE_LAN"] = "1"
@@ -224,7 +230,7 @@ def cmd_layout_run(
     from core.registry import get_algorithm_class, get_problem_class
     from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
     from core.caserta_benchmark import problem_config_for_caserta_dat
-    from core.result_store import save_run
+    from core.result_store import moves_from_records, save_run
     from core.zhu_benchmark import problem_config_for_zhu_txt
 
     root = Path(__file__).resolve().parent
@@ -253,7 +259,7 @@ def cmd_layout_run(
         print("Expected a `.dat` (Caserta) or `.txt` (Zhu) layout file.")
         return
 
-    cfg_a = _algorithm_config_from_schema(acls, {"num_eval_seeds": max(1, seeds)})
+    cfg_a = _algorithm_config_from_schema(acls, {})
     inst = acls(config=cfg_a)
 
     import multiprocessing as mp
@@ -290,6 +296,12 @@ def cmd_layout_run(
         f"best_metric={final.best_metric:.6f}  progress={final.progress:.4f}"
     )
     print(f"metrics: {final.metrics}")
+    moves = getattr(final, "extra", None) or {}
+    move_list = moves.get("moves") if isinstance(moves, dict) else None
+    if move_list:
+        n_rel = sum(1 for m in move_list if m.get("kind") == "relocate")
+        n_ret = sum(1 for m in move_list if m.get("kind") == "retrieve")
+        print(f"moves: {len(move_list)} total ({n_rel} relocate, {n_ret} retrieve)")
 
     if save:
         history = [
@@ -310,6 +322,7 @@ def cmd_layout_run(
             algo_config=algo_params,
             metrics=final.metrics,
             history=history,
+            moves=moves_from_records(records),
         )
         print(f"\nSaved: {out}")
 
@@ -327,7 +340,7 @@ def cmd_results(limit: int, verbose: bool):
         return
 
     print(f"\n{'=' * 72}")
-    print(f"Most recent {len(runs)} run(s) — same JSON files as the GUI saves")
+    print(f"Most recent {len(runs)} run(s) — same JSON files as the web workbench saves")
     print(f"{'=' * 72}\n")
 
     for r in runs:
@@ -354,13 +367,64 @@ def cmd_results(limit: int, verbose: bool):
         print()
 
 
+def cmd_bench_summary(problem: str, algo: str, limit: int, save: bool):
+    """Aggregate newest saved runs by Caserta/Zhu class (mean ± std). No npm."""
+    from web.backend.summary_pages import (
+        save_batch_summary_sidecar,
+        summarize_saved_runs,
+    )
+
+    summary = summarize_saved_runs(problem=problem, algorithm=algo, limit=limit)
+    print(f"\n{problem}  ·  {algo}")
+    print(f"total_runs={summary.get('total_runs')}  ungrouped={summary.get('ungrouped')}\n")
+    print(f"{'Class':<12} {'n':>5}  {'metric':<14} {'mean':>10} {'std':>10}")
+    print("-" * 56)
+    for row in summary.get("classes") or []:
+        metrics = row.get("metrics") or {}
+        if not metrics:
+            print(f"{row.get('label', '?'):<12} {row.get('n', 0):>5}")
+            continue
+        first = True
+        for name, agg in metrics.items():
+            label = row.get("label", "?") if first else ""
+            n = row.get("n", 0) if first else ""
+            print(
+                f"{label:<12} {n!s:>5}  {name:<14} "
+                f"{agg.get('mean', float('nan')):>10.4g} "
+                f"{agg.get('std', float('nan')):>10.4g}"
+            )
+            first = False
+    if save and summary.get("total_runs"):
+        # Sidecar without re-listing every path (optional bookkeeping).
+        path = save_batch_summary_sidecar(
+            [],
+            summary,
+            problem=problem,
+            algorithm=algo,
+        )
+        if path:
+            print(f"\nSaved sidecar: {path}")
+    from urllib.parse import urlencode
+
+    qs = urlencode({"problem": problem, "algorithm": algo, "limit": limit})
+    print(
+        "\nAlso view in browser while web is running:\n"
+        f"  http://127.0.0.1:8000/bench-summary/from-results?{qs}\n"
+    )
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="CRP Platform")
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("gui",  help="Launch Streamlit GUI")
+    web_parser = subparsers.add_parser(
+        "web",
+        help="Launch React + FastAPI Web workbench",
+    )
+    web_parser.add_argument("--host", default="127.0.0.1")
+    web_parser.add_argument("--port", type=int, default=8000)
     subparsers.add_parser("list", help="List registered problems and algorithms")
     subparsers.add_parser("test", help="Quick smoke-test")
 
@@ -371,7 +435,7 @@ if __name__ == "__main__":
 
     layout_parser = subparsers.add_parser(
         "layout-run",
-        help="Run one algorithm on one Caserta (.dat) or Zhu (.txt) file (no GUI)",
+        help="Run one algorithm on one Caserta (.dat) or Zhu (.txt) file (no web UI)",
     )
     layout_parser.add_argument(
         "--layout",
@@ -387,15 +451,9 @@ if __name__ == "__main__":
         help='Algorithm display name (see: python main.py list), e.g. "Caserta (2012) HEUR"',
     )
     layout_parser.add_argument(
-        "--seeds",
-        type=int,
-        default=1,
-        help="num_eval_seeds (heuristics often use 1 for a single pass)",
-    )
-    layout_parser.add_argument(
         "--save",
         action="store_true",
-        help="Also write results/<problem>/<algo>/…json like the GUI",
+        help="Also write results/<problem>/<algo>/…json like the web workbench",
     )
     layout_parser.add_argument(
         "--timeout",
@@ -424,10 +482,28 @@ if __name__ == "__main__":
         help='Include layout path from prob_config (layout_file_path / legacy caserta_dat_path)',
     )
 
+    bench_parser = subparsers.add_parser(
+        "bench-summary",
+        help="Class-wise mean/std over saved benchmark results (no npm)",
+    )
+    bench_parser.add_argument("--problem", default="CRP-R")
+    bench_parser.add_argument("--algo", default="Caserta (2012) HEUR")
+    bench_parser.add_argument(
+        "--limit",
+        type=int,
+        default=120,
+        help="Use the newest N result JSON files under results/<problem>/<algo>/",
+    )
+    bench_parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Also write results/.../batch_summary_*.json sidecar",
+    )
+
     args = parser.parse_args()
 
-    if args.command == "gui":
-        cmd_gui()
+    if args.command == "web":
+        cmd_web(args.host, args.port)
     elif args.command == "list":
         cmd_list()
     elif args.command == "test":
@@ -439,12 +515,13 @@ if __name__ == "__main__":
             args.layout,
             args.problem,
             args.algo,
-            args.seeds,
             args.save,
             args.timeout,
             trace_lan=args.trace_lan,
         )
     elif args.command == "results":
         cmd_results(args.limit, args.verbose)
+    elif args.command == "bench-summary":
+        cmd_bench_summary(args.problem, args.algo, args.limit, args.save)
     else:
         parser.print_help()

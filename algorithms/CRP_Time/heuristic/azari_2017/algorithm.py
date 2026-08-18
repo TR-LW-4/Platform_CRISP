@@ -434,8 +434,6 @@ class Azari2017CSUM(BaseAlgorithm):
         "Implementation is self-contained and does not depend on other algorithms."
     )
     compatible_problems = ["CRP-Time"]
-    step_label = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -446,7 +444,7 @@ class Azari2017CSUM(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict[str, float]] = []
 
         for seed_idx in range(n_seeds):
@@ -517,11 +515,6 @@ class Azari2017CSUM(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate.",
-            },
             "time_limit_s": {
                 "type": "float", "default": 5.0, "min": 0.1, "max": 120.0,
                 "label": "Search time limit (s)",

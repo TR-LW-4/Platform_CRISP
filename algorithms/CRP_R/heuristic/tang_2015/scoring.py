@@ -1,37 +1,12 @@
 """
-Tang, Jiang, Liu & Dong (2015) — H1 / H2 heuristic scoring.
+H1/H2 destination scores for TangEtAl2015.
 
-Stack data is represented as Dict[key, List[int]] where
-  key       = any hashable (e.g. (bay, row) tuple from the platform)
-  List[int] = container priorities bottom-to-top; lower value = retrieved first
-
-Paper notation mapping
-----------------------
-  container number k  →  priority value  (lower = earlier retrieval)
-  nc(c)               →  nc_value(prios, n_total)  = min priority in stack
-  RI(k, c)            →  ri_score(prios, k)  = |{p ∈ c : p < k}|
-  BI(k, c)            →  bi_score(prios, k)  = containers above min after placing k
-
-H1 rule (Eq. in Section 4.1.2)
-  1. If ∃ c : nc(c) > k  →  put k in the column with the smallest nc > k
-  2. Otherwise           →  put k in the column with the minimum RI
-     (tie-break: largest nc)
-
-H2 rule
-  Same as H1 but step 2 uses minimum BI instead of minimum RI.
-
-Extended variant (*-E)
-  For each feasible destination, simulate the full remaining retrieval
-  sequence using the original heuristic and pick the destination that
-  minimises total reshuffles.  Ties resolved by the base H1/H2 rule.
-
-Reference
----------
-L. Tang, W. Jiang, J. Liu, Y. Dong,
-"Research into container reshuffling and stacking problems in container
- terminal yards",
-IIE Transactions, 47(7), 751–766, 2015.
-https://doi.org/10.1080/0740817X.2014.971201
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

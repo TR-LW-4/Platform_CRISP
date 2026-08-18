@@ -456,7 +456,7 @@ class FirminoRGRASP(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg          = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         max_iter     = int  (cfg.extra.get("max_iterations",      500))
         max_no_impv  = int  (cfg.extra.get("max_no_improve",    10000))
         alpha_init   = float(cfg.extra.get("alpha_init",          1.0))
@@ -609,14 +609,6 @@ class FirminoRGRASP(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": (
-                    "Number of independent random seeds. Use 1 for fixed "
-                    "benchmark files; >1 for random-layout mode."
-                ),
-            },
             "max_iterations": {
                 "type": "int", "default": 500, "min": 10, "max": 50_000,
                 "label": "Max GRASP iterations",

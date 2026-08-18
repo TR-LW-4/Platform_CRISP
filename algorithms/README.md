@@ -20,15 +20,17 @@ algorithms/
 │       └── tanaka_2018/       ← physical (Tanaka 2018 CRP-D adapter)
 │
 ├── CRP_R/                # fixed-order yard retrieval (CRP-R problem family)
+│   ├── tree/                 # B&B, A*, IDA*, and abstraction searches
+│   │   ├── tanaka/            ← physical (Tanaka 2016 B&B + vendor C)
+│   │   ├── tanaka_2018/       ← physical (Tanaka 2018 B&B + vendor C)
+│   │   └── tanaka_voss_2022/  ← physical (Tanaka–Voß tree search)
+│   ├── solver_ip/            # solver-backed IP/MIP formulations
 │   ├── heuristic/
 │   │   ├── kim_hong/         ← physical (original paper = single-bay CRP-R)
 │   │   ├── caserta/          ← physical
 │   │   ├── lan/              ← physical
 │   │   ├── lin_2015/         → symlink
 │   │   └── durasevic_2024/   → symlink
-│   ├── exact/
-│   │   ├── tanaka/            ← physical (Tanaka 2016 B&B + vendor C)
-│   │   └── tanaka_2018/       ← physical (Tanaka 2018 B&B + vendor C)
 │   └── evolutionary/genetic/ → symlink
 │
 ├── CRP_Time/                 # multi-bay CRP with crane-time objective
@@ -44,8 +46,11 @@ algorithms/
 │   │   └── glah/             ← physical (CRP-Time packaging; sync with CRP_D / CRP_U)
 │   └── evolutionary/genetic/ → symlink
 │
-├── CRP_U/                # free-order CRP (same env as BRP-NonFixed)
-│   └── heuristic/
+├── CRP_U/                # fixed-order, unrestricted-relocation BRP
+│   ├── tree/                 # exact and heuristic tree-search methods
+│   │   └── forster_bortfeldt_2012/  ← CRP-U-specific adaptation
+│   ├── solver_ip/            # solver-backed IP/MIP formulations
+│   └── heuristic/            # non-tree heuristic methods
 │       └── glah/             ← physical (Jin 2015 GLAH — CRP-U packaging)
 │
 ├── brp_nonfixed/             # free-order BRP (GA only; see also CRP_U/)
@@ -62,6 +67,8 @@ algorithms/
 * **Symlinks** (`mode 120000` in git) for every other problem in the
   algorithm's `compatible_problems`.  No file duplication, no sync
   trouble.
+* **Problem-specific ports** may use independent copies when their adapter
+  metadata or environment integration intentionally differs.
 * **`_shared/`** holds algorithms that are not tied to any specific
   problem (GA).  They appear under **every** problem dir via symlink.
 * **`core/gp/`** (not inside `algorithms/`) hosts the platform-level

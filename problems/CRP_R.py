@@ -43,7 +43,7 @@ import gymnasium as gym
 
 from core.base_problem import BaseProblem, ProblemConfig
 from core.container import Container, make_containers
-from core.yard import Yard
+from core.yard import Move, Yard
 from core.plan import RelocationPlan, simulate_plan
 from core.objectives import KinematicsModel, compute_crane_time, lower_bound_relocations
 from core.layout_trace import trace_layout
@@ -213,6 +213,11 @@ class CRP_R(BaseProblem):
                 return
             if stack.top == target:
                 stack.pop()
+                # Record retrieve for move_history / crane-time export.
+                # (yard.retrieve() is not used here; auto-retrieve pops directly.)
+                self.yard.move_history.append(
+                    Move("retrieve", target.id, (stack.bay, stack.row), None)
+                )
                 self._hook_after_retrieve(stack.bay, stack.row, target.id)
                 self.yard.total_retrievals += 1
                 self._current_target_priority += 1

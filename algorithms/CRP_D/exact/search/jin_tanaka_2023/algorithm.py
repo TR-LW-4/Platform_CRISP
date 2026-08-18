@@ -58,8 +58,6 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
         "(``best_ub``).  ``optimal_proven=1`` when ``best_lb == best_ub``."
     )
     compatible_problems = ["CRP-D"]
-    step_label          = "Seed"
-
     _STAT_RE = re.compile(
         r"best_lb\s*=\s*(\d+).*?best_ub\s*=\s*(\d+)", re.DOTALL
     )
@@ -179,7 +177,7 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg_a   = self.config
-        n_seeds = max(1, cfg_a.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         extra   = cfg_a.extra or {}
         t_limit = int(extra.get("jin_time_limit_sec", 600))
 
@@ -192,7 +190,6 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
             trace_layout(f"JinTanaka2023ForCRPD.train: seed {seed + 1}/{n_seeds}")
 
             env = problem_factory()
-            env.config.seed = seed
             env.reset(seed=seed, options={"skip_auto_retrieve": True})
 
             instance_text = yard_to_jin_instance(env.config, env.yard)

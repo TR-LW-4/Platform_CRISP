@@ -4,6 +4,11 @@ __pycache__/
 results/
 .env
 wandb/
+.tools/
+web/frontend/node_modules/
+trained_models/
+*.pt
+*.pth
 
 # Local benchmark datasets (large; keep out of git — obtain separately)
 benchmark/

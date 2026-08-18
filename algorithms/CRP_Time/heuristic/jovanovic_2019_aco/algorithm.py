@@ -64,8 +64,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
         "termination use seconds instead of relocation counts."
     )
     compatible_problems = ["CRP-Time"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -80,7 +78,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds      = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         n_iters      = int(cfg.extra.get("n_iterations",   5000))
         n_ants       = int(cfg.extra.get("n_ants",         10))
         q0           = float(cfg.extra.get("q0",            0.9))
@@ -105,7 +103,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
-            env.config.seed = seed
             env.reset(options={"skip_auto_retrieve": True})
 
             n_total   = int(env.config.num_containers)
@@ -439,15 +436,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 1, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": (
-                    "Number of independent ACO runs per layout. "
-                    "Use 1 for fixed benchmark layouts (Caserta/Zhu). "
-                    "Use >1 for random-layout mode."
-                ),
-            },
             "n_iterations": {
                 "type": "int", "default": 5000, "min": 100, "max": 50000,
                 "label": "ACO iterations",

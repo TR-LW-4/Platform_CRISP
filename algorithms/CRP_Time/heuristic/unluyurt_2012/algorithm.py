@@ -180,8 +180,6 @@ class UnluyurtAydinDifference(BaseAlgorithm):
         "use num_bays=1 for single-bay faithful comparison."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -196,7 +194,7 @@ class UnluyurtAydinDifference(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg     = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
         for seed in range(n_seeds):
@@ -243,15 +241,3 @@ class UnluyurtAydinDifference(BaseAlgorithm):
     # ---------------------------------------------------------------- #
     # Config schema                                                      #
     # ---------------------------------------------------------------- #
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-                "help": "Number of random initial layouts to evaluate over.",
-            },
-        })
-        return base

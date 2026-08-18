@@ -82,8 +82,6 @@ class ExpositoDSK(BaseAlgorithm):
         "DOI: 10.1016/j.asoc.2014.04.007"
     )
     compatible_problems = ["CRP-U"]
-    step_label          = "Seed"
-
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -98,7 +96,7 @@ class ExpositoDSK(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg     = self.config
-        n_seeds = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         alpha   = int(cfg.extra.get("alpha", 1))
         base_seed = cfg.seed
 
@@ -187,17 +185,6 @@ class ExpositoDSK(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type":    "int",
-                "default": 1,
-                "min":     1,
-                "max":     50,
-                "label":   "Evaluation seeds",
-                "help":    (
-                    "Number of independent runs. With α=1 all runs are identical "
-                    "(deterministic); increase α for multi-restart diversity."
-                ),
-            },
             "alpha": {
                 "type":    "int",
                 "default": 1,

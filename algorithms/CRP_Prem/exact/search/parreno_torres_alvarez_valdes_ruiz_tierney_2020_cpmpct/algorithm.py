@@ -41,7 +41,6 @@ class ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT(BaseAlgorithm):
         "(CPMPCT), with acceleration-aware crane kinematics and exact B&B search."
     )
     compatible_problems = ["CRP-Prem"]
-    step_label = "Seed"
     requires_solver = False
     solver_backend = None
 
@@ -55,7 +54,7 @@ class ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg = self.config
-        n_seeds = max(1, int(cfg.num_eval_seeds))
+        n_seeds = 1  # multi-seed eval removed; single run only
         backend = str(cfg.extra.get("backend", "auto")).strip().lower()
         bb_time_limit = float(cfg.extra.get("bb_time_limit_s", 120.0))
         bb_max_extra_depth = int(cfg.extra.get("bb_max_extra_depth", 120))
@@ -79,7 +78,6 @@ class ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT(BaseAlgorithm):
             if stop_event.is_set():
                 break
             env = problem_factory()
-            env.config.seed = seed
             env.reset()
 
             stack_keys = list(env.yard.stacks.keys())
@@ -171,10 +169,6 @@ class ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 10, "min": 1, "max": 100,
-                "label": "Evaluation seeds",
-            },
             "backend": {
                 "type": "str", "default": "auto",
                 "label": "Backend (auto/bb/mip)",

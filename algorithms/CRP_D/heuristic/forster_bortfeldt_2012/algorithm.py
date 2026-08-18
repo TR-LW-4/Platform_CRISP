@@ -27,7 +27,7 @@ Lower bound (§5)
 
 Move → action encoding
 -----------------------
-CRP-D/U action = src_idx * S + dst_idx  (relocation only).
+CRP-D action = src_idx * S + dst_idx  (relocation only).
 The environment handles all auto-retrievals; remove moves generated
 by the tree search are NOT submitted to env.step().
 
@@ -56,7 +56,7 @@ from .tree_search import _count_relocations, run_tree_search
 
 def _build_layout(env) -> Tuple[FBLayout, int]:
     """
-    Build an FBLayout from a CRP-D or CRP-U environment.
+    Build an FBLayout from a CRP-D environment.
 
     The environment must expose:
       env.config.num_bays, env.config.num_rows, env.config.max_tiers
@@ -120,7 +120,6 @@ class ForsterBortfeldt2012(BaseAlgorithm):
     Compatible with
     ---------------
     CRP-D : grouping instances (duplicate priorities / group precedence).
-    CRP-U : simplex instances  (unique priorities).
 
     Configuration (via config.extra)
     ---------------------------------
@@ -130,7 +129,6 @@ class ForsterBortfeldt2012(BaseAlgorithm):
     cm_stop_threshold : compound-move depth controller        (default 150).
     max_flg_bb        : max FLG_BB productive moves/step      (default 3).
     max_gg            : max GG productive moves/step          (default 2).
-    num_eval_seeds    : number of independent instances/seeds (default 5).
 
     Decoupling
     ----------
@@ -145,9 +143,7 @@ class ForsterBortfeldt2012(BaseAlgorithm):
         "Greedy initial solution + depth-limited compound-move tree search "
         "with §5 lower-bound pruning and 6-type move classification (§4.2)."
     )
-    compatible_problems = ["CRP-D", "CRP-U"]
-    step_label          = "Seed"
-
+    compatible_problems = ["CRP-D"]
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 
@@ -164,7 +160,7 @@ class ForsterBortfeldt2012(BaseAlgorithm):
         cfg    = self.config
         extra  = cfg.extra if cfg.extra else {}
 
-        n_seeds       = max(1, cfg.num_eval_seeds)
+        n_seeds = 1  # multi-seed eval removed; single run only
         time_limit    = float(extra.get("time_limit_s",       15.0))
         n_succ        = int  (extra.get("n_succ",              5))
         cm_threshold  = int  (extra.get("cm_stop_threshold", 150))
@@ -260,11 +256,6 @@ class ForsterBortfeldt2012(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "num_eval_seeds": {
-                "type": "int", "default": 5, "min": 1, "max": 50,
-                "label": "Evaluation seeds",
-                "help": "Number of independent instances to solve.",
-            },
             "time_limit_s": {
                 "type": "float", "default": 15.0, "min": 1.0, "max": 300.0,
                 "label": "Time limit per instance (s)",
