@@ -2,21 +2,22 @@
 
 **Container Relocation & Stowage Platform**
 
-一个专为集装箱堆场管理问题设计的研究平台，类似 PlatEMO，支持启发式、精确算法、进化算法和可复现实验，带实时可视化界面。
-各问题类保留 Gymnasium-compatible 的 `reset` / `step` 环境接口，用于逐步仿真、解验证、Web 回放和未来可选的学习型方法扩展。
+A research platform for container-yard relocation and stowage problems. It supports heuristics, exact methods, evolutionary algorithms, and reproducible experiments, with a live web workbench.
+Each problem class keeps a Gymnasium-compatible `reset` / `step` interface for step-wise simulation, solution validation, web replay, and optional learning-based extensions.
 
 ---
 
-## 快速开始
+## Quick start
 
-### 第一步：安装依赖
+### 1. Install dependencies
 
 ```bash
 conda activate rl
 pip install -r requirements.txt
 ```
 
-验证安装：
+Check the install:
+
 ```bash
 conda activate rl
 python -c "import fastapi, gymnasium, matplotlib; print('All OK')"
@@ -24,46 +25,43 @@ python -c "import fastapi, gymnasium, matplotlib; print('All OK')"
 
 ---
 
-### 第二步：启动 Web 工作台
+### 2. Start the web workbench
 
 ```bash
 conda activate rl
 cd Platform_CRISP
 
 python main.py web
-# 浏览器访问 http://127.0.0.1:8000
+# open http://127.0.0.1:8000
 ```
 
-React 界面由 FastAPI 直接托管；算法在独立 Python 进程中运行。关闭浏览器不会
-中断当前服务器进程中的任务。
+The React UI is served by FastAPI. Algorithms run in separate Python processes. Closing the browser does not stop jobs on the current server process.
 
 ---
 
-### 第三步：命令行使用（不需要浏览器）
+### 3. Command line (no browser)
 
 ```bash
 conda activate rl
 cd Platform_CRISP
 
-# 查看所有已注册的问题和算法
+# list registered problems and algorithms
 python main.py list
 
-# 快速测试（验证所有问题能跑）
+# smoke-test all problems
 python main.py test
 
-# 运行单个实验
+# run one experiment
 python main.py run --problem "CRP-R" --algo "Caserta (2012) HEUR"
 ```
 
 ---
 
-## Web 工作台使用说明
+## Web workbench
 
-Web 工作台提供 Workbench、Jobs 和 Compare 页面。问题与算法由现有 registry 自动
-发现，参数控件由 `config_schema()` 自动生成；新增算法无需修改 React。任务
-在独立进程中执行，支持实时进度、停止、收敛曲线、堆场快照回放和结果保存。
+The workbench has Workbench, Jobs, and Compare pages. Problems and algorithms are discovered from the registry. Parameter widgets come from `config_schema()`, so a new algorithm does not require React changes. Jobs run in separate processes and support live progress, stop, convergence plots, yard-snapshot replay, and result saving.
 
-修改前端源码后可重新构建：
+Rebuild the frontend after source changes:
 
 ```bash
 cd web/frontend
@@ -73,53 +71,54 @@ npm run build
 
 ---
 
-## 问题类型说明
+## Problem families
 
-平台有七个问题类。它们不是同一 CRP 的七种别名，而是按下面四根轴切开的：
+The platform has eight problem classes. They are not aliases of one CRP. They differ along these axes:
 
 ```
-任务 / 目标     Time | Prem | Stow | Stoch     ← 不同问题，不要横比主指标
-翻箱规则        R vs U                         ← 只用于 distinct CRP
-优先级          R/U = distinct；D = duplicate  ← D 内再用 restricted_relocation
-几何            num_bays                       ← 配置项，不是问题类
+Task / objective     Time | Prem | Stow | Stoch     ← different problems; do not mix primary metrics
+Relocation rule      R vs U                         ← distinct-priority CRP only
+Priorities           R/U = distinct; D = duplicate  ← CRP-D also uses restricted_relocation
+Geometry             num_bays                       ← a config field, not a family
+Information          Online | batch-stochastic      ← separate families
 ```
 
-| 问题名 | 文献位置 | 说明 | 主指标 |
-|--------|----------|------|--------|
-| **CRP-R** | restricted + distinct | 取顺 1…N；只能搬当前目标上方的阻塞箱 | relocations |
-| **CRP-U** | unrestricted + distinct | 取顺 1…N；任意栈顶都可搬到任意未满栈 | relocations |
-| **CRP-D** | duplicate（默认 Du） | 组间有序、组内任意。`extra["restricted_relocation"]`：`False`（默认）= 无限制 Du，`True` = 受限 Dr。**不是**配载问题，与 CRP-Stow 无关 | relocations |
-| **CRP-Time** | 同 CRP-R，换目标 | 规则与 CRP-R 相同（受限 + distinct），主目标为场桥总作业时间 | crane_time（兼看 relocations） |
-| **CRP-Online** | OCRP / limited look-ahead | 动力学同 CRP-R，但未来取箱信息按 `lookahead_h` 逐步揭示；`lookahead_h=0` 对应 Zehendner 2017 | relocations |
-| **CRP-Prem** | pre-marshalling | 不取箱，把堆场重排到每栈有序 | moves |
-| **CRP-Stow** | BRLP / POCRP | 按船舶配载计划从堆场取箱；`rc_ratio>0` 开启 **POCRP-RC**（Rolled Container） | relocations |
-| **CRP-Stoch** | SCRP | 批次揭示、批内均匀随机；`batch_size=1` 时退回 CRP-R。与 **CRP-Online** 的逐步揭示语义区分开 | expected_relocations |
+| Problem | Literature | Description | Primary metric |
+|---------|------------|-------------|----------------|
+| **CRP-R** | restricted + distinct | Retrieve in order 1…N; only blockers above the current target may move | relocations |
+| **CRP-U** | unrestricted + distinct | Retrieve in order 1…N; any stack top may move to any non-full stack | relocations |
+| **CRP-D** | duplicate (Du by default) | Groups are ordered; order inside a group is free. `extra["restricted_relocation"]`: `False` (default) = unrestricted Du, `True` = restricted Dr. Not a stowage problem; unrelated to CRP-Stow | relocations |
+| **CRP-Time** | same rules as CRP-R, different objective | Restricted + distinct; minimise total yard-crane working time | crane_time (also report relocations) |
+| **CRP-Online** | OCRP / limited look-ahead | Same dynamics as CRP-R, but future retrievals are revealed with `lookahead_h`. `lookahead_h=0` matches Zehendner 2017 | relocations |
+| **CRP-Prem** | pre-marshalling | No retrievals; reshuffle the bay until every stack is internally sorted | moves |
+| **CRP-Stow** | BRLP / POCRP | Retrieve according to a vessel stowage plan. `rc_ratio>0` enables **POCRP-RC** (rolled containers) | relocations |
+| **CRP-Stoch** | SCRP | Ordered batches; intra-batch order is uniform-random. `batch_size=1` reduces to CRP-R. This is not the same as CRP-Online progressive revelation | expected_relocations |
 
-没有 **BRP-NonFixed**（自由选择取箱顺序）这一类。
+There is no **BRP-NonFixed** family (free choice of which container to retrieve next).
 
 ---
 
-## 算法说明
+## Algorithms
 
-完整名单以 registry 为准，不要以本页表格为准：
+The live catalog is the registry, not a static table on this page:
 
 ```bash
 python main.py list
 ```
 
-各族目录和论文入口写在 `algorithms/<族>/README.md`（`CRP_R`、`CRP_U`、`CRP_D`、`CRP_Time`、`CRP_Online`、`CRP_Prem`、`CRP_Stow`、`CRP_Stoch`）。
+Family directories and paper lists live in `algorithms/<family>/README.md` (`CRP_R`, `CRP_U`, `CRP_D`, `CRP_Time`, `CRP_Online`, `CRP_Prem`, `CRP_Stow`, `CRP_Stoch`).
 
-> **部署约定**：同一问题族共享一套 `ProblemConfig`（`num_bays, num_rows, max_tiers, num_containers` 等）。新算法放进 `algorithms/<primary_problem>/<category>/<paper_key>/`，用 `compatible_problems` 声明可跑哪些问题；**问题定义与目标保持不动**，变的只有方法。
+> **Placement.** One family shares one `ProblemConfig` (`num_bays`, `num_rows`, `max_tiers`, `num_containers`, …). Put a new method in `algorithms/<primary_problem>/<category>/<paper_key>/` and list runnable families in `compatible_problems`. Keep the problem definition and objective unchanged; only the method changes.
 >
-> **「单贝 / 多贝」不是两个问题**，只是 `num_bays`。CRP-R 与 CRP-Time 的差别在目标（翻箱次数 vs 场桥时间），几何通用。
+> **Single-bay vs multi-bay is not two problems.** It is only `num_bays`. CRP-R and CRP-Time differ by objective (relocations vs crane time); the geometry is shared.
 >
-> 若干 CRP-R 启发式（Kim–Hong 2006 ENAR、Caserta 2012 HEUR、LA-N）通过 `compatible_problems` 也可在 CRP-Time 下拉框出现，当作退化 baseline；它们的目录仍在 `algorithms/CRP_R/heuristic/`，Time 目录里没有 symlink。Jin (2015) GLAH 目前只在 `algorithms/CRP_U/heuristic/glah/`。
+> Some CRP-R heuristics (Kim–Hong 2006 ENAR, Caserta 2012 HEUR, LA-N) also appear in the CRP-Time menu via `compatible_problems`. Their code stays in `algorithms/CRP_R/heuristic/`; there is no symlink under Time. Jin (2015) GLAH currently lives only in `algorithms/CRP_U/heuristic/glah/`.
 
 ---
 
-## 如何添加自己的算法
+## Add an algorithm
 
-在 `algorithms/` 下任意子目录新建 `.py` 文件：
+Create a `.py` file under `algorithms/`:
 
 ```python
 # algorithms/CRP_R/heuristic/my_rule/algorithm.py
@@ -127,26 +126,26 @@ from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 import multiprocessing as mp
 
 class MyRule(BaseAlgorithm):
-    name     = "My Rule"       # GUI 下拉菜单中显示的名字
+    name     = "My Rule"       # label in the GUI menu
     category = "Heuristic"     # "Exact" / "Evolutionary" / "Heuristic"
-    description = "自定义启发式算法"
+    description = "Custom heuristic"
     compatible_problems = ["CRP-R"]
 
     def train(self, problem_factory, result_queue, stop_event):
         env = problem_factory()
         obs, info = env.reset()
 
-        # ↓ 在这里写你的算法逻辑。问题环境负责验证动作、更新堆场和计算指标。
+        # Algorithm logic goes here. The environment validates actions,
+        # updates the yard, and computes metrics.
         for step in range(self.config.max_iterations):
             if stop_event.is_set():
                 break
 
-            action = env.action_space.sample()  # 替换成你的规则
+            action = env.action_space.sample()  # replace with your rule
             obs, reward, done, _, info = env.step(action)
             if done:
                 break
-            
-            # 每隔 report_interval 步，推送进度给 GUI
+
             if step % self.config.report_interval == 0:
                 self._push(result_queue,
                     step=step,
@@ -160,13 +159,13 @@ class MyRule(BaseAlgorithm):
         return self._best_solution
 ```
 
-**保存文件，重启 GUI** → "My Rule" 自动出现在算法下拉菜单中。
+Save the file and restart the GUI. **My Rule** appears in the algorithm menu automatically.
 
 ---
 
-## 如何添加自己的问题
+## Add a problem
 
-在 `problems/` 下新建 `.py` 文件：
+Create a `.py` file under `problems/`:
 
 ```python
 # problems/my_problem.py
@@ -175,7 +174,7 @@ import numpy as np, gymnasium as gym
 
 class MyProblem(BaseProblem):
     name        = "My Problem"
-    description = "自定义集装箱问题"
+    description = "Custom container problem"
     tags        = ["relocation", "custom"]
     metric_names = ["my_metric"]
 
@@ -185,7 +184,7 @@ class MyProblem(BaseProblem):
         self.action_space      = gym.spaces.Discrete(n)
 
     def _build_episode(self):
-        # 初始化堆场，往 self.yard 里放集装箱
+        # Initialise the yard and place containers in self.yard
         pass
 
     def reset(self, seed=None, options=None):
@@ -194,7 +193,7 @@ class MyProblem(BaseProblem):
         return self._get_obs(), {}
 
     def step(self, action):
-        # 执行动作，返回 (obs, reward, terminated, truncated, info)
+        # Apply the action; return (obs, reward, terminated, truncated, info)
         return self._get_obs(), 0.0, False, False, {}
 
     def evaluate(self, solution):
@@ -209,45 +208,68 @@ class MyProblem(BaseProblem):
 
 ---
 
-## 项目结构
+## Layout
 
 ```
-crp_platform/
+Platform_CRISP/
 ├── core/
-│   ├── container.py      集装箱数据模型（size/weight/type/group/priority）
-│   ├── yard.py           底层 relocation 引擎（Stack + Yard）
-│   ├── base_problem.py   问题抽象基类
-│   ├── base_algorithm.py 算法抽象基类（子进程训练框架）
-│   └── registry.py       自动注册系统
-├── problems/             问题环境：Gymnasium-compatible 仿真 / 验证接口
-├── algorithms/           算法库（可无限扩展）
+│   ├── container.py      container model (size/weight/type/group/priority)
+│   ├── yard.py           relocation engine (Stack + Yard)
+│   ├── base_problem.py   problem base class
+│   ├── base_algorithm.py algorithm base class (subprocess training)
+│   └── registry.py       auto-registration
+├── problems/             Gymnasium-compatible environments
+├── algorithms/           algorithm library
 │   ├── CRP_R/
 │   ├── CRP_U/
 │   ├── CRP_D/
 │   ├── CRP_Time/
+│   ├── CRP_Online/
 │   ├── CRP_Prem/
 │   ├── CRP_Stow/
 │   └── CRP_Stoch/
-├── visualization/        可视化渲染（供环境 / Web 回放）
+├── visualization/        rendering for the environment and web replay
 ├── web/
-│   ├── backend/          FastAPI catalog、任务与结果 API
-│   └── frontend/         React + TypeScript 界面
-├── main.py               CLI / Web 入口
-└── requirements.txt      依赖列表
+│   ├── backend/          FastAPI catalog, jobs, and results
+│   └── frontend/         React + TypeScript UI
+├── main.py               CLI / web entry
+└── requirements.txt      dependencies
 ```
 
 ---
 
-## 常见问题
+## Collaboration
 
-**Q: `python main.py web` 后浏览器没有自动打开？**  
-A: 手动在浏览器访问 `http://127.0.0.1:8000`
+The default branch is `main`. Open a branch per problem family and send a pull request. Do not push straight to `main`.
 
-**Q: 训练很慢？**  
-A: 减小 `max_iterations`，或用 `Caserta (2012) HEUR` 等轻量启发式先测试
+| Branch | Scope |
+|--------|--------|
+| `crp-time` | `algorithms/CRP_Time/` and CRP-Time experiments |
 
-**Q: 如何用你现有的 spp-main 代码？**  
-A: `problems/CRP_Stow.py` 已经基于你的原始 `stowage_gym.py` 逻辑重构，逻辑完全一致
+```bash
+git clone https://github.com/TR-LW-4/Platform_CRISP.git
+cd Platform_CRISP
+git checkout crp-time
+```
 
-**Q: 如何保存训练结果？**  
-A: Workbench 运行结束后会写入 `results/`；Compare 页可汇总与导出 CSV
+Conventions:
+
+- Put a new Time method in `algorithms/CRP_Time/<category>/<paper_key>/`
+- Use the same module-header style as `algorithms/CRP_R/heuristic/caserta_2009_lah/algorithm.py` (main file) and `scoring.py` (helpers)
+- Push to `origin crp-time`, then open a PR into `main`
+
+---
+
+## FAQ
+
+**Q: The browser does not open after `python main.py web`?**  
+A: Open `http://127.0.0.1:8000` yourself.
+
+**Q: Training is slow?**  
+A: Lower `max_iterations`, or first try a cheap heuristic such as `Caserta (2012) HEUR`.
+
+**Q: How do I reuse earlier stowage-gym code?**  
+A: `problems/CRP_Stow.py` follows the original `stowage_gym.py` logic.
+
+**Q: How are results saved?**  
+A: Finished Workbench runs write to `results/`. The Compare page can summarise and export CSV.
