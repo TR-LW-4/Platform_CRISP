@@ -1,43 +1,12 @@
 """
-PMPm1 -- de Melo da Silva, Toulouse & Wolfler Calvo (2018), Sections 3.1-3.2.
+PMPm1 Gurobi formulation for DeMeloSilva2018PMP.
 
-Time-indexed binary formulation over a fixed horizon of R relocation steps
-(the paper's parameter T; renamed ``n_steps``/R here to avoid clashing with
-this platform's very different "T" used elsewhere). Time point t=0 is the
-given initial layout; time points t=1..R are the layout after each
-relocation step (some of which may be idle, per Eq. (11)).
-
-Variables (0-based indices in code; paper uses 1-based g/s/h/t):
-  x[t,g,s,h]  = 1 if a container of group g occupies slot (s,h) at the end
-                of time point t, t = 0..R.
-  y[t,g,s,h]  = 1 if a container of group g is dropped into slot (s,h)
-                during step t, t = 1..R.
-  z[t,g,s,h]  = 1 if a container of group g is picked up from slot (s,h)
-                during step t, t = 1..R.
-
-Constraints implemented (paper numbering):
-  (2)  initial layout fix
-  (19) replaces (3): at most one group occupies (or is leaving) a slot
-  (5)  per-group container-count conservation (no retrievals in PMP)
-  (8)/(9) at most one drop-off / one pick-up per step (K=1, the paper's own
-       basic PMPm1 -- no multi-move relaxation is proposed for the PMP)
-  (10) flow link between consecutive layouts and the movement variables
-  (11) idle steps are pushed to the end of the horizon
-  Strengthening (Section 3.2), ``lifo_strengthening`` toggle:
-    (15)-(17) LIFO: drop-offs/pick-ups restricted to a stack's available top
-    (18) forbid moving the same group right back out the step after it
-         arrived at a stack (no immediate shuffling)
-    when disabled, falls back to the plain (4) no-floating-container rule
-    that (15)-(17) would otherwise make redundant.
-  Strengthening, ``flow_strengthening`` toggle:
-    (20) no simultaneous pick-up and drop-off at the same stack
-    (21)/(22) a drop-off at s must be matched by a pick-up elsewhere (and
-         vice-versa) within the same step
-Objective (1): minimise total drop-offs (== total relocations).
-
-The final-layout constraint (either Eq. (6) or Eq. (7)) is intentionally
-left out of this module and added by ``extensions.py`` / ``solve.py``,
-since the paper presents them as two mutually exclusive alternatives.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

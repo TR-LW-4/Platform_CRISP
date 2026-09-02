@@ -1,50 +1,19 @@
 """
-Bacci, Mattia, Ventura (2019) — Bounded Beam Search (BBS) heuristic for CRP-R.
+BacciBBS
+<2019> <heuristic> <restricted> <single-bay> <CRP-R>
+Bounded beam search with adaptive beam width
+bbs_time_limit --- 5.0 --- Per-instance time limit (s)
 
-Algorithm overview
-------------------
-The BBS heuristic uses a beam search with adaptive beam width β (dependent on
-problem size) to explore relocation sequences.  At each node, three fast inner
-heuristics compute upper bounds used to guide and prune the search:
-
-  • ChainF    — Jovanović & Voß (2014) chain heuristic (used when n < 1 000)
-  • Difference1 — Ünlüyurt & Aydin (2012) (used when 1 000 ≤ n < 10 000)
-  • GAH       — Wu & Ting (2012) (used when n ≥ 10 000)
-
-Lower bounds during search come from the UBALB bound (Bacci et al., 2019).
-
-Beam widths (hardcoded, size-adaptive):
-  n <  40  → β = 800     n < 60  → β = 500
-  n < 80   → β = 300     n < 100 → β = 200
-  n < 120  → β = 100     n ≥ 120 → β = 50
-
-The algorithm terminates either when the search tree is exhausted or when the
-configurable time limit is reached; it always returns the best feasible
-solution found so far.
-
-Integration notes
------------------
-The C++ source (`rBRP_BSheu.cpp`) is compiled once into `vendor/bbs_heuristic`.
-Each `train()` call converts the current platform yard to the BC-RBRP input
-format, runs the binary via subprocess, and parses the relocation count from
-stdout.  No step-by-step environment interaction is needed: BBS solves the
-full instance in one shot.
-
-Config parameters
------------------
-  bbs_time_limit   : float — per-instance time limit in seconds (default 5.0)
-  bbs_binary       : str  — override path to compiled binary (optional)
-
-Compatible problems
--------------------
-  CRP-R
-
-Reference
----------
+------------------------------- Reference --------------------------------
 T. Bacci, S. Mattia, P. Ventura,
 "The bounded beam search algorithm for the block relocation problem",
-Computers & Operations Research, 103, 252–264, 2019.
-https://doi.org/10.1016/j.cor.2018.11.011
+Computers & Operations Research 103 (2019) 252–264.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -67,13 +36,7 @@ class BacciBBS(BaseAlgorithm):
 
     name                = "Bacci et al. (2019) BBS"
     category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Bacci, Mattia, Ventura (Computers & OR 2019, 103:252–264) Bounded Beam Search for CRP-R. "
-        "Adaptive beam width β (800 → 50 depending on n); guided by ChainF / "
-        "Difference1 / GAH upper bounds and UBALB lower bound. "
-        "Returns best feasible solution within the time limit."
-    )
+    description         = "Bacci et al. (C&OR 2019) bounded beam search."
     compatible_problems = ["CRP-R"]
     _RESHUFFLES_RE = re.compile(r"reshuffles=(\d+)")
 

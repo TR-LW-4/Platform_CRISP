@@ -1,37 +1,12 @@
 """
-Jovanović, Tuba, Voß (2019) — scoring and greedy primitives for ACO rBRP-Time.
+MinMax heuristic and pheromone helpers for JovanovicACO_CRPTime.
 
-Adapts Section 6 of the paper (crane-time objective) to the platform's 2D
-KinematicsModel (bay × row, gantry + trolley axes).
-
-Paper-faithful components (copied, not imported, from CRP-R version):
-  dd()          — Eq. 2  minimum due-date in a stack
-  dd_star()     — Eq. 2  extended dd for pheromone-matrix indexing
-  dif()         — Eq. 3  relocation undesirability (heuristic, unchanged)
-  compute_lb()  — lower bound: number of non-well-located containers
-
-New components for crane-time objective (Section 6):
-  _travel_time()          — repositioning time between two (bay,row) positions
-  move_time_inline()      — crane time for one relocation (reposition + carry + spreader)
-  retrieval_time_inline() — crane time for one retrieval (carry to truck at (0,0))
-  compute_lb_time()       — crane-time LB = n_nwl × spreader_s
-  run_greedy_rbrp_time()  — MinMax greedy warm-start returning (solution_4tuples, crane_time)
-
-Stack keys in this module are (bay, row) tuples, which are also the spatial
-positions used by KinematicsModel — no separate position lookup is needed.
-
-Reference
----------
-R. Jovanović, M. Tuba, S. Voß,
-"An efficient ant colony optimization algorithm for the blocks relocation
- problem",
-European Journal of Operational Research 274 (2019) 78–90.
-https://doi.org/10.1016/j.ejor.2018.09.038
-
-Section 6 cost functions (adapted to platform 2D RMGC model):
-  cost_f  (Eq. 40/42) → move_time_inline with fixed spreader_s
-  LB_f    (Eq. 44)    → compute_lb_time
-  val_f   (Eq. 46)    → used inline in algorithm.py
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,30 +1,12 @@
 """
-BRP-m3 and BRP-m3R MIP formulations (Lu, Zeng & Liu 2019, Section IV).
+BRP-m3 Gurobi formulation for LuZengLiu2019BRP.
 
-Two models are implemented:
-  BRP-m3   — full MIP that minimises the total number of relocations (§IV-A)
-  BRP-m3R  — relaxed version that minimises remaining direct blockages
-              after L relocations; used as a subroutine in IS* (§IV-B)
-
-Variable naming follows the paper:
-  x[t, i, j]   — block i directly upon block j at end of turn t  (B0 = B + {B+1})
-  yhat[t, i, j] — block i lifted UP from block j in turn t
-  y[t, i, j]   — block i placed DOWN upon block j in turn t
-  z[t, i, j]   — block i retrieved from atop block j in turn t   (j > i only)
-  u[t, i]      — height of block i after lift-down in turn t
-
-Simplifications from Proposition 1 (always applied):
-  (a) x[t,i,j] and u[t,i] are relaxed to continuous
-  (b) constraints (yhat3), (z1), (z2) are eliminated
-  (c) equality constraints (e1)-(e7) for block 1 are added
-
-Reference
----------
-C. Lu, B. Zeng, S. Liu,
-"A Study on the Block Relocation Problem: Lower Bound Derivations and
-Strong Formulations",
-IEEE Transactions on Automation Science and Engineering, 2019.
-arXiv:1904.03347
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -55,7 +55,7 @@ export function InstanceSourcePanel({
         setError('')
         const available = payload.sources.filter((item) => item.available)
         if (!available.some((item) => item.id === source)) {
-          onSourceChange(available[0]?.id ?? 'random')
+          onSourceChange(available[0]?.id ?? '')
         }
         const dup = payload.sources.find((item) => item.id === 'zhu_dup')
         if (dup?.alphas?.length && !dup.alphas.includes(alpha)) {
@@ -213,7 +213,7 @@ export function InstanceSourcePanel({
             setSelectedPairs([])
           }}
         >
-          {(catalog?.sources ?? [{ id: 'random', label: 'Random Layout', available: true }]).map(
+          {(catalog?.sources ?? []).map(
             (item) => (
               <option key={item.id} value={item.id} disabled={!item.available}>
                 {item.label}{item.available ? '' : ' (unavailable)'}

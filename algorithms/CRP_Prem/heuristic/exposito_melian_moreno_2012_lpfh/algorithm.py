@@ -1,10 +1,20 @@
 """
-Expósito-Izquierdo, Melián-Batista, Moreno-Vega (2012) LPFH.
+ExpositoMelianMoreno2012LPFH
+<2012> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Lowest Priority First Heuristic with multistart
+max_iterations --- 150 --- Multistart iterations
+no_improve_limit --- 100 --- Stagnation cutoff
 
-Paper:
+------------------------------- Reference --------------------------------
 C. Expósito-Izquierdo, B. Melián-Batista, M. Moreno-Vega,
 "Pre-Marshalling Problem: Heuristic solution method and instances generator",
-Expert Systems with Applications 39 (2012) 8337-8349.
+Expert Systems with Applications 39 (2012) 8337–8349.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

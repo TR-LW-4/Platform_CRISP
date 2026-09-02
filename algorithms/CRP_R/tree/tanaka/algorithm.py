@@ -1,7 +1,19 @@
 """
-Tanaka ``restricted-duplicate-1.02`` branch-and-bound (exact BRP solver).
+TanakaBB
+<2016> <exact> <restricted> <single-bay> <CRP-R>
+Branch-and-bound wrapper (restricted-duplicate-1.02)
+tanaka_time_limit_sec --- 600 --- Per-instance time limit (s)
 
-Bridges the vendor C binary ``brp_bb`` to :class:`core.base_algorithm.BaseAlgorithm`.
+------------------------------- Reference --------------------------------
+S. Tanaka, K. Takii,
+"A faster branch-and-bound algorithm for the block relocation problem",
+IEEE Transactions on Automation Science and Engineering 13 (2016) 181–190.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -23,20 +35,10 @@ from .tanaka_export import yard_to_tanaka_instance
 
 
 class TanakaBB(BaseAlgorithm):
-    """
-    Shunji Tanaka — restricted relocation branch-and-bound (CRP-R naming).
-
-    Vendor code lives under ``vendor/restricted-duplicate-1.02`` (BSD licence).
-    """
 
     name                = "Tanaka (2016) B&B"
     category            = "Exact"
-    description         = (
-        "Exact branch-and-bound for restricted BRP (Tanaka ``restricted-duplicate-1.02``). "
-        "Exports the initial yard to Tanaka format and runs ``brp_bb``. "
-        "Primary metric = relocation count; stderr reports ``opt=`` (proven optimal) "
-        "or ``best=`` (time limit / interrupted)."
-    )
+    description         = "Tanaka & Takii (IEEE T-ASE 2016) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
     _OPT_RE = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")

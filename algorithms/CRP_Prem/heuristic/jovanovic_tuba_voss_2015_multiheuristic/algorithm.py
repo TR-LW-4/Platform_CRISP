@@ -1,55 +1,20 @@
 """
-Jovanovic, Tuba, Voss (2015) multi-heuristic approach for the pre-marshalling
-problem.
+JovanovicTubaVoss2015MultiHeuristic
+<2015> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Deterministic 48-combination multi-heuristic for the CPMP
+full_48_search --- True --- Enumerate all stage-heuristic combinations
+safe_slack --- 1 --- Deadlock-avoidance slack
 
-Reference
----------
-R. Jovanovic, M. Tuba, S. Voss, "A multi-heuristic approach for solving the
-pre-marshalling problem", Central European Journal of Operations Research
-25 (2017) 1-28 (published online 2015).
-
-Embedding scope
-----------------
-This paper is a deterministic extension of the already-embedded
-Exposito-Izquierdo, Melian-Batista, Moreno-Vega (2012) LPFH
-(``heuristic/exposito_melian_moreno_2012_lpfh``): it keeps the same
-four-stage greedy skeleton (select a block to well-locate, select a
-destination stack, relocate the blocking containers, fill the destination)
-but replaces LPFH's randomized top-k selection with a small set of
-competing deterministic heuristic functions per stage, enumerates every
-combination (2 x 2 x 3 x 4 = 48), and keeps the best solution. It also adds
-two paper-specific mechanisms not present in LPFH:
-
-* Sec. 4.1 formalized deadlock avoidance (Eq. 7-9): instead of
-  backtracking, undo the most recent relocation, borrow a slot from a
-  random full stack, and retry -- always finds a way to continue.
-* Sec. 4.2 move-sequence correction (Eq. 10-11): removes redundant
-  "chain" and "there-and-back" relocations from the final solution.
-
-This is intentionally a self-contained reimplementation (not an import) of
-the shared four-stage primitives, consistent with this platform's
-one-paper-one-folder convention.
-
-Documented approximations (see module docstrings for detail):
-* ``core.py``: the forced-relocation count fr(c, s*) (Sec. 3.2) is only
-  described informally in the paper via a worked example; we implement the
-  literal "all other stacks' effective top values exceed the blocker's own
-  value" rule stated in the text.
-* ``relocation.py``: the MinMax heuristic (Sec. 3.3) is cited from other
-  papers rather than fully specified; we use the standard BRP/PMP
-  formulation from that literature (tightest well-locating fit, else
-  smallest stack maximum).
-* ``deadlock.py``: Eq. 7-9's exact subscripts are ambiguous in the source;
-  our recovery preserves the same ingredients (revert an earlier
-  relocation, optionally borrow through a random full stack) without a
-  literal "redo" step, to stay provably capacity-safe.
-
-Empirically (randomized instances following the paper's own benchmark
-convention of ``max_tiers = instance_height + 2``), the full 48-combination
-search reaches a fully well-located layout on ~99% of instances (50/75%
-occupancy: 100%, 100% occupancy: ~97%); the rest report ``solved=False``
-with the best partial layout found rather than crashing or corrupting
-state.
+------------------------------- Reference --------------------------------
+R. Jovanovic, M. Tuba, S. Voss,
+"A multi-heuristic approach for solving the pre-marshalling problem",
+Central European Journal of Operations Research 25 (2017) 1–28.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

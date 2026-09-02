@@ -1,28 +1,12 @@
 """
-Wang et al. (2026) POCRP-RC — Definitions 1-5 and derived helpers.
+NBC/DC/BC task definitions for Wang2026GRASP.
 
-All helpers operate on the platform's CRP-Stow environment and its yard,
-using the semantics:
-    c.group    = vs(c)  (vessel stack)
-    c.priority = vt(c)  (vessel tier)
-    env._is_rc(c)                → True iff c is a Rolled Container (RC).
-    env._is_retrievable(c)       → True iff c is an OC currently retrievable.
-    env._vessel_loaded[g]        → number of OCs of group g already loaded.
-
-Container-echelon (Def 4) after platform re-ranking:
-    ce(c) = c.priority - _vessel_loaded[c.group] + 1     (=1 → candidate)
-    ce(RC) = C + 1                                        (RCs are last)
-
-Stack-echelon (Def 5):
-    se(s) = min ce(c) over OCs c in s, C+1 if s is empty or a rolled stack.
-
-Bad container (Def 2):
-    OC d in stack s is BAD iff exists OC c in s below d with g(c)==g(d)
-    and p(c) < p(d)  (c must be retrieved before d).
-
-Deadlock (Def 3):
-    A relevant 4-cycle among 4 non-bad OCs across two stacks (equivalent to
-    Jovanović 2019 §4.3's "relevant 4-cycle"; adapted to ignore RCs).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

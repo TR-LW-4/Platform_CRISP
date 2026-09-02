@@ -1,13 +1,12 @@
 """
-Caserta & Voß (2009) — Corridor Method (CM) for Pre-marshalling.
+Corridor sampling and local-search helpers for CasertaVossCM.
 
-This file keeps a paper-faithful core:
-  1) corridor definition/selection
-  2) neighborhood generation
-  3) move evaluation + elite roulette selection
-  4) local search (heuristic_swap + heuristic_subsequence_building)
-
-No extra diversification/perturbation mechanism is used.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

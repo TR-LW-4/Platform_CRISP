@@ -1,18 +1,12 @@
 """
-A* and IDA* search drivers for the pre-marshalling problem (Section 4 of
-the paper). Both are exact: as long as the cost estimation heuristic never
-overestimates the true remaining cost, both algorithms are guaranteed to
-return an optimal move sequence (or correctly report infeasibility) once
-their search terminates.
+A*/IDA* search loop for TierneyPacinoVoss2017AStarIDAStar.
 
-Consistency fix-up for the EMO bound (Section 4.3): the EMO bound is
-admissible but not consistent, so a child's heuristic value could in rare
-cases be *lower* than its parent's. Both drivers therefore clamp a node's
-effective heuristic to be at least its parent's effective heuristic, which
-is exactly the paper's fix.
-
-Self-contained: only depends on ``core.py``, ``bounds.py`` and
-``branching.py`` in this same package.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

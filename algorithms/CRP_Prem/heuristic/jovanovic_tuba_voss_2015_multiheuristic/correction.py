@@ -1,14 +1,12 @@
 """
-Sec. 4.2: post-processing correction of the generated move sequence
-(Eq. 10-11).
+Move-sequence correction for JovanovicTubaVoss2015MultiHeuristic.
 
-Filling, out-of-order block selection, and the deadlock-avoidance mechanism
-can all introduce "chain moves": a container relocated twice in a row with
-nothing else touching its destination in between. Two local rewrite rules
-remove these, applied repeatedly to a fixed point:
-
-    (s1, s2), (s2, s3) -> (s1, s3)      if s1 != s3   (Eq. 10)
-    (s1, s2), (s2, s1) -> (removed)                    (Eq. 11)
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

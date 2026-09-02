@@ -1,13 +1,12 @@
 """
-Lee & Lee (2010) – Phase 2: Move reduction.
+Phase-2 path shortening for LeeLeeRetrievalHeuristic.
 
-Iteratively finds Type B containers (relocated ≥1 time) and tries to
-replace their multi-hop path with a shorter 2-hop path:
-  (c: initial → new_waypoint)  then  (c: new_waypoint → OUT).
-
-Accepts any improvement that reduces total moves and passes feasibility
-simulation.  Terminates when the lower bound is reached or
-`max_no_improve` consecutive iterations fail to improve.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

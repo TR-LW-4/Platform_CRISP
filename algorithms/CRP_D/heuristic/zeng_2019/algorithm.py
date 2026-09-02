@@ -1,61 +1,19 @@
 """
-Zeng et al. (2019) – Five heuristics (H_1 to H_5) for CRP-D.
+Zeng2019
+<2019> <heuristic> <grouped> <single-bay> <CRP-D>
+Five group-aware relocation heuristics H1–H5
 
-Reference
----------
-Zeng, Q., Feng, Y., & Yang, Z. (2019). "Integrated optimization of pickup
-sequence and container rehandling based on partial truck arrival information."
-Computers & Industrial Engineering, 127, 366–382.
-
-Problem correspondence
-----------------------
-- The paper's "groups" correspond to CRP-D duplicate-priority groups.
-- Group priorities are ordered: group 1 before group 2, etc.
-- Within a group the retrieval order is free (the paper optimises this).
-- Compatible with the CRP-D platform only.
-- Action space: Discrete(n²), action = src_idx * n + dst_idx.
-
-Algorithm structure (shared by all five heuristics)
----------------------------------------------------
-At every step the CRP-D environment has already auto-retrieved all accessible
-target-group containers.  The algorithm must issue one relocation action.
-
-Source selection (§4.2.1 — "sequencing rule"):
-    Among stacks that contain at least one blocked target-group container:
-    1. Pick the stack with LARGEST ḡ_min(s, k)
-       (the non-target containers in that stack will be retrieved later → safer
-       to disturb first).
-    2. Tie-break: smallest (bay, row).
-
-Destination selection (§4.2.2 — "relocation rule"):
-    The five heuristics share the same priority tiers for the destination:
-
-    Priority 1 — "first-kind" stacks: non-empty, gmin(s) > k
-                  (all containers retrieved AFTER current group; safest).
-                  Among these → smallest gmin(s) closest to k.
-    Priority 2 — empty stacks  (tie-break: smallest (bay, row)).
-    Priority 3 — "sub-first-kind": gmin(s) == k  (tie-break: smallest (bay, row)).
-    Fallback    — remaining stacks where gmin(s) < k:
-
-        H_1  (H6 rule)      → smallest BI,  tie-break: largest gmin(s)
-        H_2  (Adj-H1 rule)  → smallest RI,  tie-break: largest gmin(s)
-        H_3  (Adj-H2 rule)  → smallest BI,  tie-break: smallest RI
-
-For H_4 (Adj-H4) and H_5 (Adj-H5):
-    When a source is chosen, pre-assign destinations for ALL blockers above the
-    highest blocked target-group container in that stack, sorted by DECREASING
-    group code (later-retrieved blockers assigned first to minimise cascading
-    rehandles).  The physical relocation plan is then executed top-to-bottom.
-    Uses "adjusted RI / BI" accounting for virtual placements in each round.
-
-Helper definitions
-------------------
-    k          : current target group code
-    gmin(s)    : min group code among containers in stack s
-    ḡmin(s, k) : min group code in s, excluding group k
-    RI(s, g_b) : number of containers in s with group < g_b
-    BI(s)      : containers above the earliest-to-retrieve container in s,
-                 after placing one more container on top
+------------------------------- Reference --------------------------------
+Q. Zeng, Y. Feng, Z. Yang,
+"Integrated optimization of pickup sequence and container rehandling
+ based on partial truck arrival information",
+Computers & Industrial Engineering 127 (2019) 366–382.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

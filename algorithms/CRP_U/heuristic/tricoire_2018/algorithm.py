@@ -1,79 +1,20 @@
 """
-Tricoire, Parragh, Feillet (2018) — Heuristics for CRP-U (uBRP).
+TricoireHeuristic
+<2018> <heuristic> <unrestricted> <single-bay> <CRP-U>
+Safe-move greedy, SmSEQ, RakeSearch, and Pilot methods
+mode --- SmSEQ-2 --- SM-1/2, SmSEQ-1/2, RakeSearch, or Pilot
+width --- 100 --- RakeSearch / Pilot beam width
 
-Algorithm summary
------------------
-The paper proposes a family of greedy heuristics and metaheuristics for the
-unrestricted Block Relocation Problem (CRP-U), all based on two "safe move"
-primitives:
-
-  SM-1   (safe 1-relocate) — place the top item of a misplaced stack onto a
-         destination whose minimum is ≥ the item, so no new conflict is created.
-  SM-2   (safe 2-relocate) — a two-move sequence: first safely relocate one item
-         to unblock a stack-top so that a safe 1-relocate becomes possible.
-
-Greedy heuristics (mode options)
----------------------------------
-  SM-1      — apply best safe 1-relocate at each step; forced move otherwise.
-  SM-2      — apply best safe 1- or safe 2-relocate; forced move otherwise.
-  SmSEQ-1   — if the blocking items form a decreasing sequence (≥ 2 items),
-               prepare a target stack for the whole sequence; else SM-1.
-  SmSEQ-2   — same but falls back to SM-2 instead of SM-1.
-
-Condensation post-processor (applied to SmSEQ solutions)
-----------------------------------------------------------
-  classic  — Jin et al. condensation: merge (s1→s2, s2→s3) if s3 is untouched.
-  improved — Tricoire improved condensation: allows s3 to receive/lose items
-             between the two relocations, subject to capacity constraints.
-
-Metaheuristics
---------------
-  RakeSearch   — BFS over partial solutions up to width W; apply fast-meta
-                 (all four greedy heuristics) on each leaf.
-  PilotMethod  — iteratively expand the best candidate using all valid single
-                 relocations, evaluate each with RakeSearch(w=hub_width).
-
-Reference
----------
-F. Tricoire, S. Parragh, D. Feillet,
+------------------------------- Reference --------------------------------
+F. Tricoire, S.N. Parragh, D. Feillet,
 "New insights on the block relocation problem",
 Computers & Operations Research 89 (2018) 127–139.
-https://doi.org/10.1016/j.cor.2017.08.009
-
-C++ codebase: https://github.com/ftricoire/block-relocation-master
-
-Platform configuration (extra parameters)
-------------------------------------------
-mode          : str   'SmSEQ-2' (default) | 'SM-1' | 'SM-2' | 'SmSEQ-1'
-                      | 'RakeSearch' | 'PilotMethod'
-condensation  : str   'improved' (default, Tricoire) | 'classic' (Jin) | 'none'
-                      Applied only to SmSEQ modes and as completion step in
-                      RakeSearch / PilotMethod.
-width         : int   100 (default). BFS width for RakeSearch; outer width for
-                      PilotMethod.  Larger → better quality, slower.
-hub_width     : int   2 (default). RakeSearch width used as look-ahead hub
-                      inside PilotMethod.
-verbose       : bool  False (default). Print per-seed relocation counts.
-
-Correspondence to the original C++ command-line flags (README.txt)
-------------------------------------------------------------------
-  -m SM-1 / SM-2 / SmSEQ-1 / SmSEQ-2   ←→  mode = '...'
-  -m RS-<N>                              ←→  mode = 'RakeSearch', width = N
-  -m PM-<N>                             ←→  mode = 'PilotMethod', width = N
-  -hub RS-<N>                           ←→  hub_width = N
-  -cp none / jin / tricoire             ←→  condensation = 'none' / 'classic' / 'improved'
-  -m DFBB / BB                          ←→  (not implemented; platform has stronger exact solvers)
-
-Excluded from this port (deliberately)
-----------------------------------------
-  Exact algorithms  – DFBB, Branch-and-Bound (dfbb.cpp / branchandbound.cpp).
-                      The platform already provides stronger exact solvers at
-                      CRP_U/tree/ (Tanaka & Mizuno 2018, Jin & Tanaka 2023).
-  Baselines         – GLAH (→ CRP_U/heuristic/glah/),
-                      LA-N  (→ CRP_U/heuristic/lan_*/),
-                      JZW, ZHU (not in Platform_CRISP scope).
-  SubsequencePolicy – plain 'SSEQ' mode; superseded by SmSEQ variants which
-                      are used in all main experiments and FastMeta.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

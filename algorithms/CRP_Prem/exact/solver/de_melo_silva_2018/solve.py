@@ -1,15 +1,12 @@
 """
-Solve driver for PMPm1 (de Melo da Silva et al., 2018).
+Time-horizon solve driver for DeMeloSilva2018PMP.
 
-Unlike Lee & Hsu (2007) -- whose time-expanded network needs an externally
-guessed horizon T of unknown validity -- Section 3.3's own greedy heuristic
-already returns a *guaranteed-valid* upper bound on the number of
-relocations needed to sort the yard. Because T only bounds relocations from
-above (extra steps just sit idle at the end, per Eq. (11)), a single solve
-at T = heuristic value is enough to reach the true optimum; no ascending
-search is required in the common case. A short escalation ladder is kept
-purely as a safety net against pathological instances / coarsening edge
-cases where that would not hold.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

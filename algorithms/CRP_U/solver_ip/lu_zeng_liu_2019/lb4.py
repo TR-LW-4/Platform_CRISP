@@ -1,28 +1,12 @@
 """
-LB4 — strongest lower bound for BRP (Lu, Zeng & Liu, 2019, Section III).
+LB4 virtual-layer lower bound for LuZengLiu2019BRP.
 
-LB4 = LB1  +  2 × |P7-subsets|  +  |P5-subsets|  +  |P8-subsets|
-
-Algorithms implemented
------------------------
-A5   — identify one virtual layer satisfying Property 5 (O(BS))
-A5*  — variant of A5 that seeks blocks at the lowest possible positions
-A7   — identify two overlapping virtual layers sharing one WP block
-        satisfying Property 7 (O(BS))
-A8   — identify one block subset satisfying Property 8, reduced to
-        exactly S blocks via A8-s (O(B log S))
-compute_lb4 — orchestrates A7 → A5/A5* → A8 to compute LB4
-
-All functions operate on plain Python lists (snapshots of BRPState),
-not on BRPState directly, so they are pure and side-effect-free.
-
-Reference
----------
-C. Lu, B. Zeng, S. Liu,
-"A Study on the Block Relocation Problem: Lower Bound Derivations and
-Strong Formulations",
-IEEE Transactions on Automation Science and Engineering, 2019.
-arXiv:1904.03347
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

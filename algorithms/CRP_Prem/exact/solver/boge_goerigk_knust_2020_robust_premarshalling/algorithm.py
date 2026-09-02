@@ -1,16 +1,19 @@
 """
-Boge, Goerigk, Knust (2020) robust optimization for pre-marshalling.
+BogeGoerigkKnust2020RobustPMP
+<2020> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Robust pre-marshalling under adjacent-swap uncertainty
+robust_delta --- 2 --- Adjacent-swap uncertainty budget
 
-Paper:
+------------------------------- Reference --------------------------------
 S. Boge, M. Goerigk, S. Knust,
 "Robust optimization for premarshalling with uncertain priority classes",
-European Journal of Operational Research 287 (2020) 191-210.
-
-Embedding scope (v1):
-  - uncertainty model via adjacent swaps (Kendall distance parameter delta)
-  - theorem-based robust-existence checks (paper Sections 3.1/3.2)
-  - solver-based optimization of BIbar^rob upper-bound objective
-  - optional exact BI^rob evaluation by explicit scenario enumeration
+European Journal of Operational Research 287 (2020) 191–210.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -288,6 +288,18 @@ def stop_job(job_id: str):
     return job.summary()
 
 
+@app.post("/api/jobs/{job_id}/continue")
+def continue_job(job_id: str):
+    """Continue a stopped batch from the first instance without a saved result."""
+    try:
+        job = manager.continue_job(job_id)
+    except KeyError:
+        raise HTTPException(404, "Job not found") from None
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return job.summary()
+
+
 @app.get("/api/results")
 def results(limit: int = Query(100, ge=1, le=1000)):
     return json_safe(list_saved_runs()[:limit])

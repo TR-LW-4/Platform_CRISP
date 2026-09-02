@@ -1,13 +1,12 @@
 """
-Final-layout constraints for PMPm1 (de Melo da Silva et al., 2018, Section
-3.1). The paper presents these as two *mutually exclusive* alternatives --
-callers should add exactly one of them, never both.
+LIFO/flow strengthening for DeMeloSilva2018PMP.
 
-* Eq. (6): pin an exact, caller-supplied target layout.
-* Eq. (7): require the standard "sorted by group, most urgent on top" rule,
-  which is exactly CRP-Prem's own well-located definition
-  (``core.yard.Stack.is_sorted_by_priority``) once groups are mapped 1:1 to
-  priority values -- this is the default used by ``solve.py``.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

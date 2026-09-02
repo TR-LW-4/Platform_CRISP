@@ -1,52 +1,20 @@
 """
-Tanaka & Voß (2019) exact branch-and-bound for the BRPSP.
+TanakaBB2019Stow
+<2019> <exact> <stowage> <multi-bay> <CRP-Stow>
+Iterative-deepening branch-and-bound for the BRPSP
+variant --- unrestricted --- Restricted or unrestricted BRPSP
+time_limit_sec --- 1800 --- Per-instance wall-clock limit (s)
 
-Reference
----------
-S. Tanaka, S. Voß.
-"An exact algorithm for the block relocation problem with a stowage plan."
-European Journal of Operational Research 279(3):767-781, 2019.
-DOI: 10.1016/j.ejor.2019.06.014
-
-Algorithm
----------
-Branch-and-bound with iterative deepening (ID-B&B) over the sequence of
-relocations.  Three lower bounds are implemented and selectable at compile
-time:
-
-    LB  1 – LB2c    : total number of 2-blocking containers  (§5.1.1)
-    LB  2 – LB2c4c  : LB2c + minimal-4-cycle set cover       (§5.1.2)
-    LB  3 – LBr     : relaxation B&B (strongest, default)    (§5.2)
-
-The upper bound is computed by the improved MBW4CB+MM4CB heuristic (§6.3).
-
-Two problem variants are supported, each compiled to a separate binary:
-
-    brpsp_bb_u  – unrestricted BRPSP (any stack-top may be relocated)
-    brpsp_bb_r  – restricted BRPSP   (only the topmost blocker above the
-                                       next target is relocatable)
-
-Build
------
-From this directory:
-    make          → builds brpsp_bb_u  (unrestricted, default)
-    make restrict → builds brpsp_bb_r  (restricted)
-    make both     → builds both
-
-Or directly from vendor/brpsp-1.0:
-    make TARGET=brpsp_bb_u
-    make TARGET=brpsp_bb_r EXTRA_DEFS=-DRESTRICTED
-
-Input / output
---------------
-Input  : Jovanović .pro file (directly accepted) or generated from env state
-         via pro_export.env_to_pro_string().
-Output : stderr line  ``opt=N``  (proven optimal)
-                  or  ``best=N`` (best found within time limit)
-         stdout : full relocation sequence (not parsed by this wrapper).
-
-This module is standalone: it copies the brpsp-1.0 sources but has no
-import or inheritance coupling to them.
+------------------------------- Reference --------------------------------
+S. Tanaka, S. Voß,
+"An exact algorithm for the block relocation problem with a stowage plan",
+European Journal of Operational Research 279 (2019) 767–781.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

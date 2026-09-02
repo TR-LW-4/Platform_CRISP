@@ -1,33 +1,12 @@
 """
-Export a CRP_Stow environment snapshot to Tanaka & Voß (2019) .pro format.
+Yard → Tanaka–Voß .pro export for TanakaBB2019Stow.
 
-The .pro format (used by both Jovanović 2019 benchmark files and the
-brpsp-1.0 C solver) is:
-
-    Number Of Containers
-    N
-    Number Of Yard Stacks
-    YS
-    MaxTier of Yard Stacks
-    YT
-    Number of Vessel Stacks
-    VS
-    Max Tier of Vessel Stacks
-    H_v[0]
-    H_v[1]
-    ...
-    H_v[VS-1]
-    Yard Bay
-    Stack 0:
-    <bottom→top container tokens, e.g. "A_0 B_2 C_1">
-    Stack 1:
-    ...
-
-Container token "X_t" means the container's destination is vessel stack X
-(A=0, B=1, …) at vessel tier t (0 = bottom).
-
-This module is intentionally standalone: it imports nothing from the
-brpsp-1.0 vendor directory and has no coupling to it.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

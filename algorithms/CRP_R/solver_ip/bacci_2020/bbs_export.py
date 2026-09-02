@@ -1,20 +1,12 @@
 """
-Convert the platform's Yard / ProblemConfig to the BC-RBRP input format
-expected by the BBS heuristic binary.
+Yard → BC-RBRP input text for BacciBC2020.
 
-BC-RBRP input format (see BC_RBRP.cpp / rBRP_BSheu.cpp)
----------------------------------------------------------
-Line 1:  w h n
-  w = total number of stacks (num_bays × num_rows)
-  h = maximum stack height (max_tiers)
-  n = total number of containers
-Remaining w lines, one per stack (left-to-right, bay-major order):
-  k item1 item2 ...
-  k   = current height of this stack (number of containers)
-  items are priorities 1 … n, listed bottom-to-top
-  (priority 1 = retrieved first; matches the platform's convention)
-
-Empty stacks are written as a single "0" on their line.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

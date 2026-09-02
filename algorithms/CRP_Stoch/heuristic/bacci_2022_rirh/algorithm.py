@@ -1,30 +1,20 @@
 """
-Bacci, Mattia & Ventura (2022) — Realization-Independent Reallocation
-Heuristic (RIRH) for the Stochastic Container Relocation Problem.
+RIRH
+<2022> <heuristic> <stochastic> <single-bay> <CRP-Stoch>
+Realization-independent reallocation and Expected MinMax
+num_sample_realizations --- 0 --- Sampled realizations (0 = full tree)
 
-Two ``BaseAlgorithm`` classes are exposed:
-
-- ``RIRH``            — the paper's main contribution (Algorithm 2 + 3).
-- ``ExpectedMinMax``  — the Galle et al. (2018) EM baseline (Algorithm 1)
-  used in the paper's experiments (Table 3 in Bacci 2022).
-
-Both build a :class:`core.stoch.PolicyTree` off-line from the current
-``CRP-Stoch`` environment, then call ``env.evaluate_policy(tree)`` to
-obtain the expected number of reshuffles ``E[R]``.
-
-Compatible problems
--------------------
-Only ``CRP-Stoch`` (the stochastic variant).  When ``batch_size == 1``
-the SCRP degenerates to deterministic CRP-R, so RIRH and EM both
-collapse to a single Caserta/Galle MinMax pass — useful as a sanity
-check.
-
-Reference
----------
-T. Bacci, S. Mattia, P. Ventura, "The realization-independent
-reallocation heuristic for the stochastic container relocation
-problem", *Soft Computing*, 2022.
-DOI: 10.1007/s00500-022-07070-3.
+------------------------------- Reference --------------------------------
+T. Bacci, S. Mattia, P. Ventura,
+"The realization-independent reallocation heuristic for the stochastic
+ container relocation problem",
+Soft Computing, 2022.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

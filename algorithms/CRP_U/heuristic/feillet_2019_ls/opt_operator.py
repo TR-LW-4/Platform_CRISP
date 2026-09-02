@@ -1,48 +1,12 @@
 """
-OPT(n) operator — Algorithm 2 of Feillet, Parragh, Tricoire (2019).
+OPT(n) DP operator for FeillletLS.
 
-Overview
---------
-Given the current solution S and a container n, OPT(n) finds the shortest
-relocation sub-sequence for n by solving a shortest-path problem on a
-*state-space graph* over configurations of the *reduced solution* S^−n.
-
-S^−n is built by:
-  1. Removing all of n's own relocation steps from S (before n's retrieval).
-  2. Recomputing the bay height matrix h[s][t] along those remaining steps.
-
-A STATE(t, s, h) represents "in S^−n configuration t, container n is at
-stack s, tier h."  Transitions:
-  cost 0 — n stays at (s, h); apply S^−n step t → arrive at config t+1.
-  cost 1 — n relocated from (s, h_top) to (s', h[s'][t+1]+1) before step t.
-
-Feasibility rules (Definition 1)
----------------------------------
-Middle states  2 ≤ t ≤ M−1:
-  R1. h ≤ h(s,t)+1              n is not floating
-  R2. h(s,t) < H_max            room exists for n
-  R3. if σ^t_1 = s: h ≤ h(s,t) n is not on top when step t picks from s
-  R4. if σ^t_2 = s: h(s,t)+1 < H_max  incoming container won't overflow
-Final state  t = M:
-  F1. h = h(s,M)+1              n is exactly on top (ready for retrieval)
-  F2. h(s,M) < H_max            room exists
-
-Speedups implemented
---------------------
-  #1 — upper-bound pruning: any partial path with cost ≥ f_n is discarded.
-  #3 — aspiration criterion: if n can remain at its current position until
-       retrieval without further relocations (3 conditions), return early.
-       (Speedup #2 — "useless evaluations" — is not implemented; it is a
-       constant-factor improvement that complicates the code considerably.)
-
-Complexity note
----------------
-For each container n the BFS scans at most M configurations with at most
-W × H_max active states per configuration, and W−1 destinations per
-cost-1 transition: O(M × W² × H_max) per call.  For a standard 10×5 bay
-with N=100 this is ~10 M operations per container per LS iteration — fast
-in Java/C++, but noticeable in Python.  For production use, consider a
-Cython port of this module.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

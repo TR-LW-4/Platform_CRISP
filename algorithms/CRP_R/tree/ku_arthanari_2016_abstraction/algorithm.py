@@ -1,37 +1,20 @@
 """
-Ku & Arthanari (2016) abstraction method + PDB bidirectional search for
-the Restricted BRP (CRP-R).
+KuArthanari2016Abstraction
+<2016> <exact> <restricted> <single-bay> <CRP-R>
+Abstraction method with pattern-database bidirectional search
+time_limit_s --- 300 --- Per-instance search limit (s)
+pdb_depth --- 5 --- PDB remaining-container depth
 
-Reference
----------
-D. Ku, T. S. Arthanari, "On the abstraction method for the container
-relocation problem", Computers & Operations Research 68 (2016) 110-122.
-
-Algorithm overview
--------------------
-Depth-first branch-and-bound directly over bay-configuration states
-(same family as ``exact/search/kim_hong_2006`` and ``exact/search/
-zhu_2012``), enhanced with two abstraction-based space-reduction
-techniques from the paper:
-
-  - Forward search: visited nodes are cached by their *abstract state*
-    (Section 3.4 -- empty columns dropped, remaining containers
-    relabelled to contiguous ranks, columns sorted ascending by base
-    value) up to a configurable depth/size from the root (``CC_n``);
-    a node whose abstract state was already seen with an equal-or-lower
-    ``g`` is pruned.
-  - Backward search: a pattern database (PDB, Section 4.3) of *exact*
-    optimal costs-to-clear for every abstract state up to a configurable
-    number of remaining containers is pre-built once (amortised across
-    seeds, as the paper recommends -- Section 4) and looked up directly
-    whenever the search frontier reaches it, terminating that branch
-    without further expansion.
-
-Independence
-------------
-Self-contained: depends only on ``core.base_algorithm``, and its own
-``combinatorics`` / ``abstraction_core`` modules.  Does not import from
-any other algorithm package.
+------------------------------- Reference --------------------------------
+D. Ku, T.S. Arthanari,
+"On the abstraction method for the container relocation problem",
+Computers & Operations Research 68 (2016) 110–122.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -64,45 +47,10 @@ def _yard_to_stacks(yard: Yard) -> List[List[int]]:
 # ================================================================ #
 
 class KuArthanari2016Abstraction(BaseAlgorithm):
-    """
-    Exact bidirectional search for the Restricted BRP / CRP-R, using the
-    abstraction method + pattern database of Ku & Arthanari (2016).
-
-    Parameters
-    ----------
-    time_limit_s : float
-        Per-seed wall-clock search time limit in seconds (default 300).
-        Does *not* include the one-off PDB build (see ``pdb_build_time_
-        limit_s``); if the search is stopped early, the best solution
-        found so far is reported and ``optimal_proven`` is set to 0.0.
-    pdb_depth : int
-        Number of remaining containers (``r`` in PDB_r, Section 4.3) for
-        which the pattern database stores *exact* optimal costs.
-        Reduction factors over the raw state space grow very fast with
-        ``pdb_depth`` (Table 3), but so does build time/memory -- the
-        paper itself notes only ~10-15 units are practical on typical
-        hardware; this port defaults conservatively (5) given Python's
-        overhead relative to the original Java implementation.
-    cache_depth : int
-        Number of levels from the root (``n`` in ``CC_n``, Section 3.4)
-        for which visited nodes are cached by abstract state during the
-        forward search.
-    max_cache_size : int
-        Upper bound on the number of cached forward-search node entries
-        (``Pmax_size`` in the paper; default kept well below the paper's
-        Java-scale 20,000,000 to fit comfortably in a Python process).
-    """
 
     name = "Ku & Arthanari (2016) Abstraction+PDB"
     category = "Exact"
-    description = (
-        "Depth-first branch-and-bound over bay-configuration states "
-        "(Ku & Arthanari, COR 2016) using the abstraction method: "
-        "forward node caching by abstract state (CC_n) plus a pattern "
-        "database of exact costs for small remaining-container counts "
-        "(bidirectional search). Guarantees the optimal number of "
-        "relocations if it completes within the time limit."
-    )
+    description = "Ku & Arthanari (COR 2016) abstraction + pattern-database search."
     compatible_problems = ["CRP-R"]
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)

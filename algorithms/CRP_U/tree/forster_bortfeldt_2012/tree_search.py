@@ -1,38 +1,12 @@
 """
-Greedy initial solution + heuristic tree search for Forster & Bortfeldt (2012).
+Compound-move tree search core for ForsterBortfeldt2012.
 
-Implements §6 of:
-  F. Forster and A. Bortfeldt,
-  "A tree search procedure for the container relocation problem",
-  Computers & Operations Research 39 (2012) 299–309.
-
-Completely self-contained: imports only from layout.py inside this package.
-
-Public API
-----------
-greedy_solution(layout, max_flg_bb, max_gg)   → (ops, n_relocations)
-run_tree_search(layout, time_limit, …)         → (ops, n_relocations)
-
-Move representation
--------------------
-Each move is a tuple:
-  ('rem', s)       — remove from stack s   (stack index 0-based)
-  ('rel', d, r)    — relocate top of d to r (stack indices 0-based)
-
-Six relocation categories (§4.2)
----------------------------------
-  FLG_BG : freeing-lowest-group   Bad→Good
-  FOG_BG : non-freeing            Bad→Good
-  FLG_BB : freeing-lowest-group   Bad→Bad
-  FOG_BB : non-freeing            Bad→Bad
-  GG     : Good→Good
-  GB     : Good→Bad               (NON-productive, not generated here)
-
-Productive moves (§6.4) in priority order:
-  1. Removes  (if any exist)
-  2. All BG relocations (FLG_BG ∪ FOG_BG)
-  3. FLG_BB (up to max_flg_bb, sorted asc by g_item − gmin_r)
-   + GG     (up to max_gg,     sorted asc by diffBefore − diffAfter)
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -110,23 +110,24 @@ def run_greedy_rbrp(
     n_total:            int,
     max_tiers:          int,
     key_to_1based_idx:  Dict[Any, int],
-) -> Tuple[List[Tuple[int, int, int, int]], int]:
+) -> Tuple[List[Tuple[int, int, int, int, Any]], int]:
     """
     Greedy rBRP using the MinMax heuristic (Eqs. 5/7).
 
     Returns
     -------
-    solution : list of (c, d_star, mc, t) 4-tuples used to seed the
+    solution : list of (c, d_star, mc, t, dst_key) tuples used to seed the
                pheromone matrix, where:
                  c      = due-date of the relocated container
                  d_star = dd*(destination stack) at the time of relocation
                  mc     = number of prior relocations of c (before this one)
                  t      = current target due-date
+                 dst_key = physical destination stack (for final validation)
     cost     : total number of relocations
     """
     stacks: Dict[Any, List[int]] = {k: list(v) for k, v in stacks_init.items()}
     M: Dict[int, int] = {}                            # M[c] = relocation count
-    solution: List[Tuple[int, int, int, int]] = []
+    solution: List[Tuple[int, int, int, int, Any]] = []
 
     for target in range(1, n_total + 1):
         src_key = next((k for k, p in stacks.items() if target in p), None)
@@ -156,7 +157,7 @@ def run_greedy_rbrp(
             # Record 4-tuple for pheromone initialisation
             d_val = dd_star(stacks[best_dst], n_total, key_to_1based_idx[best_dst])
             mc    = M.get(c, 0)
-            solution.append((c, d_val, mc, target))
+            solution.append((c, d_val, mc, target, best_dst))
 
             stacks[src_key].pop()
             stacks[best_dst].append(c)

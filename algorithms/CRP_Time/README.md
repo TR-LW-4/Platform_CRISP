@@ -1,27 +1,39 @@
-# CRP-Time
+# CRP-Time algorithms
 
-**Container Retrieval Problem with crane working-time objective.**
-Multi-bay yard, fixed retrieval order, Lee–Lee (2010) RMGC kinematics
-(γ_row = 1.2 s, γ_bay = 3.5 s, γ_acc = 40 s, γ_pd = 30 s).
+Container retrieval with a **crane working-time** objective. Dynamics
+match CRP-R: distinct priorities 1…N, restricted relocation. Lee–Lee
+(2010) RMGC kinematics (`γ_row = 1.2 s`, `γ_bay = 3.5 s`,
+`γ_acc = 40 s`, `γ_pd = 30 s`).
+
 **Objective:** minimise total crane working time.
 
-## Algorithms available
+`exact/search/` and `exact/solver/` exist as empty scaffolds; no exact
+Time solver is registered yet.
 
-| Folder | Type | Paper | Origin |
-|---|---|---|---|
-| `heuristic/lee_lee/` | 3-phase IP/MIP | Lee & Lee 2010, COR | **native** (multi-bay origin of CRP-Time) |
-| `heuristic/lin_2015/` | priority rule | Lin, Lee & Lee 2015, TRC | **native** (multi-bay) |
-| `heuristic/kim_2016/` | 4-case rule | Kim, Kim & Lee 2016, C&IE | **native** (multi-bay; restricted-model adaptation) |
-| `heuristic/lopez_plata_2019/` | A*-based heuristic | López-Plata, Expósito-Izquierdo & Moreno-Vega 2019, C&IE | **native** (BRP with operating costs; restricted model) |
-| `heuristic/cifuentes_riff_2020/` | GRASP + RIL | Cifuentes & Riff 2020, ASOC | **native** (multi-bay) |
-| `heuristic/durasevic_2024/` | GP hyper-heuristic | Ðurasević & Ðumić 2024, ASOC | **native** (multi-bay) |
-| `heuristic/durasevic_2025_mgp/` | Multitask GP | Ðurasević, Ðumić & Gil-Gala 2025, EAAI | **native** (multi-bay) |
-| `heuristic/kim_hong/` | rule | Kim & Hong 2006, COR | symlink (native: CRP_R, single-bay origin) |
-| `heuristic/caserta/` | rule | Caserta et al. 2012, EJOR | symlink (native: CRP_R) |
-| `heuristic/lan/` | look-ahead | Petering & Hussein 2013, EJOR | symlink (native: CRP_R) |
-| `heuristic/glah/` | metaheuristic | Jin, Zhu & Lim 2015, EJOR | **native** (CRP-Time packaging; keep in sync with `CRP_D` / `CRP_U` copies) |
-| `evolutionary/genetic/` | GA | — | symlink (`_shared/`) |
+## Algorithms in this directory
 
-Symlinked `CRP_R` papers are usable as degenerate baselines here
-(their scoring ignores `γ_bay`/`γ_acc`, so they are generally suboptimal
-on multi-bay yards but still produce feasible plans).
+| Folder | Type | Paper |
+|---|---|---|
+| `heuristic/lee_lee/` | 3-phase heuristic | Lee & Lee 2010, COR |
+| `heuristic/lin_2015/` | priority rule | Lin, Lee & Lee 2015, TRC (also listed for CRP-R) |
+| `heuristic/kim_2016/` | multi-case rule | Kim, Kim & Lee 2016, C&IE |
+| `heuristic/lopez_plata_2019/` | A*-based heuristic | López-Plata et al. 2019, C&IE |
+| `heuristic/unluyurt_2012/` | Difference1 | Ünlüyurt & Aydın 2012 (also listed for CRP-R) |
+| `heuristic/azari_2017/` | CSUM | Azari, Eskandari & Nourmohammadi 2017 |
+| `heuristic/forster_bortfeldt_2012/` | retrieval tree search | Forster & Bortfeldt 2012 |
+| `heuristic/firmino_2019_rgrasp/` | reactive GRASP | Firmino et al. 2019 |
+| `heuristic/jovanovic_2019_aco/` | ACO | Jovanović et al. 2019 |
+
+There are no Cifuentes–Riff, Ðurasević GP/MGP, or GLAH folders here.
+
+## Also listed in the CRP-Time GUI
+
+These live under `algorithms/CRP_R/heuristic/` and declare
+`compatible_problems` including `"CRP-Time"` (no symlink in this tree):
+
+- Kim–Hong (2006) ENAR
+- Caserta (2012) HEUR
+- LA-N Look-Ahead (Petering & Hussein 2013)
+
+They ignore bay-travel / acceleration costs in their scoring, so they
+are degenerate baselines on multi-bay Time instances.

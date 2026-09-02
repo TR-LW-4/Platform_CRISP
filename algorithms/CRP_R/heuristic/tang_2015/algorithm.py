@@ -23,10 +23,9 @@ from __future__ import annotations
 import multiprocessing as mp
 from typing import Callable, Dict, List, Optional
 
-import numpy as np
-
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
+from core.move_export import attach_crane_time, export_yard_moves
 from .scoring import tang_select_action
 
 
@@ -34,17 +33,9 @@ class TangEtAl2015(BaseAlgorithm):
 
     name                = "Tang et al. (2015) H1/H2"
     category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Tang, Jiang, Liu & Dong (IIE Trans. 2015) reshuffling heuristics for CRP-R. "
-        "H1 uses the Reshuffle Index (RI); H2 uses the Blocking Index (BI). "
-        "Both prefer destinations where the relocated container will be retrieved "
-        "before the current stack's most urgent container (nc > k). "
-        "The Extended variant (*-E, default) picks the destination that minimises "
-        "total future reshuffles via full-sequence simulation — H2-E achieves the "
-        "best average performance across all tested bay configurations."
-    )
+    description         = "Tang et al. (IIE Trans. 2015) H1/H2 reshuffling heuristic."
     compatible_problems = ["CRP-R"]
+
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -58,61 +49,57 @@ class TangEtAl2015(BaseAlgorithm):
         result_queue:    mp.Queue,
         stop_event:      mp.Event,
     ) -> None:
+        if stop_event.is_set():
+            return
+
         cfg          = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         rule         = str(cfg.extra.get("rule", "H2"))
         use_extended = bool(cfg.extra.get("use_extended", True))
-        all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
+        trace_layout(f"TangEtAl2015.train: rule={rule}  use_extended={use_extended}")
+
+        env = problem_factory()
+        env.reset()
+
+        solution: List[int] = []
+        done = False
+
+        while not done:
             if stop_event.is_set():
                 break
+            action = tang_select_action(env, rule=rule, use_extended=use_extended)
+            _, _, done, _, _ = env.step(action)
+            solution.append(action)
 
-            trace_layout(
-                f"TangEtAl2015.train: seed {seed + 1}/{n_seeds}  "
-                f"rule={rule}  use_extended={use_extended}"
+        metrics = attach_crane_time(
+            env.get_metrics(),
+            env.yard,
+            getattr(env.config, "extra", None) or {},
+        )
+        metrics["time"] = metrics["crane_time"]
+        metrics["feasible"] = float(done)
+        metrics["completed"] = float(done)
+        metrics["validated"] = 1.0
+        metrics["validation_conflicts"] = 0.0 if done else 1.0
+        if not done:
+            metrics["executed_relocations"] = float(
+                metrics.get("relocations", 0.0)
             )
+            metrics["relocations"] = float("inf")
+        primary = float(metrics.get("relocations", 0.0))
+        self._best_solution = solution[:]
 
-            env = problem_factory()
-            env.reset()
-
-            solution: List[int] = []
-            done = False
-
-            while not done:
-                action = tang_select_action(env, rule=rule, use_extended=use_extended)
-                _, _, done, _, _ = env.step(action)
-                solution.append(action)
-
-            metrics = env.get_metrics()
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", 0.0))
-
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = solution[:]
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = self._best_metric,
-                metrics  = agg,
-                progress = 1.0,
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "solution": solution[:],
+                "moves": export_yard_moves(env.yard),
+            },
+        )
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
@@ -131,10 +118,10 @@ class TangEtAl2015(BaseAlgorithm):
                 "options": ["H1", "H2"],
                 "label":   "Heuristic rule",
                 "help": (
-                    "H1: Reshuffle-Index based — best at 100% bay utilisation. "
-                    "H2: Blocking-Index based — best at ~80% utilisation and in "
-                    "dynamic environments (paper Tables 2–5). "
-                    "Both first try to place the blocker where nc > k (no future deadlock)."
+                    "H1 scores a stack by how many containers are retrieved sooner "
+                    "than the one being moved. "
+                    "H2 scores it by how deeply the most urgent container would be buried. "
+                    "Both first try a stack that does not create a new blockage."
                 ),
             },
             "use_extended": {
@@ -143,10 +130,8 @@ class TangEtAl2015(BaseAlgorithm):
                 "label":   "Extended variant (*-E)",
                 "help": (
                     "When enabled, every feasible destination is evaluated by "
-                    "simulating the full remaining retrieval sequence with the base "
-                    "heuristic; the destination yielding fewest reshuffles is chosen. "
-                    "H2-E is the top performer across static and dynamic benchmarks "
-                    "(paper Tables 3 and 5). Negligible extra run-time."
+                    "simulating the remaining retrieval sequence; "
+                    "the one with fewest reshuffles is chosen."
                 ),
             },
         })

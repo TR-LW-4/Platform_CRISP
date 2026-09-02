@@ -1,49 +1,20 @@
 """
-Parreno-Torres, Alvarez-Valdes & Ruiz (2019) "Integer programming models
-for the pre-marshalling problem", European Journal of Operational Research
-274 (2019) 142-154.
+ParrenoTorresAlvarezValdesRuiz2019IPS6
+<2019> <exact> <premarshalling> <single-bay> <CRP-Prem>
+IPS6 time-indexed MIP with iterative T-search
+per_solve_time_limit_s --- 30 --- Per-T Gurobi limit (s)
+overall_time_budget_s --- 120 --- Overall solve budget (s)
 
-Embedding scope: the paper's **IPS6** model (Section 5.4) -- the authors'
-own best-performing formulation among the eight IP/IPS variants compared in
-the paper -- solved via the paper's own **Section 6 iterative T-search**
-(ascend T starting from the "blocking containers" lower bound; the first
-feasible T is provably optimal), rather than a single oversized-T solve.
-This is deliberately a different sizing strategy from this platform's other
-two PMP embeddings (Lee & Hsu 2007's ascending search over a different
-weaker bound, and de Melo da Silva et al. 2018's own from-scratch greedy
-heuristic), each kept faithful to its own paper.
-
-This folder is fully self-contained: it does not import from, and is not
-imported by, ``lee_hsu_2007_network_flow_ip/``, ``de_melo_silva_2018/``
-(EJOR 271, 2018 -- a different paper), or
-``exact/search/parreno_torres_alvarez_valdes_ruiz_tierney_2020_cpmpct/`` (Transp. Res.
-Part E 137, 2020 -- a later, different paper by an overlapping author list
-with a crane-time objective instead of a relocation-count objective).
-
-What is implemented here
--------------------------
-* ``core.py`` -- stack helpers plus the Section 6 "blocking containers"
-  lower bound used to seed the T-search.
-* ``mip_model.py`` -- the IPS6 variables (x/w/z) and constraints (26)-(38).
-* ``extensions.py`` -- the four optional Section 8 final-layout extensions
-  (balance, no empty/full stacks, stability bonus, same-priority bonus),
-  all off by default and each provably unable to change the optimal move
-  count.
-* ``solve.py`` -- the Section 6 iterative T-search driver.
-
-Documented simplifications / out of scope
-------------------------------------------
-* Priority groups map 1:1 to each instance's distinct container priority
-  values (matching ``core.yard.Stack.is_sorted_by_priority``), same
-  convention as this platform's other two PMP embeddings. Instances with
-  more distinct priorities than ``max_priorities`` are bucketed into
-  contiguous groups to keep the model tractable (a documented
-  approximation, not part of the original paper).
-* K=1 throughout (Eq. 28): the paper's PMP models do not consider
-  multi-move segments.
-* Eq. (29) ("earliest time" push) is implemented but left off by default,
-  matching the paper's own Section 6 remark that it is unnecessary once
-  the ascending iterative T-search is used.
+------------------------------- Reference --------------------------------
+C. Parreño-Torres, R. Alvarez-Valdes, R. Ruiz,
+"Integer programming models for the pre-marshalling problem",
+European Journal of Operational Research 274 (2019) 142–154.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

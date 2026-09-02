@@ -1,21 +1,12 @@
 """
-Shared bay/move representation for the Tierney, Pacino & Voß (2017) A*/IDA*
-pre-marshalling embedding.
+Search-state helpers for TierneyPacinoVoss2017AStarIDAStar.
 
-Paper:
-K. Tierney, D. Pacino, S. Voß, "Solving the Pre-Marshalling Problem to
-Optimality with A* and IDA*", Flexible Services and Manufacturing Journal
-29(2), 223-259, 2017.
-
-Stack/priority convention (Section 2): ``pst`` is the priority of the
-container in stack ``s`` at tier ``t``, smaller values leave the bay earlier
-and therefore belong nearer the *top* of the stack in a mis-overlay-free
-layout. A bay has no mis-overlays iff, for every stack, priorities are
-non-increasing from bottom to top. This matches the rest of the platform's
-``core.yard.Stack.is_sorted_by_priority`` convention.
-
-This module is intentionally self-contained: it does not import from any
-other algorithm package.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

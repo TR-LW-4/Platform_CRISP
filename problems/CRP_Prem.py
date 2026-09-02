@@ -1,20 +1,13 @@
 """
-P3 – Pre-Marshalling Problem (PMP)
+CRP-Prem
+<premarshalling> <distinct> <CRP-Prem>
+Container Pre-Marshalling Problem (no retrievals)
 
-Rules
------
-- The yard contains containers with group/priority labels.
-- No retrieval happens – the goal is to *rearrange* the yard so that
-  within every stack, containers are sorted (lower priority on top).
-- Each move = relocate top container of one stack to top of another.
-- Objective: reach a sorted state with the minimum number of moves.
-
-Gym interface
--------------
-Observation : flat yard state (bay×row×tier×5) + bad_overlaps count
-Action      : flat (src_stack, dst_stack) pair index
-Reward      : −1 per move; +0 when already sorted (terminal)
-Terminal    : yard is_sorted() == True
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -31,8 +24,7 @@ from core.container import make_containers
 class CRP_Prem(BaseProblem):
 
     name         = "CRP-Prem"
-    description  = ("Pre-marshalling problem: rearrange containers in the yard "
-                    "so they are sorted before ship arrival. Minimise moves.")
+    description  = "Pre-marshalling containers into a well-ordered yard layout."
     tags         = ["relocation", "pre-marshalling", "yard-only", "sorting"]
     metric_names = ["moves", "bad_overlaps", "time"]
 

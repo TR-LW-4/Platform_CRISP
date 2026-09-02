@@ -1,52 +1,21 @@
 """
-de Melo da Silva, Toulouse & Wolfler Calvo (2018) "A new effective unified
-model for solving the Pre-marshalling and Block Relocation Problems",
-European Journal of Operational Research 271 (2018) 40-56.
+DeMeloSilva2018PMP
+<2018> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Time-indexed PMPm1 MIP for pre-marshalling
+lifo_strengthening --- True --- Section 3.2 LIFO cuts
+per_solve_time_limit_s --- 30 --- Per-T Gurobi limit (s)
 
-Embedding scope: the paper's **PMPm1** model (Sections 3.1-3.3) -- the
-Pre-marshalling half of the paper, and the part most directly comparable to
-this platform's already-embedded Lee & Hsu (2007) network-flow IP
-(``exact/solver/lee_hsu_2007_network_flow_ip/``). The paper's own
-experiments report PMPm1 dominating Lee & Hsu (2007) on both LP-relaxation
-quality and instances solved to optimality.
-
-The paper's BRP / Restricted-BRP formulations (Sections 3.4-3.7, which
-extend this same PMPm1 skeleton with retrieval variables) are embedded
-independently for the platform's other relocation problems:
-  * ``algorithms/CRP_U/exact/solver/de_melo_silva_2018/`` -- unrestricted BRP
-  * ``algorithms/CRP_R/exact/solver/de_melo_silva_2018/`` -- restricted BRP
-  * ``algorithms/CRP_D/exact/solver/de_melo_silva_2018/`` -- grouped BRP/r-BRP
-This folder does not import from (or get imported by) any of those, by
-design, so each of the paper's four "pieces" can be maintained on its own.
-
-What is implemented here
--------------------------
-* ``core.py`` -- stack helpers plus a from-scratch, documented
-  reimplementation of the Section 3.3 greedy heuristic (Algorithm 3) used
-  to size the model's time horizon T.
-* ``mip_model.py`` -- the PMPm1 variables (x/y/z), objective (1), and
-  constraints (2), (5), (8)-(11), (19) plus the Section 3.2 strengthening
-  constraints (15)-(18)/(20)-(22) (default on; togglable), matching the
-  paper's own "pmp model" used in its experiments.
-* ``extensions.py`` -- the two mutually exclusive final-layout options,
-  Eq. (6) (exact target layout) and Eq. (7) (sorted-by-group rule, which is
-  exactly CRP-Prem's own well-located definition and is the default).
-* ``solve.py`` -- sizes T from the Section 3.3 heuristic (a single solve
-  usually suffices, since T only needs to be a valid upper bound) with a
-  short escalation ladder kept only as a safety net.
-
-Documented simplifications / out of scope
-------------------------------------------
-* Groups map 1:1 to each instance's distinct container *priority* values
-  (matching ``core.yard.Stack.is_sorted_by_priority``'s definition of a
-  solved layout exactly), not to any coarser ``container.group`` label a
-  scenario may also define. As in the Lee & Hsu (2007) embedding, instances
-  with more distinct priorities than ``max_groups`` are bucketed into
-  contiguous groups to keep the model tractable; this is a documented
-  approximation, not part of the original paper.
-* K=1 (constraints (8)/(9)) throughout: the paper does not propose a
-  multi-move relaxation for the PMP (only for its BRP variants), so none is
-  added here.
+------------------------------- Reference --------------------------------
+M. de Melo da Silva, S. Toulouse, R. Wolfler Calvo,
+"A new effective unified model for solving the Pre-marshalling and
+ Block Relocation Problems",
+European Journal of Operational Research 271 (2018) 40–56.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

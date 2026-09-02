@@ -1,22 +1,12 @@
 """
-State feasibility, container stability, and extreme/pre-extreme/dead-end
-state predicates (paper §4).
+Surplus-vector feasibility test for WangJinZhangLim2017FBH.
 
-Definitions implemented
-------------------------
-* Def 3 (state feasibility): the surplus vector ``Delta(g) = R(g) - D(g)``
-  where ``R(g) = sum_{i>=g} r(i)`` (slots with capability >= g) and
-  ``D(g) = sum_{i>=g} d(i)`` (unfixed containers with group value >= g).
-  Proposition 1: ``Delta >= 0`` is a *necessary* (not sufficient) condition.
-* Def 4 (container stability): an orderly container is stable if
-  hypothetically fixing it (and everything underneath it in its stack)
-  keeps ``Delta >= 0``. ``sh(s)`` is the stable height of stack s.
-* Def 5-6 (extreme / dead-end state): exactly S-2 stacks fully fixed; the
-  state is a dead end if the remaining 2-stack sub-layout cannot be sorted
-  without touching the S-2 fixed stacks.
-* Def 7 (pre-extreme state) + §5.2.1 dead-end avoidance: tasks aiming at a
-  stack with f(s) = H-1 are dropped from the valid-task set while the state
-  is pre-extreme, to keep the search from ever reaching a dead end.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

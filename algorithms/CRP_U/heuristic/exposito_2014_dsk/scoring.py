@@ -1,27 +1,12 @@
 """
-Scoring functions for Exposito-Izquierdo et al. (2014) DSK heuristic.
+Blocked-container destination scores for ExpositoDSK.
 
-Core idea (domain-specific knowledge)
---------------------------------------
-A container b placed at the top of stack s is *well-located* if no container
-currently in s has a strictly smaller priority than b.priority.  Smaller
-priority = retrieved earlier; if such a container exists below b, b will
-eventually need to be relocated when that container becomes the target.
-
-The scoring function counts those "bad" containers in the destination stack
-(blocking potential).  0 = well-located = ideal placement.
-
-For CRP-U the heuristic focuses on the TOPMOST BLOCKER of the current target
-as the source, which guarantees forward progress (each move shortens the
-blocker list by one).  With alpha > 1, the action is chosen uniformly from
-the alpha best-scored destinations, enabling diverse multi-restart trajectories.
-
-Reference
----------
-C. Exposito-Izquierdo, B. Melian-Batista, J.M. Moreno-Vega,
-"A domain-specific knowledge-based heuristic for the Blocks Relocation Problem",
-Applied Soft Computing 14 (2014) 1-20.
-https://doi.org/10.1016/j.asoc.2014.04.007
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

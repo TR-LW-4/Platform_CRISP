@@ -1,32 +1,12 @@
 """
-Internal solution representation for Feillet, Parragh, Tricoire (2019) LS.
+Relocation-sequence representation for FeillletLS.
 
-A BRP solution is a flat ordered sequence of Steps covering all N containers:
-  - relocations  (dst > 0): move container from src to dst
-  - retrievals   (dst = 0): remove container from bay
-
-The greedy initialiser embedded here (MinMax rBRP-style) makes this module
-**fully self-contained** — no coupling to GLAH or any other algorithm.
-
-Coupling decision
------------------
-The LS operator OPT(n) only requires
-  (a) a List[Step] representing the current solution
-  (b) init_stacks: the initial bay configuration as a 1-indexed list of
-      priority lists (bottom-to-top)
-
-No GLAH data structures (GlahLayout, GlahOp, GlahState) are used.
-Any constructive heuristic that can produce a List[Step] (or that can be
-converted to one) can therefore serve as the warm-start.  GLAH output can
-be accepted via ops_to_steps() if desired, but is not required.
-
-Reference
----------
-D. Feillet, S. Parragh, F. Tricoire,
-"A local-search based heuristic for the unrestricted block relocation
- problem",
-Computers & Operations Research 108 (2019) 44–56.
-https://doi.org/10.1016/j.cor.2019.04.005
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,50 +1,12 @@
 """
-Ting & Wu (2017) — SDH, VRH, and Beam Search scoring functions.
+SDH, VRH, and beam-search helpers for TingWuBS.
 
-Stack representation (same as the rest of the platform):
-  stacks : Dict[Any, List[int]]
-    key       = any hashable stack identifier (e.g. (bay, row))
-    List[int] = container priorities bottom-to-top; smaller = more urgent
-
-Notation from the paper
------------------------
-  fs         = min priority in stack s  (most urgent container in s)
-               = N + 1 if empty  (Eq. 1 uses "highest retrieval priority";
-                 the paper confirms: smaller number = higher priority)
-  DIs        = fs − b  (Eq. 1)
-               DIs > 0  →  no deadlock for b in s  (b more urgent than all in s)
-               DIs ≤ 0  →  additional relocation inevitable
-  tb         = original tier index of blocking container b in the source stack
-               (0 = directly above target, len−1 = topmost)
-  Ts         = min(tx) among all blockers already virtually assigned to stack s
-               Used in Condition 2 of Phase I (LIFO constraint)
-
-Phase I  (Algorithm in Section 4.2, lines 8–16):
-  Sort blockers descending by priority number (least urgent first).
-  For each, find a destination s satisfying:
-    Cond 1: b < fs    → DIs > 0 (no deadlock)
-    Cond 2: tb < Ts   → LIFO constraint respected
-  Pick the stack with smallest positive DIs.
-
-Phase II (lines 18–22):
-  Remaining "skipping" containers, processed ascending by priority (most urgent
-  first = reverse of Phase I order).  For each, compute VRI for every candidate
-  stack s and pick argmax:
-    VRI_s = min(ls − b, b − us)   if U ≤ 1
-          = −N + (b − us)          if U > 1
-  where:
-    us = min priority of upper containers in s (will end up above b in dest;
-         these are Phase I assignments in s with tier_idx < tb, priority > b)
-    ls = min priority of lower containers (Phase I in s with tier_idx > tb +
-         original existing containers of s)
-    U  = count of upper containers (those that block b = priority > b)
-
-Reference
----------
-C.-J. Ting, K.-C. Wu,
-"Optimizing container relocation operations at container yards with beam search",
-Transportation Research Part E, 103, 17–31, 2017.
-https://doi.org/10.1016/j.tre.2017.04.010
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,30 +1,20 @@
 """
-GLAH – Greedy Look-Ahead Heuristic for CRP-R.
+GLAHHeuristic
+<2015> <heuristic> <unrestricted> <single-bay> <CRP-U>
+Greedy look-ahead heuristic packaged for CRP-U
+D --- 3 --- Look-ahead depth
+n_ftbg --- 5 --- Fast BG successors
 
-Port of MainProcess.java + Probing.java (Bo Jin, 2015).
-Reference: Jin, Zhu & Lim, EJOR 240 (2015) 837–847.
-
-Architecture
-------------
-Phase 1: Run evaluation_heuristic alone → initial solution (IS).
-Phase 2: Greedy outer loop + look-ahead tree:
-         while bay not empty:
-             if LB + current_relocs ≥ best → break early
-             op = Lookahead.most_promising_relocation(state)
-             execute op, auto-retrieve, continue
-Phase 3: Record best solution found during Phase 2 (updated whenever
-         evaluation_heuristic is called at a leaf node).
-
-Platform interface
-------------------
-Packaged for **CRP-U** (uBRP: fixed order, unrestricted relocation moves).
-The GLAH *procedure* is the fixed-order
-2015 **restricted** BRP port; on **CRP-U** it is only a **baseline** (valid moves
-are a subset of uBRP).  Uses GlahLayout internally; outputs RelocationPlan via
-evaluate_plan().
-
-NOTE:  Sibling copy: ``algorithms/CRP_Time/heuristic/glah``.
-Physical home for **CRP-U** is this folder.
+------------------------------- Reference --------------------------------
+B. Jin, W. Zhu, A. Lim,
+"A greedy look-ahead heuristic for the container relocation problem",
+European Journal of Operational Research 240 (2015) 837–847.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

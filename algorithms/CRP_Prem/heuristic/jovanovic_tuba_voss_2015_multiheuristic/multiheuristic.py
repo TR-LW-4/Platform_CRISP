@@ -1,15 +1,12 @@
 """
-Sec. 4.3: the multi-heuristic method. A single greedy pass (Sec. 3's
-four-stage skeleton, extended with deadlock avoidance and move correction)
-parameterized by one heuristic choice per stage; the full method enumerates
-all combinations and keeps the best solution found.
+48-combination enumeration for JovanovicTubaVoss2015MultiHeuristic.
 
-    Hb (stage 1, "which block to well-locate next"):  descending | lookahead
-    Hs (stage 2, "which stack to well-locate it to"):  w | w_hat
-    Hw (stage 3, "which stack to relocate a blocker to"): TLP | LPI | MinMax
-    Hf (stage 4, "how to fill the destination stack"): None | Standard | Safe | Stop
-
-2 x 2 x 3 x 4 = 48 combinations, matching the paper.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

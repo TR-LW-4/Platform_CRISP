@@ -1,25 +1,12 @@
 """
-Heuristic, metaheuristic and condensation algorithms for CRP-U.
+Safe-move and SmSEQ operators for TricoireHeuristic.
 
-Ported from Tricoire et al. (2018) C++ codebase (block-relocation-master).
-Source files: brppolicy.cpp, safemoves.cpp, subsequence.cpp,
-              rakesearch.cpp, pilotmethod.cpp, brpstate.cpp (condensation).
-
-Implemented algorithms
-----------------------
-SM-1   (SafeMovesPolicy level 1)  – safe 1-relocates only
-SM-2   (SafeMovesPolicy level 2)  – safe 1- or 2-relocates
-SmSEQ-1 (SmartSubsequencePolicy level 1) – seq + SM-1
-SmSEQ-2 (SmartSubsequencePolicy level 2) – seq + SM-2
-RakeSearch  – BFS metaheuristic, C++ RakeSearch
-PilotMethod – look-ahead metaheuristic, C++ PilotMethod
-
-Condensation post-processors (applied after SmSEQ variants)
------------------------------------------------------------
-condense_jin     – classic (Jin et al.) condensation
-condense_tricoire – improved (Tricoire 2018) condensation
-
-All functions operate on BRPState objects (see state.py).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

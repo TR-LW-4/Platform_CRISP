@@ -1,26 +1,21 @@
 """
-Lin, Lee & Lee (2015) priority-rule heuristic for CRP-Time / CRP-R.
+Lin2015Heuristic
+<2015> <heuristic> <time> <multi-bay> <CRP-Time>
+SSI priority-rule heuristic for retrieval with relocation
+P_r --- 30 --- Row-distance weight in SSI
+P_b --- 300 --- Bay-distance weight in SSI
+restricted --- False --- Disable unrestricted pre-moves
 
-Reference
----------
+------------------------------- Reference --------------------------------
 D.-Y. Lin, Y.-J. Lee, Y. Lee,
 "The container retrieval problem with respect to relocation",
 Transportation Research Part C 52 (2015) 132–143.
-
-Role on the platform
---------------------
-Main target problem: ``CRP-Time`` (multi-bay RMGC, Lee & Lee kinematics).
-Shin et al. (TRC 2026) use this rule — with ``P_r = 30`` and
-``P_b = 300`` — as the strongest classical baseline for the CRP.
-
-Per-step decision flow (see ``scoring.lin_compute_moves``)
-----------------------------------------------------------
-1. Find the target stack (contains the minimum-priority container).
-2. Identify ideal stacks (min_priority(s) > target_top_priority, not full).
-3a. If ideal stacks exist: score by SSI = min_prio + P_r·row + P_b·|bay−bay_target|.
-    Optionally prepend Rule-2 pre-moves (restricted=False).
-3b. If no ideal stacks: pick stack with max min_priority (Rule 3).
-4. Execute the returned action list via env.step().
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,69 +1,19 @@
 """
-Yongmin Kim, Taeho Kim, HongChul Lee (2016)
-Heuristic algorithm for retrieving containers.
-Computers & Industrial Engineering, 101, 352–360.
-https://doi.org/10.1016/j.cie.2016.08.022
+Kim2016Heuristic
+<2016> <heuristic> <time> <multi-bay> <CRP-Time>
+Four-case destination rule for RMGC retrieval
+restricted --- False --- Restrict relocation to the current blocker
 
-CRP-Time (multi-bay RMGC working-time) implementation.
-
-Reference
----------
-Y. Kim, T. Kim, H. Lee.
-"Heuristic algorithm for retrieving containers."
+------------------------------- Reference --------------------------------
+Y. Kim, T. Kim, H.C. Lee,
+"Heuristic algorithm for retrieving containers",
 Computers & Industrial Engineering 101 (2016) 352–360.
-
-The paper presents a 4-case heuristic (ideal / unideal / critical stacks)
-that decides where to relocate the current blocker of cmin and, in
-unrestricted settings, performs pre-relocations of tops from other
-critical stacks into the chosen destination before moving the immediate
-blocker.
-
-Platform adaptation (restricted model)
---------------------------------------
-The platform CRP-Time inherits the *restricted* relocation model from
-CRP_R: at every relocation step only the direct top container above the
-current target (cmin) may be relocated. True pre-relocations of
-non-blocking critical stacks (as described in the paper's Case 3/4)
-cannot be executed.
-
-We therefore reproduce the paper's *destination selection logic*
-exactly:
-- Case 1: cmin on top → no relocation decision (return []).
-- Case 2: no ideal stack → dest = stack with maximum min_priority.
-- Case 3: ideal stacks exist with top > tnccmin (candidate stacks) →
-  choose the candidate with *minimum* top priority (deterministic tie-break:
-  smallest action index).
-- Case 4: ideal stacks exist but none qualify as candidate →
-  choose the ideal stack with *maximum* top priority (deterministic tie-break).
-
-After the chosen relocation (and auto-retrievals), the caller re-invokes
-the heuristic so that the situation is re-identified for the same cmin
-(possibly with a new blocker). This mirrors the paper's outer loop
-structure ("return to identify the circumstance of the container yard
-and continue the heuristic algorithm to retrieve the same cmin").
-
-Definitions (paper → platform)
-------------------------------
-- Ideal stack: empty or specified retrieval order ascending from top
-  to bottom (earlier containers above later ones). In platform terms:
-  priorities strictly increase from top to bottom.
-- Critical stack: unideal stack containing at least one container that
-  must be retrieved before at least one container above it.
-- cmin: container with the smallest priority still present.
-- tnccmin / target_top_priority: priority of the current top of cmin's
-  stack (the container that must be relocated right now).
-- Candidate stack: an ideal stack whose top priority > target_top_priority.
-
-The implementation follows the case criteria in the paper (Fig. 3) and
-the structure of the pseudo-code in Appendix A, adapted to the
-restricted setting and the platform's action encoding (destination stack
-only).
-
-Randomness
-----------
-No randomness is used for destination selection (deterministic tie-break
-by smallest action index). This improves reproducibility compared with
-"random tie" variants.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

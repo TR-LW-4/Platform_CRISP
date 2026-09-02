@@ -1,14 +1,12 @@
 """
-Regression / sanity checks for the Zhu et al. (2012) IDA*-R embedding.
-Not part of an automated test runner -- run directly with:
+Sanity checks for Zhu2012IDAStarR.
 
-    cd Platform_CRISP
-    python -m algorithms.CRP_R.exact.search.zhu_2012.test_ida
-
-Cross-validates against ``exact/search/kim_hong_2006`` (an independently
-implemented exact B&B) to confirm IDA*-R finds the same optimal
-relocation count, and checks LB1 <= LB2 <= LB3 <= optimal (admissibility
-+ dominance) on every instance.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

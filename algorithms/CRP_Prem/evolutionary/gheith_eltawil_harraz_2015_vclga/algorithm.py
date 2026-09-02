@@ -1,10 +1,21 @@
 """
-Gheith, Eltawil, Harraz (2015) variable-length GA for pre-marshalling.
+GheithEltawilHarraz2015VCLGA
+<2015> <evolutionary> <premarshalling> <single-bay> <CRP-Prem>
+Variable-length genetic algorithm for pre-marshalling
+crossover_probability --- 0.15 --- Single-point crossover rate
+max_length_factor --- 5.0 --- Chromosome length cap vs bay size
 
-Reference:
+------------------------------- Reference --------------------------------
 M. Gheith, A.B. Eltawil, N.A. Harraz,
 "Solving the container pre-marshalling problem using variable length
-genetic algorithms", Engineering Optimization, 2015.
+ genetic algorithms",
+Engineering Optimization, 2015.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

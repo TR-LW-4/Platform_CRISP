@@ -1,13 +1,12 @@
 """
-Self-contained BRP state for Lu, Zeng & Liu (2019).
+Yard-state helpers for LuZengLiu2019BRP.
 
-Manages the incremental stack representation needed by:
-  - LB4 (virtual-layer derivation)
-  - IS* fast heuristics (greedy completion)
-  - BRP-m3 solution extraction
-
-Items are 1-indexed (priority 1 = retrieved first).
-Stacks are 0-indexed.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

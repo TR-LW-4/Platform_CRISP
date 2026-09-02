@@ -1,47 +1,19 @@
 """
-Ji et al. (2015) – Two rehandling-strategy heuristics for CRP-Stow / CRP-D.
+Ji2015
+<2015> <heuristic> <stowage> <multi-bay> <CRP-Stow>
+Nearest-stack and optimization rehandling strategies
 
-Reference
----------
-Ji, M., Guo, W., Zhu, H., & Yang, Y. (2015). Optimization of loading sequence
-and rehandling strategy for multi-quay crane operations in container terminals.
-Transportation Research Part E, 80, 1–19.
-
-Problem correspondence
-----------------------
-The paper studies yard-to-vessel loading with a known stowage plan, aiming to
-minimise rehandles. Its three relocation strategies (nearest / lowest /
-optimization) map directly onto the CRP-Stow "low" phase (choosing where to
-send a blocker).  The "lowest stack" strategy is already covered by the
-existing GreedyStow heuristic, so only the two novel strategies are implemented
-here.
-
-Platform mapping
-----------------
-High phase  – Select the source stack (same greedy rule as GreedyStow: fewest
-              blockers above a target-group container, tie-break by stack index).
-Low phase   – Differs between the two heuristics:
-
-  JiNearest      (§3.1)
-      Send the blocker to the non-full, non-source stack with the MINIMUM
-      Manhattan distance  |Δbay| + |Δrow|  to the source stack.
-      Tie-break 1: smallest height (emptiest).
-      Tie-break 2: smallest (bay, row) index.
-
-  JiOptimization (§3.3)
-      A destination stack is "safe" if it does NOT contain any container of
-      the current target group k — placing the blocker there will NOT
-      immediately create a secondary rehandle for k's retrieval.
-      Priority: safe stacks sorted by height (lowest first).
-      Fallback:  if no safe stack exists, fall back to the lowest stack
-                 (same as GreedyStow), ignoring the safety check.
-
-Note on JiNearest vs. GreedyStow / ZengH1
-------------------------------------------
-GreedyStow low phase  → emptiest non-source stack  (equivalent to "Lowest")
-ZengH1 low phase      → gmin-based priority tiers   (nuanced version of Optimization)
-JiNearest             → spatially closest stack      (new, distance-aware)
-JiOptimization        → avoids stacks with group k  (direct, explicit version of Optimization)
+------------------------------- Reference --------------------------------
+M. Ji, W. Guo, H. Zhu, Y. Yang,
+"Optimization of loading sequence and rehandling strategy for multi-quay
+ crane operations in container terminals",
+Transportation Research Part E 80 (2015) 1–19.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

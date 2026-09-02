@@ -1,28 +1,12 @@
 """
-GlahLayout – internal state representation for the GLAH algorithm.
+Bay-layout helpers for GLAHHeuristic.
 
-Port of Layout.java + State.java from crp-glah-main (Bo Jin, 2015).
-
-Design
-------
-This class is INTERNAL to the GLAH algorithm only.  It is NOT a
-replacement for the platform's Yard/Stack/Container.  It exists because
-GLAH needs fast O(1) queries:
-  - support_capacity(s):  min priority in stack s  (= minUnderInclusive[s][height])
-  - is_top_well_placed(s): top container is not badly placed
-  - bad_count:            total badly-placed containers
-
-These are maintained incrementally on every move / undo to avoid O(N)
-rescans inside the lookahead tree.
-
-Coordinate convention (1-indexed like the Java source):
-  - stacks are numbered 1 … S
-  - tiers  are numbered 1 … H  (tier 1 = bottom)
-  - to == 0  means retrieval (container leaves the bay)
-
-Conversion helpers:
-  build_from_yard(yard, containers)  →  GlahLayout
-  to_relocation_plan(ops, uid_to_container, S)  →  RelocationPlan
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

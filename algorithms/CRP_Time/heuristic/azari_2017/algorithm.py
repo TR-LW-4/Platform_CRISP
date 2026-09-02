@@ -1,32 +1,20 @@
 """
-Azari, Eskandari, Nourmohammadi (2017) - CSUM heuristic for CRP-Time.
+Azari2017CSUM
+<2017> <heuristic> <time> <single-bay> <CRP-Time>
+CSUM tree search minimizing crane working time
+time_limit_s --- 5 --- Search time limit (s)
+max_branches_b --- 6 --- Constant-summation branch width
 
-Reference
----------
+------------------------------- Reference --------------------------------
 E. Azari, H. Eskandari, A. Nourmohammadi,
 "Decreasing the crane working time in retrieving the containers from a bay",
-Scientia Iranica E, 24(1), 309-318 (2017).
-
-This implementation is intentionally self-contained:
-- no import from other algorithm packages
-- only depends on platform core abstractions (`core.*`)
-
-Paper-aligned structure
------------------------
-1) Build an initial solution with GBH-style branching preference.
-2) Split containers into set A / B from the initial plan:
-   - A: relocated more than once
-   - B: otherwise
-3) Run CSUM DFS with:
-   - GBH branching for A
-   - constant-summation branching for B
-4) Objective: minimise crane working time (TCW); ties by fewer total moves.
-
-Notes
------
-- [single-bay origin] The paper assumes one bay.
-- For multi-bay layouts, stack order is flattened lexicographically (bay,row),
-  so CSUM "left/right" stack logic becomes an approximation.
+Scientia Iranica E 24 (2017) 309–318.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

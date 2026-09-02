@@ -1,49 +1,13 @@
 """
-CRP-Stoch — Stochastic Container Relocation Problem (SCRP).
+CRP-Stoch
+<stochastic> <batch> <CRP-Stoch>
+Batch-stochastic Container Relocation Problem (SCRP)
 
-Model
------
-Extends the deterministic ``CRP-R`` environment by partitioning the N
-containers into ordered **batches** ``B_1, ..., B_b``:
-
-- Containers in B_k must be retrieved before those in B_{k+1}.
-- The intra-batch retrieval order is revealed only when the LAST
-  container of B_{k-1} leaves the yard.
-- All permutations of a batch are assumed equiprobable (uniform
-  distribution — matches Bacci, Mattia & Ventura, Soft Computing 2022;
-  Galle et al. 2018; Ku & Arthanari, EJOR 2016).
-
-The **primary metric** is the *expected* number of relocations
-``E[R]`` over all batch-based realizations.
-
-Backward compatibility
-----------------------
-- ``batch_size = 1`` (the default) puts every container in its own
-  batch, so every retrieval order is fully known ⇒ **identical** to
-  CRP-R.  All CRP-R baselines can therefore be run on CRP-Stoch as
-  sanity checks without changing anything.
-- Existing metric keys (``relocations``, ``steps``, ``time``,
-  ``crane_time``) are preserved.  A new key ``expected_relocations``
-  is added and used as the primary metric when a policy tree has been
-  evaluated.
-
-Interfaces
-----------
-Two evaluation entry-points are provided:
-
-- ``step(action)`` — inherited from CRP-R; drives a **single**
-  realization of the retrieval sequence.  Suitable for online-style
-  heuristics such as Zehendner et al. (EJOR 2017) leveling.
-
-- ``evaluate_policy(tree)`` — takes a :class:`core.stoch.PolicyTree`
-  and returns E[R] plus feasibility.  Used by Bacci et al. (Soft
-  Comp 2022) RIRH and Galle et al. (2018) EM baselines.
-
-Reference
----------
-T. Bacci, S. Mattia, P. Ventura, "The realization-independent
-reallocation heuristic for the stochastic container relocation
-problem", Soft Computing (2022).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -89,12 +53,8 @@ class CRP_Stoch(CRP_R):
 
     name = "CRP-Stoch"
     description = (
-        "Stochastic Container Relocation Problem (SCRP): "
-        "containers are partitioned into ordered batches whose intra-batch "
-        "retrieval order is revealed only after the previous batch is empty. "
-        "Primary metric: expected number of relocations E[R] (Bacci et al. 2022; "
-        "Galle et al. 2018; Ku & Arthanari 2016). "
-        "Set batch_size=1 for deterministic CRP-R compatibility."
+        "Batch-stochastic container retrieval with ordered batches and "
+        "uniform intra-batch uncertainty."
     )
     tags = ["crp", "stochastic", "batches", "yard-only"]
     metric_names = [

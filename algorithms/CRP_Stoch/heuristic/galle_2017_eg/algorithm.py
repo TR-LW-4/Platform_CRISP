@@ -1,26 +1,20 @@
 """
-Galle et al. — Expected Group Assignment (EG) heuristic for the SCRP.
+ExpectedGroupAssignment
+<2018> <heuristic> <stochastic> <single-bay> <CRP-Stoch>
+Expected Group Assignment for batch-stochastic relocation
+revelation_model --- batch --- Revelation: batch or online
+num_samples --- 5000 --- Monte-Carlo realizations for E[R]
 
-EG generalises the deterministic Group Assignment Heuristic of Wu & Ting
-(2012) to the stochastic setting: blocking containers above the current
-target are relocated in two phases (an "acceptable" descending-label
-phase, then an ascending-label phase for the remainder), using virtual
-minimum-label bookkeeping so several blockers of the same batch can be
-grouped into the same destination column.
-
-Ported from the reference implementation
-------------------------------------------
-`https://github.com/vgalle/StochasticCRP` (vendored at
-`/data/liuw2/StochasticCRP-master`, files `retrieveEG.m` + `heuristic.m`).
-Core logic lives in :mod:`core.stoch.galle_2017_source` and is shared
-with the ERI heuristic (Ku & Arthanari 2016) and the PBFS/PBFSA exact
-algorithms (Galle et al.), which are ported from the same repository.
-
-Reference
----------
-V. Galle, S. Borjian Boroujeni, V. H. Manshadi, C. Barnhart, P. Jaillet,
-"The Stochastic Container Relocation Problem", 2017 (source repository);
-published as Galle et al., *Transportation Science* 52(5), 2018.
+------------------------------- Reference --------------------------------
+V. Galle, S. Borjian Boroujeni, V.H. Manshadi, C. Barnhart, P. Jaillet,
+"The Stochastic Container Relocation Problem",
+Transportation Science 52 (2018) 1030–1047.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

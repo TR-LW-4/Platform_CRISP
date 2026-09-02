@@ -1,35 +1,19 @@
 """
-Wang, Jin, Lim (2015) target-guided heuristic (TGH) for the container
-pre-marshalling problem.
+WangJinLim2015TGH
+<2015> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Target-guided giant-move heuristic for the CPMP
+has_dummy_stack --- False --- Enable the CPMPDS dummy-stack variant
 
-Reference
----------
-N. Wang, B. Jin, A. Lim, "Target-guided algorithms for the container
-pre-marshalling problem", Omega 53 (2015) 67-77.
-
-Embedding scope
-----------------
-* §3 CPMP / CPMPDS: the dummy-stack variant is exposed as a config toggle
-  (``has_dummy_stack``) rather than a separate problem class -- the last
-  stack of the bay is treated as a temporary transfer-lane slot that must be
-  emptied by the end of pre-marshalling.
-* §4.1-§4.2 candidate container/stack selection with the smallF-lowT
-  evaluation scheme (paper's final choice; §6.1 ablation not embedded).
-* §4.3 giant moves (Case 1 / Case 2, each with their nslot-based
-  sub-scenarios) and §4.4 the 5-priority relocation + single-move
-  fulfillment.
-* §4.5 termination guarantee via the fixed-height invariant.
-
-Only the main greedy algorithm (TGH, Algorithm 1) is embedded; the beam
-search extensions (BS-G, BS-B, §5) are out of scope for this pass.
-
-Known limitation: in the doubly-degenerate giant-move sub-case where
-``nslot == 0`` *and* the only borrowable container happens to sit in a
-completely fixed stack, restoring it can occasionally be capacity-infeasible
-mid-sequence. This is a rare corner case (empirically <0.3% of adversarial
-random instances at realistic occupancy); when it occurs the heuristic
-reports ``solved=False`` for that instance rather than corrupting state or
-crashing.
+------------------------------- Reference --------------------------------
+N. Wang, B. Jin, A. Lim,
+"Target-guided algorithms for the container pre-marshalling problem",
+Omega 53 (2015) 67–77.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

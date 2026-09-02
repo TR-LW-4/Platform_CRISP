@@ -1,20 +1,12 @@
 """
-Wang et al. (2026) POCRP-RC — Large Neighborhood Search (Algorithm 3) and
-neighborhood generation via poor-move correction (Algorithm 4).
+Poor-move LNS for Wang2026GRASP.
 
-Poor-move criteria (§5.3.3)
----------------------------
-Poor relocations (borrowed from Jovanović 2019, "CMM/CMB"):
-    (1.1) If a container was relocated ≥ M_a times, the FIRST relocation
-          of that container is a poor relocation.
-    (1.2) If retrieving a target required ≥ M_b blocker-relocations AND
-          the target itself was previously relocated as a blocker, the
-          LAST such previous relocation of the target is a poor relocation.
-
-Poor targets (NEW in Wang 2026):
-    (2.1) If a relocation is poor, its parent target is a poor target.
-    (2.2) If retrieving a target required > M_c blocker-relocations, that
-          target is a poor target.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

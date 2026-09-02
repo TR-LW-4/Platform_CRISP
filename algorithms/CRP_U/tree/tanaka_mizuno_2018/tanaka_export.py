@@ -1,15 +1,12 @@
 """
-Export a Platform_CRISP yard snapshot to Tanaka ``unrestricted-distinct`` input.
+Yard → Tanaka–Mizuno B&B binary input for TanakaMizuno2018BB.
 
-Tanaka & Mizuno's reader (``main.c``) expects the same format as the
-restricted solver:
-  Line 1: ``n_stack n_block``
-  Line 2+: whitespace-separated integers describing stacks in order
-           ``index 0 .. n_stack-1``.  For each stack: ``height`` then
-           ``height`` priorities **bottom → top** (tier 0 first).
-
-Stack order matches CRP-U flat actions: index ``i`` → bay ``i // num_rows + 1``,
-row ``i % num_rows + 1``.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,34 +1,21 @@
 """
-Zhu, Qin, Lim & Zhang (2012) IDA* algorithm for the Restricted BRP (CRP-R).
+Zhu2012IDAStarR
+<2012> <exact> <restricted> <single-bay> <CRP-R>
+Iterative deepening A* with LB3 / PR4
+time_limit_s --- 300 --- Per-instance wall-clock limit (s)
+lb_mode --- LB3 --- Lower bound: LB1 / LB2 / LB3
+probe_mode --- PR4 --- Probe heuristic: PR1–PR4
 
-Reference
----------
-W. Zhu, H. Qin, A. Lim, H. Zhang, "Iterative deepening A* algorithms for
-the container relocation problem", IEEE Transactions on Automation
-Science and Engineering, 9(4) (2012) 710-722.
-
-Algorithm overview
--------------------
-Iterative deepening A* (IDA*), *not* branch-and-bound: successive depth-
-first passes explore all nodes with cost estimate ``f(n) = g(n) + h(n)``
-up to an increasing threshold, using an admissible lower bound ``h(n)``
-(Section V-A: LB1/LB2/LB3) and a greedy "probe" heuristic (Section V-B:
-PR1-PR4) to find good solutions early and narrow the search window.  The
-paper reports this outperforms the branch-and-bound approach of Kim &
-Hong (2006) (``exact/search/kim_hong_2006``) by a wide margin under
-tight (1 s) time limits.
-
-Best configuration from the paper (IDA*-R, Section VII-C):
-``IDAStar(pi, PR+, LB3, PR4)`` -- initial upper bound from the best of
-PR1-PR4 ("PR+"), LB3 for branch-and-bound pruning, PR4 for probing
-children on the search frontier.  All exposed as configurable options
-below.
-
-Independence
-------------
-Self-contained: depends only on ``core.base_algorithm``, ``core.yard``
-and its own ``ida_core`` module (the IDA* engine).  Does not import
-from any other algorithm package.
+------------------------------- Reference --------------------------------
+W. Zhu, H. Qin, A. Lim, H. Zhang,
+"Iterative deepening A* algorithms for the container relocation problem",
+IEEE Transactions on Automation Science and Engineering 9 (2012) 710–722.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -61,40 +48,10 @@ def _yard_to_stacks(yard: Yard) -> List[List[int]]:
 # ================================================================ #
 
 class Zhu2012IDAStarR(BaseAlgorithm):
-    """
-    Exact IDA* search for the Restricted BRP / CRP-R.
-
-    Reference: Zhu, Qin, Lim & Zhang (2012), IEEE T-ASE 9(4), 710-722.
-
-    Unlike ``exact/solver`` algorithms, this is not an IP formulation --
-    it is a hand-crafted iterative-deepening search directly over bay
-    states, using the paper's LB1/LB2/LB3 lower bounds and PR1-PR4
-    probe heuristics.
-
-    Parameters
-    ----------
-    time_limit_s : float
-        Per-seed wall-clock time limit in seconds (default 300).  If
-        the search is stopped early, the best solution found so far is
-        reported and ``optimal_proven`` is set to 0.0.
-    lb_mode : str
-        Lower bound used for pruning: "LB1" | "LB2" | "LB3" (default
-        "LB3", the paper's strongest and best-performing bound for
-        larger instances).
-    probe_mode : str
-        Probe heuristic used on frontier nodes: "PR1" | "PR2" | "PR3" |
-        "PR4" (default "PR4").
-    """
 
     name                = "Zhu et al. (2012) IDA*-R"
     category            = "Exact"
-    description         = (
-        "Iterative deepening A* for the Restricted BRP (Zhu, Qin, Lim & "
-        "Zhang, IEEE T-ASE 2012). Admissible lower bounds LB1/LB2/LB3 "
-        "for pruning; probe heuristics PR1-PR4 narrow the search window. "
-        "Guarantees the optimal number of relocations if it completes "
-        "within the time limit."
-    )
+    description         = "Zhu et al. (IEEE T-ASE 2012) iterative deepening A*."
     compatible_problems = ["CRP-R"]
     _LB_MODES    = (LB1, LB2, LB3)
     _PROBE_MODES = (PR1, PR2, PR3, PR4)

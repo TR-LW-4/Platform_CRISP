@@ -1,59 +1,21 @@
 """
-Tanaka & Voß (2022) improved B&B for the restricted BRP with distinct priorities.
+TanakaBB2022
+<2022> <exact> <restricted> <single-bay> <CRP-R>
+Improved branch-and-bound wrapper (restricted-distinct-1.3)
+tanaka2022_time_limit_sec --- 600 --- Per-instance time limit (s)
+tanaka2022_n_threads --- 1 --- OpenMP threads (0 = auto)
 
-Wraps the ``restricted-distinct-1.3`` C binary (``rbrp_bb``) which accompanies:
-
-  S. Tanaka and S. Voß, "An exact approach to the restricted block relocation
-  problem based on a new integer programming formulation,"
-  European Journal of Operational Research, 296(2):485-503, 2022.
-
-NOTE: Relationship between this module and the paper's primary algorithm
------------------------------------------------------------------------
-
-The primary contribution of Tanaka & Voss (2022) (Sections 3-4, Algorithm 1)
-is an exact iterative algorithm based on a novel integer programming (IP)
-formulation. Its key steps are:
-
-  1. Enumerate all possible relocation sequences for each blocking block and
-     formulate the problem as a binary IP (the "IP formulation").
-  2. Build a relaxed formulation (RP) using truncated relocation sequences
-     as a lower bound.
-  3. Derive an upper-bound formulation (UP) from (RP) by retaining only
-     complete relocation sequences.
-  4. Iteratively expand truncated sequences, update (RP)/(UP), and repeat
-     until the optimality gap reaches zero.
-  5. Solve each (RP)/(UP) instance with Gurobi Optimizer (MIP solver).
-
-This module instead wraps the *comparison* B&B algorithm described in
-Section 5.2 of the same paper -- an improved version of the branch-and-bound
-from Tanaka & Mizuno (2018), with the following enhancements introduced in
-the 2022 paper:
-
-  - Tighter lower bounds: LB-LIS (Quispe et al. 2018) and UBALB
-    (Bacci et al. 2019) replace LB4, with early termination as soon as
-    the lower bound exceeds the current upper bound.
-  - OpenMP multi-threading support (-m flag).
-  - Backtrack-and-restart search strategy (-b flag).
-
-Vendor C source: vendor/restricted-distinct-1.3/
-  - solve.c      : B&B main search (functions bb / bb_sub).
-  - lower_bound.c: Lower bound implementations; LOWER_BOUND=5 (LB-LIS) active.
-  - heuristics.c : Greedy heuristic embedded in B&B for upper-bound updates.
-
-The paper's primary IP-based algorithm (Algorithm 1) is NOT yet integrated
-into this platform. It requires a C++ implementation of the IP modelling /
-sequence expansion logic plus Gurobi (or a compatible MIP solver).
-The authors' original C++ source is available at:
-  https://sites.google.com/site/shunjitanaka/brp
-
-Key improvements in this B&B over the 2018 solver (``restricted-distinct-1.11``):
-  * Optional OpenMP multi-threading (``-m`` flag).
-  * Optional backtrack-and-restart search strategy (``-b`` flag).
-  * Tighter lower bounds: LB-LIS (Quispe et al. 2018) and UBALB (Bacci et al. 2019),
-    with early termination once the lower bound exceeds the current upper bound.
-
-The input/output format is identical to the 2018 solver, so the same
-``tanaka_export`` helper is reused.
+------------------------------- Reference --------------------------------
+S. Tanaka, S. Voß,
+"An exact approach to the restricted block relocation problem based on
+ a new integer programming formulation",
+European Journal of Operational Research 296 (2022) 485–503.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -75,19 +37,10 @@ from .tanaka_export import yard_to_tanaka_instance
 
 
 class TanakaBB2022(BaseAlgorithm):
-    # "BB2022" in the class name distinguishes this comparison B&B from the
-    # paper's primary IP-based algorithm, which is not implemented here.
+
     name = "Tanaka & Voß (2022) B&B"
     category = "Exact"
-    description = (
-        "Improved branch-and-bound for restricted BRP with distinct priorities "
-        "(Tanaka & Voss 2022, EJOR 296:485-503). "
-        "Note: this is the comparison B&B algorithm from the paper, not the "
-        "primary IP-based iterative algorithm. "
-        "Supports OpenMP multi-threading and optional backtrack-restart. "
-        "Uses ``restricted-distinct-1.3`` (``rbrp_bb``). "
-        "Primary metric: relocation count."
-    )
+    description = "Tanaka & Voß (EJOR 2022) improved branch-and-bound."
     compatible_problems = ["CRP-R"]
     # Parse opt=N (proven optimal) and best=N (best found, optimality not proven)
     # from rbrp_bb stderr output.

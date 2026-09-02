@@ -1,70 +1,22 @@
 """
-Firmino, Silva & Times (2019) — Reactive GRASP for CRP-Time.
+FirminoRGRASP
+<2019> <heuristic> <time> <single-bay> <CRP-Time>
+Reactive GRASP with MNI construction and reverse-scan local search
+max_iterations --- 500 --- GRASP iterations
+alpha_init --- 1.0 --- Initial greedy rate
+local_search --- True --- Enable suffix rebuild
 
-Reference
----------
-A. da Silva Firmino, R. M. de Abreu Silva, V. C. Times,
+------------------------------- Reference --------------------------------
+A. da Silva Firmino, R.M. de Abreu Silva, V.C. Times,
 "A reactive GRASP metaheuristic for the container retrieval problem to
  reduce crane's working time",
 Journal of Heuristics 25 (2019) 141–173.
-https://doi.org/10.1007/s10732-018-9390-0
-
-Algorithm overview
-------------------
-Each GRASP iteration consists of two phases:
-
-1. **Construction Phase** (Algorithm 2 in paper):
-   A semi-greedy heuristic that, at each step, builds a Restricted
-   Candidate List (RCL) using the MNI decision index (Jovanovic & Voß
-   2014) and randomly selects a relocation from the RCL.
-
-   MNI score for placing container *c* into stack *s* with min-priority *vs*:
-     score = vs − c           if vs > c   (no blocking, lower = better fit)
-     score = 2N + 1 − vs      if vs ≤ c   (blocking)
-     +extra penalty            if the stack would become full AND creates blocking
-
-   RCL greedy rate α ∈ [0, 1]:
-     GLimitα = max_score − α · (max_score − min_score)
-     RLC = {s | MNI(s) ≤ GLimitα}
-   When α = 0: full random (all candidates). α = 1: pure greedy.
-
-2. **Local Search Phase** (Algorithm 3 in paper):
-   Scans moves in reverse order. For each relocation, "undoes" it and
-   attempts to find a substitute destination that:
-     (a) has not been visited in this pass,
-     (b) produces no blocking (min_prio > c), and
-     (c) reduces the total crane working time.
-   When a valid replacement is found, the subsequent portion of the
-   solution is rebuilt by re-running the greedy MNI heuristic from the
-   new yard state.
-
-3. **Reactive α** (paper §7):
-   α is adjusted every iteration based on whether the new solution
-   improved on the previous one:
-     • improved → continue the current adjustment direction
-     • worsened → reverse the adjustment direction
-   Start: α = 1.0 (greedy), step Δv = 0.05, direction D (decrement).
-
-Crane-time model
-----------------
-Uses the platform's Lee & Lee (2010) kinematics (`compute_crane_time`)
-to ensure that the reported `crane_time` is directly comparable with
-all other CRP-Time algorithms on the same benchmarks.
-
-The paper's own 4-speed model (ν₁–ν₄, horizontal + vertical) is NOT
-replicated here because: (a) it is a different physical model and makes
-results incomparable, and (b) the platform's model is the canonical one
-for the Lee_instances and Shin_instances benchmarks.
-
-Bay support
------------
-[single-bay origin]  The paper restricts all relocations to the same bay
-(no cross-bay moves, as stated in Sect. 1).  On single-bay instances
-(num_bays = 1) the algorithm is fully faithful to the paper.  On
-multi-bay instances the greedy selection considers all valid stacks across
-bays, but the MNI index does NOT penalise cross-bay gantry travel, so
-the behaviour is analogous to GLAH in this platform: crane-time is
-correctly computed but the heuristic decision ignores bay distance.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

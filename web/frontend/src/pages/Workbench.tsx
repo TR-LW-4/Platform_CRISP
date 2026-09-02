@@ -211,6 +211,8 @@ export function Workbench({
                 batch_summary: response.batch_summary ?? current.batch_summary,
                 batch_total: response.batch_total,
                 batch_index: response.batch_index,
+                completed_count: response.completed_count,
+                pending_count: response.pending_count,
                 instance_source: response.instance_source,
               }
             : current,
@@ -288,6 +290,18 @@ export function Workbench({
     }
   }
 
+  const continueRun = async () => {
+    if (!job) return
+    setError('')
+    try {
+      setJob(await api.continueJob(job.id))
+    } catch (continueError) {
+      setError(
+        continueError instanceof Error ? continueError.message : String(continueError),
+      )
+    }
+  }
+
   const latest = records.at(-1) ?? job?.latest
   const primaryMetric = problem?.metric_names[0] ?? 'Metric'
   const hasBatchSummary = Boolean(job?.batch_summary?.classes?.length)
@@ -299,6 +313,12 @@ export function Workbench({
     job?.batch_total && job.batch_total > 0
       ? `${(job.batch_index ?? 0) + 1} / ${job.batch_total}`
       : null
+  const canContinue = Boolean(
+    job
+    && (job.status === 'stopped' || job.status === 'failed')
+    && (job.batch_total ?? 0) > 0
+    && (job.pending_count ?? 0) > 0,
+  )
 
   return (
     <main className="page workbench">
@@ -392,7 +412,9 @@ export function Workbench({
             <>
               <div className="tags">
                 <span>{algorithm.method_group}</span>
-                <span>{algorithm.category}</span>
+                {algorithm.category !== algorithm.method_group && (
+                  <span>{algorithm.category}</span>
+                )}
               </div>
               <p className="description">
                 {algorithm.requires_solver && (
@@ -447,6 +469,14 @@ export function Workbench({
             <button disabled={!running || job?.status === 'stopping'} onClick={stop}>
               Stop
             </button>
+            {canContinue && (
+              <button className="primary" onClick={() => void continueRun()}>
+                Continue
+                {job?.pending_count
+                  ? ` (${job.pending_count} left)`
+                  : ''}
+              </button>
+            )}
           </div>
         </aside>
 

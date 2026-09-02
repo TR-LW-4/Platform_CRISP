@@ -1,28 +1,20 @@
 """
-Tus, Rendl, Raidl (2014): Metaheuristics for the Two-Dimensional
-Container Pre-Marshalling Problem (2D-PMP).
+TusRendlRaidl2014
+<2014> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+2D-PMP LPFH, Pilot, and MMAS metaheuristics
+n_ants --- 8 --- MMAS colony size
+lookahead_k --- 7 --- Pilot look-ahead depth
 
-Reference
----------
+------------------------------- Reference --------------------------------
 A. Tus, A. Rendl, G.R. Raidl,
-"Metaheuristics for the Two-Dimensional Container Pre-Marshalling Problem".
-
-Paper scope and this module's structure
----------------------------------------
-The paper studies one problem family (2D-PMP) and compares three methods:
-  1) 2D-LPFH construction heuristic
-  2) Pilot method using 2D-LPFH-style compound moves
-  3) MMAS (Max-Min Ant System) with move-based pheromone model
-
-To keep a one-paper-one-folder layout, this module exposes three independent
-algorithm classes in the same file:
-  - TusRendlRaidl2DLPFH
-  - TusRendlRaidl2DPilot
-  - TusRendlRaidl2DMMAS
-
-All classes are registered under CRP-Prem as requested by the project setup.
-The implementation is self-contained and does not import logic from other
-algorithm folders.
+"Metaheuristics for the Two-Dimensional Container Pre-Marshalling Problem",
+2014.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

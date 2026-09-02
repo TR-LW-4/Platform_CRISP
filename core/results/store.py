@@ -38,9 +38,9 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from core.benchmark_keys import layout_path_from_extra
+from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY, layout_path_from_extra
 from core.move_export import moves_from_final_record
 
 # Default results directory (project root, i.e. the parent of core/)
@@ -110,13 +110,58 @@ def _result_path(
     seed: int,
     prob_config: Optional[Mapping[str, Any]] = None,
     base_dir: Path = _DEFAULT_DIR,
+    *,
+    mkdir: bool = True,
 ) -> Path:
     safe_algo = _safe_token(algorithm)
     safe_prob = _safe_token(problem)
     folder = base_dir / safe_prob / safe_algo
-    folder.mkdir(parents=True, exist_ok=True)
+    if mkdir:
+        folder.mkdir(parents=True, exist_ok=True)
     stem = stable_result_stem(prob_config, seed=seed)
     return folder / f"{stem}.json"
+
+
+def result_path_for(
+    problem: str,
+    algorithm: str,
+    layout_path: str | Path,
+    *,
+    seed: int = 0,
+    base_dir: Path = _DEFAULT_DIR,
+    mkdir: bool = False,
+) -> Path:
+    """Path of the JSON that ``save_run`` would write for this layout.
+
+    Lookup-only by default (``mkdir=False``) so Continue can scan without
+    creating empty algorithm folders.
+    """
+    return _result_path(
+        problem,
+        algorithm,
+        seed,
+        {LAYOUT_FILE_EXTRA_KEY: str(layout_path)},
+        base_dir,
+        mkdir=mkdir,
+    )
+
+
+def completed_layout_paths(
+    problem: str,
+    algorithm: str,
+    layout_paths: Sequence[str | Path],
+    base_dir: Path = _DEFAULT_DIR,
+) -> List[str]:
+    """Layout paths that already have a result file, in the given order."""
+    done: List[str] = []
+    for raw in layout_paths:
+        path = Path(raw)
+        result = result_path_for(
+            problem, algorithm, path, base_dir=base_dir, mkdir=False,
+        )
+        if result.exists():
+            done.append(str(path))
+    return done
 
 
 def save_run(

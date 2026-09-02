@@ -1,18 +1,20 @@
 """
-Tierney & Voß (2016) robust container pre-marshalling (RCPMP).
+TierneyVoss2016RCPMP
+<2016> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Robust pre-marshalling with blocking-matrix IDA*
+robust_interval_window --- 2 --- Priority-class uncertainty window
+ida_time_limit_s --- 60 --- IDA* time limit (s)
 
-Paper:
+------------------------------- Reference --------------------------------
 K. Tierney, S. Voß,
 "Solving the Robust Container Pre-Marshalling Problem",
-ICCL 2016, LNCS 9855, pp. 131-145.
-
-This implementation embeds the paper's central idea into the platform:
-  - robust blocking-matrix objective in state evaluation
-  - deterministic CPMP-style relaxation (groups) as lower-bound guidance
-  - exact-search style IDA* over move sequences
-
-It is kept self-contained in this single paper folder and does not depend on
-other algorithm folders.
+ICCL 2016, LNCS 9855, pp. 131–145.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

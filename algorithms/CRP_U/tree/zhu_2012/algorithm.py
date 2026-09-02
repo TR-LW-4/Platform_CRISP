@@ -1,38 +1,21 @@
 """
-Zhu, Qin, Lim & Zhang (2012) IDA* algorithm for the Unrestricted BRP (CRP-U).
+Zhu2012IDAStarU
+<2012> <exact> <unrestricted> <single-bay> <CRP-U>
+Iterative deepening A* with LB1/LB3 and PU probes
+time_limit_s --- 300 --- Per-instance wall-clock limit (s)
+lb_mode --- LB1 --- Lower bound: LB1 or LB3
+probe_mode --- PU2 --- Probe heuristic
 
-Reference
----------
-W. Zhu, H. Qin, A. Lim, H. Zhang, "Iterative deepening A* algorithms for
-the container relocation problem", IEEE Transactions on Automation
-Science and Engineering, 9(4) (2012) 710-722.
-
-Algorithm overview
--------------------
-Same iterative-deepening A* framework as ``exact/search/zhu_2012`` in
-CRP-R (see that package's docstring for Algorithm 1 / Algorithm 2), but
-with the *unrestricted* branching rule: a relocation may move the top
-container of **any** stack (not only a blocker above the current
-target) to any other non-full stack.  Three configurations from
-Section VII-D are exposed:
-
-  - **IDA*-U**  (``lb_mode="LB1"``, ``use_visited_map=False``): exact,
-    admissible LB1 only, no transposition table.
-  - **IDA*-UM** (``lb_mode="LB1"``, ``use_visited_map=True``, default):
-    exact; a transposition table avoids re-exploring layouts already
-    seen at an equal-or-shallower depth within the same iteration.
-  - **IDA*-UM3** (``lb_mode="LB3"``): reuses the restricted variant's
-    LB3 bound for more aggressive pruning.  The paper notes LB3 is
-    **not proven admissible for CRP-U** -- solutions found in this
-    mode are never reported as ``optimal_proven`` even if the search
-    appears to converge.
-
-Independence
-------------
-Self-contained: depends only on ``core.base_algorithm``, ``core.yard``
-and its own ``ida_core`` module.  Duplicates (rather than imports) the
-small amount of logic shared in spirit with the CRP-R package -- see
-that package's ``ida_core.py`` docstring for the rationale.
+------------------------------- Reference --------------------------------
+W. Zhu, H. Qin, A. Lim, H. Zhang,
+"Iterative deepening A* algorithms for the container relocation problem",
+IEEE Transactions on Automation Science and Engineering 9 (2012) 710–722.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

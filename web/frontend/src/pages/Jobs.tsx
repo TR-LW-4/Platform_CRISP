@@ -36,6 +36,19 @@ export function Jobs({ onOpen }: JobsProps) {
     }
   }, [])
 
+  const continueJob = async (job: JobSummary) => {
+    setBusyId(job.id)
+    setError('')
+    try {
+      await api.continueJob(job.id)
+      onOpen(job.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const removeJob = async (job: JobSummary, deleteFiles: boolean) => {
     const msg = deleteFiles
       ? `Remove job and delete ${job.result_files?.length ?? 0} saved result file(s)?`
@@ -80,6 +93,17 @@ export function Jobs({ onOpen }: JobsProps) {
                 <span>{job.record_count} updates</span>
                 <div className="job-actions">
                   <button onClick={() => onOpen(job.id)}>Open</button>
+                  {(job.status === 'stopped' || job.status === 'failed')
+                    && (job.batch_total ?? 0) > 0
+                    && (job.pending_count ?? 0) > 0 && (
+                    <button
+                      disabled={busyId === job.id}
+                      onClick={() => void continueJob(job)}
+                    >
+                      Continue
+                      {job.pending_count ? ` (${job.pending_count})` : ''}
+                    </button>
+                  )}
                   {terminal.has(job.status) || job.status === 'failed' ? (
                     <>
                       <button

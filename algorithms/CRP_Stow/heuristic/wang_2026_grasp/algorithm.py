@@ -1,41 +1,19 @@
 """
-Wang, Ma, Yang, & Hu (2026) — GRASP for POCRP-RC.
+Wang2026GRASP
+<2026> <heuristic> <stowage> <multi-bay> <CRP-Stow>
+GRASP with LNS for POCRP with rolled containers
 
-Reference
----------
-Wang, N., Ma, X., Yang, R., & Hu, J. (2026).  Optimization of partially
-ordered container relocation problem with rolled containers.
-Computers & Operations Research, 191, 107434.
-https://doi.org/10.1016/j.cor.2026.107434
-
-What is implemented
--------------------
-The paper proposes four methods (two IP models + Greedy + GRASP).  Following
-the user's choice we only implement the paper's MAIN algorithm — the GRASP
-of §5.3, wired to CRP-Stow.
-
-Contents mapped to platform code
---------------------------------
-`definitions.py`   Def 1-5 (rolled stack, bad container, deadlock, container-
-                   echelon, stack-echelon) + a Jovanović-2019-derived
-                   relevant-4-cycle detector adapted to ignore RCs.
-`construction.py`  §5.2  – Greedy_Randomized_Construction (also used as
-                   deterministic Greedy when rng=None) with §5.2.2's TR
-                   (min NBC → max DC → min BC+RCB → prefer-empty/rolled)
-                   and §5.2.3's RR (Task 1 for RCs, Task 2 for OCs).
-`lns.py`           §5.3  – LNS + neighGene + the four poor-move criteria
-                   (CMM, CMB from Jovanović 2019; and the paper's original
-                   poor-target criteria 2.1 and 2.2).
-`algorithm.py`     §5.3  – Algorithm 2 GRASP framework (this file) + platform
-                   BaseAlgorithm boilerplate.
-
-Parameters (§6.3 tuning conclusions)
-------------------------------------
-max_iteration = 10, hood_num = 10, NOIMPRLIMIT = 3   (tuned in §6.3.2 / §6.3.3)
-deadlock only in stack selection (RR), not container selection (TR)   (§6.3.1)
-Other constants (α, β, M_a, M_b, M_c, temperature) are not stated in the
-paper — we adopt the defaults documented in `lns.LNSParams` (based on
-Figure 4's example and common GRASP practice).
+------------------------------- Reference --------------------------------
+N. Wang, X. Ma, R. Yang, J. Hu,
+"Optimization of partially ordered container relocation problem with
+ rolled containers",
+Computers & Operations Research 191 (2026) 107434.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

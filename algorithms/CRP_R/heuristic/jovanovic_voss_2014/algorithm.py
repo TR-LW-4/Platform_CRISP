@@ -21,10 +21,9 @@ from __future__ import annotations
 import multiprocessing as mp
 from typing import Callable, Dict, List, Optional
 
-import numpy as np
-
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
+from core.move_export import attach_crane_time, export_yard_moves
 from .scoring import chain_select_action
 
 
@@ -32,14 +31,7 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
 
     name                = "Jovanović & Voß (2014) Chain"
     category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Jovanović & Voß (C&IE 2014) chain look-ahead heuristic for CRP-R. "
-        "Extends the Min–Max rule by considering the NEXT block to be relocated "
-        "when choosing the destination for the current one. "
-        "Two modes: Chain (look-ahead only) and Chain F (+ full-stack correction). "
-        "Chain F improves on Min–Max by ≈5% on average and up to 8% on large instances."
-    )
+    description         = "Jovanović & Voß (C&IE 2014) chain look-ahead heuristic."
     compatible_problems = ["CRP-R"]
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -54,61 +46,56 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
         result_queue:    mp.Queue,
         stop_event:      mp.Event,
     ) -> None:
-        cfg          = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
-        use_chain_f  = bool(cfg.extra.get("use_chain_f", True))
-        all_metrics: List[Dict] = []
+        if stop_event.is_set():
+            return
 
-        for seed in range(n_seeds):
+        cfg         = self.config
+        use_chain_f = bool(cfg.extra.get("use_chain_f", True))
+
+        trace_layout(f"JovanovicVoss2014Chain.train: use_chain_f={use_chain_f}")
+
+        env = problem_factory()
+        env.reset()
+
+        solution: List[int] = []
+        done = False
+
+        while not done:
             if stop_event.is_set():
                 break
+            action = chain_select_action(env, use_chain_f=use_chain_f)
+            _, _, done, _, _ = env.step(action)
+            solution.append(action)
 
-            trace_layout(
-                f"JovanovicVoss2014Chain.train: seed {seed + 1}/{n_seeds}  "
-                f"use_chain_f={use_chain_f}"
+        metrics = attach_crane_time(
+            env.get_metrics(),
+            env.yard,
+            getattr(env.config, "extra", None) or {},
+        )
+        metrics["time"] = metrics["crane_time"]
+        metrics["feasible"] = float(done)
+        metrics["completed"] = float(done)
+        metrics["validated"] = 1.0
+        metrics["validation_conflicts"] = 0.0 if done else 1.0
+        if not done:
+            metrics["executed_relocations"] = float(
+                metrics.get("relocations", 0.0)
             )
+            metrics["relocations"] = float("inf")
+        primary = float(metrics.get("relocations", 0.0))
+        self._best_solution = solution[:]
 
-            env = problem_factory()
-            env.reset()
-
-            solution: List[int] = []
-            done = False
-
-            while not done:
-                info   = env._get_info()
-                action = chain_select_action(env, use_chain_f=use_chain_f)
-                _, _, done, _, _ = env.step(action)
-                solution.append(action)
-
-            metrics = env.get_metrics()
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", 0.0))
-
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = solution[:]
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = self._best_metric,
-                metrics  = agg,
-                progress = 1.0,
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "solution": solution[:],
+                "moves": export_yard_moves(env.yard),
+            },
+        )
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
@@ -128,8 +115,6 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
                 "help": (
                     "When True (Chain F), penalises destination stacks that would "
                     "become full when a deadlock is unavoidable. "
-                    "Improves average relocations by ≈5% over plain Chain on large "
-                    "instances. Set False for the basic Chain heuristic."
                 ),
             },
         })

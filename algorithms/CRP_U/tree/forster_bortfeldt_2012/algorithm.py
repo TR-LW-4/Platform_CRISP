@@ -1,40 +1,20 @@
 """
-Platform adapter for Forster & Bortfeldt (2012) tree search.
+ForsterBortfeldt2012
+<2012> <heuristic> <unrestricted> <single-bay> <CRP-U>
+Compound-move tree search for unrestricted BRP
+time_limit_s --- 15 --- Search time limit (s)
+n_succ --- 5 --- Successor compound moves per node
 
-Reference
----------
-F. Forster and A. Bortfeldt,
+------------------------------- Reference --------------------------------
+F. Forster, A. Bortfeldt,
 "A tree search procedure for the container relocation problem",
 Computers & Operations Research 39 (2012) 299–309.
-
-Algorithm overview (§6)
------------------------
-1. Greedy initial solution (§6.1):
-     Iterates: removes → BG-to-non-empty → BG-to-empty → FLG_BB.
-2. Heuristic tree search (§6.2):
-     Recursively applies *compound moves* (sequences of productive
-     single moves) and prunes with the §5 lower bound.
-3. Compound moves (§6.3):
-     Built recursively until the cm_stop_threshold is exceeded or the
-     layout is emptied.
-4. Productive moves (§6.4 / §4.2):
-     Removes > BG (FLG_BG ∪ FOG_BG) > FLG_BB + GG.
-     GB and non-FLG-BB moves are non-productive and excluded.
-
-Lower bound (§5)
-----------------
-  n'_m = n (remaining) + nb (badly placed) + n'_non_BG (0 or 1)
-
-Move → action encoding
------------------------
-CRP-U action = src_idx * S + dst_idx  (relocation only).
-The environment handles all auto-retrievals; remove moves generated
-by the tree search are NOT submitted to env.step().
-
-Coupling
---------
-No imports from any other algorithm in the platform.  The only
-platform dependency is core.base_algorithm (BaseAlgorithm / AlgorithmConfig).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

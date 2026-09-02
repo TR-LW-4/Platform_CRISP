@@ -1,14 +1,12 @@
 """
-Solve driver for the Tanaka & Tierney (2018) IDBB embedding.
+Solve driver for TanakaTierney2018IDBB.
 
-Unlike this platform's MIP-based CRP-Prem embeddings (Lee & Hsu 2007, de
-Melo da Silva et al. 2018, Parreno-Torres et al. 2019's IPS6), the vendored
-IDBB algorithm needs no externally-guessed model size (time horizon T,
-group coarsening, ...): it works directly on the exact instance and
-iteratively deepens its own search over the relocation count, so a single
-call is enough. This module just adds the trivial already-sorted fast path
-(skipping the subprocess entirely) and wraps ``bridge.run_idbb`` in a
-dataclass consistent with this platform's other solver result objects.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

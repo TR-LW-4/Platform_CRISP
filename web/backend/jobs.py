@@ -22,7 +22,12 @@ from core.registry import (
     get_problem_class,
 )
 from core.benchmark_summary import summarize_result_files
-from core.result_store import moves_from_records, save_run
+from core.result_store import (
+    completed_layout_paths,
+    moves_from_records,
+    result_path_for,
+    save_run,
+)
 from web.backend.summary_pages import save_batch_summary_sidecar
 from web.backend.benchmarks import (
     SOURCE_RANDOM,
@@ -171,6 +176,17 @@ def _save_layout_run(
     return str(path)
 
 
+def _merge_unique(existing: Sequence[str], incoming: Sequence[str]) -> List[str]:
+    merged: List[str] = []
+    seen = set()
+    for item in list(existing) + list(incoming):
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        merged.append(item)
+    return merged
+
+
 def _worker_main(
     problem_name: str,
     algorithm_name: str,
@@ -181,6 +197,7 @@ def _worker_main(
     instance_source: str = SOURCE_RANDOM,
     layout_paths: Optional[List[str]] = None,
     category: str = "Unknown",
+    skip_paths: Optional[List[str]] = None,
 ) -> None:
     """Resolve classes inside the child and never import Web framework objects."""
     try:
@@ -193,6 +210,7 @@ def _worker_main(
 
         algorithm_cfg = algorithm_config(algorithm_values)
         paths = [Path(p) for p in (layout_paths or [])]
+        skip = {str(Path(p)) for p in (skip_paths or [])}
 
         if not paths:
             problem_cfg = problem_config(problem_values)
@@ -210,6 +228,8 @@ def _worker_main(
         for index, layout_path in enumerate(paths):
             if stop_event.is_set():
                 break
+            if str(layout_path) in skip:
+                continue
             problem_cfg = problem_config_for_layout(
                 instance_source,
                 layout_path,
@@ -229,6 +249,10 @@ def _worker_main(
                 return problem_cls(config=_cfg)
 
             algorithm.train(factory, proxy, stop_event)
+            # Interrupted instance is unfinished: drop the buffer and continue
+            # later from this same layout file.
+            if stop_event.is_set():
+                break
             saved = _save_layout_run(
                 problem_name=problem_name,
                 algorithm_name=algorithm_name,
@@ -285,13 +309,35 @@ class Job:
     stop_event: Any = field(default=None, repr=False)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
+    def batch_counts(self) -> Dict[str, Any]:
+        """batch_index / completed_count / pending_count for API payloads."""
+        batch_total = len(self.layout_paths)
+        latest = self.records[-1] if self.records else None
+        batch_index = None
+        if latest and isinstance(latest.get("extra"), dict):
+            batch_index = latest["extra"].get("batch_index")
+        completed_count = None
+        pending_count = None
+        if batch_total:
+            if self.status in FINAL_STATUSES:
+                completed_count = len(completed_layout_paths(
+                    self.problem_name,
+                    self.algorithm_name,
+                    self.layout_paths,
+                ))
+            else:
+                completed_count = len(self.result_files)
+            pending_count = max(0, batch_total - completed_count)
+        return {
+            "batch_total": batch_total or None,
+            "batch_index": batch_index,
+            "completed_count": completed_count,
+            "pending_count": pending_count,
+        }
+
     def summary(self, include_records: bool = False) -> Dict[str, Any]:
         with self.lock:
             latest = self.records[-1] if self.records else None
-            batch_total = len(self.layout_paths)
-            batch_index = None
-            if latest and isinstance(latest.get("extra"), dict):
-                batch_index = latest["extra"].get("batch_index")
             payload = {
                 "id": self.id,
                 "problem_name": self.problem_name,
@@ -300,8 +346,7 @@ class Job:
                 "problem_config": json_safe(self.problem_config),
                 "algorithm_config": json_safe(self.algorithm_config),
                 "instance_source": self.instance_source,
-                "batch_total": batch_total or None,
-                "batch_index": batch_index,
+                **self.batch_counts(),
                 "status": self.status,
                 "created_at": self.created_at,
                 "started_at": self.started_at,
@@ -354,8 +399,6 @@ class JobManager:
         if instance_source == SOURCE_RANDOM:
             paths = []
 
-        # FastAPI already owns worker threads; spawn avoids unsafe fork-after-thread.
-        context = mp.get_context("spawn")
         category = self._algorithm_categories.get(algorithm_name, "Unknown")
         job = Job(
             id=uuid.uuid4().hex,
@@ -367,35 +410,9 @@ class JobManager:
             instance_source=instance_source,
             layout_paths=paths,
         )
-        job.result_queue = context.Queue(maxsize=512)
-        job.stop_event = context.Event()
-        job.process = context.Process(
-            target=_worker_main,
-            args=(
-                problem_name,
-                algorithm_name,
-                job.problem_config,
-                job.algorithm_config,
-                job.result_queue,
-                job.stop_event,
-                instance_source,
-                paths,
-                category,
-            ),
-            daemon=True,
-            name=f"crisp-web-{job.id[:8]}",
-        )
         with self._lock:
             self._jobs[job.id] = job
-        job.process.start()
-        job.status = "running"
-        job.started_at = _utc_now()
-        threading.Thread(
-            target=self._monitor,
-            args=(job,),
-            daemon=True,
-            name=f"monitor-{job.id[:8]}",
-        ).start()
+        self._spawn(job)
         return job
 
     def get(self, job_id: str) -> Optional[Job]:
@@ -431,11 +448,7 @@ class JobManager:
                 "result_file": job.result_file,
                 "result_files": list(job.result_files),
                 "batch_summary": json_safe(job.batch_summary),
-                "batch_total": len(job.layout_paths) or None,
-                "batch_index": (
-                    (job.records[-1].get("extra") or {}).get("batch_index")
-                    if job.records else None
-                ),
+                **job.batch_counts(),
                 "instance_source": job.instance_source,
             }
 
@@ -450,6 +463,89 @@ class JobManager:
             job.status = "stopping"
             job.stop_event.set()
         return job
+
+    def continue_job(self, job_id: str) -> Job:
+        """Resume a stopped/failed batch from the first layout without a result file."""
+        job = self.get(job_id)
+        if job is None:
+            raise KeyError(job_id)
+        with job.lock:
+            if job.status not in FINAL_STATUSES:
+                raise ValueError("Job is still running")
+            if not job.layout_paths:
+                raise ValueError("Only batch runs can be continued")
+            if job.process is not None and job.process.is_alive():
+                raise ValueError("Worker is still shutting down. Try again in a moment.")
+            done = completed_layout_paths(
+                job.problem_name,
+                job.algorithm_name,
+                job.layout_paths,
+            )
+            if len(done) >= len(job.layout_paths):
+                raise ValueError("All instances already have saved results")
+            self._sync_result_files_from_disk(job)
+            job.stop_requested = False
+            job.error = None
+            job.finished_at = None
+            job.status = "running"
+            skip_paths = list(done)
+        self._spawn(job, skip_paths=skip_paths)
+        return job
+
+    def _spawn(
+        self,
+        job: Job,
+        *,
+        skip_paths: Optional[Sequence[str]] = None,
+    ) -> None:
+        # FastAPI already owns worker threads; spawn avoids unsafe fork-after-thread.
+        context = mp.get_context("spawn")
+        job.result_queue = context.Queue(maxsize=512)
+        job.stop_event = context.Event()
+        job.process = context.Process(
+            target=_worker_main,
+            args=(
+                job.problem_name,
+                job.algorithm_name,
+                job.problem_config,
+                job.algorithm_config,
+                job.result_queue,
+                job.stop_event,
+                job.instance_source,
+                list(job.layout_paths),
+                job.category,
+                [str(p) for p in (skip_paths or [])],
+            ),
+            daemon=True,
+            name=f"crisp-web-{job.id[:8]}",
+        )
+        job.process.start()
+        job.status = "running"
+        if job.started_at is None:
+            job.started_at = _utc_now()
+        threading.Thread(
+            target=self._monitor,
+            args=(job,),
+            daemon=True,
+            name=f"monitor-{job.id[:8]}",
+        ).start()
+
+    @staticmethod
+    def _sync_result_files_from_disk(job: Job) -> None:
+        existing: List[str] = []
+        seen = set()
+        for layout in job.layout_paths:
+            path = result_path_for(job.problem_name, job.algorithm_name, layout)
+            if not path.exists():
+                continue
+            text = str(path)
+            if text in seen:
+                continue
+            seen.add(text)
+            existing.append(text)
+        job.result_files = _merge_unique(existing, job.result_files)
+        if job.result_files:
+            job.result_file = job.result_files[-1]
 
     def remove(self, job_id: str, *, delete_files: bool = False) -> Optional[Dict[str, Any]]:
         """
@@ -542,24 +638,25 @@ class JobManager:
 
         with job.lock:
             if finished_files:
-                job.result_files = finished_files
-                job.result_file = finished_files[-1]
-                if len(finished_files) > 1:
-                    try:
-                        job.batch_summary = summarize_result_files(finished_files)
-                        save_batch_summary_sidecar(
-                            finished_files,
-                            job.batch_summary,
-                            problem=job.problem_name,
-                            algorithm=job.algorithm_name,
-                        )
-                    except Exception as exc:
-                        job.batch_summary = {
-                            "classes": [],
-                            "ungrouped": 0,
-                            "total_runs": len(finished_files),
-                            "error": f"summary failed: {exc}",
-                        }
+                job.result_files = _merge_unique(job.result_files, finished_files)
+                job.result_file = job.result_files[-1]
+            summary_files = list(job.result_files)
+            if len(summary_files) > 1:
+                try:
+                    job.batch_summary = summarize_result_files(summary_files)
+                    save_batch_summary_sidecar(
+                        summary_files,
+                        job.batch_summary,
+                        problem=job.problem_name,
+                        algorithm=job.algorithm_name,
+                    )
+                except Exception as exc:
+                    job.batch_summary = {
+                        "classes": [],
+                        "ungrouped": 0,
+                        "total_runs": len(summary_files),
+                        "error": f"summary failed: {exc}",
+                    }
             if job.stop_requested:
                 job.status = "stopped"
             elif failure is not None:

@@ -1,59 +1,21 @@
 """
-Caserta, Schwarze, Voß (2012)
+Caserta2012BRPI
+<2012> <exact> <unrestricted> <single-bay> <CRP-U>
+BRP-I move-indexed 0-1 integer program
+time_limit_s --- 3600 --- Gurobi time limit (s)
+ub_method --- heuristic --- Upper-bound source for T
+
+------------------------------- Reference --------------------------------
+M. Caserta, S. Schwarze, S. Voß,
 "A mathematical formulation and complexity considerations for the
-blocks relocation problem"
-European Journal of Operational Research 219 (2012) 96-104.
-
-Model: BRP-I (Section 3, move-indexed model -- no Assumption A1)
---------------------------------------------------------------------
-Unlike BRP-II (algorithms/CRP_R/exact/solver/caserta_2012_brp2, which
-assumes only blocks above the *current target* may be relocated), BRP-I
-maps the *complete* feasible region of the BRP: at every time period at
-most one single move happens (a relocation of the top container of any
-stack, or a retrieval), and that move may originate from *any* stack --
-matching CRP-U ("unrestricted relocation") in this platform.
-
-Because a period now corresponds to a single move rather than to "all
-moves needed to retrieve one block", the total number of periods T
-(= total number of moves) is *not* known a priori and must be bounded
-from above.  We use the tight, instance-specific bound produced by the
-MinMax heuristic of Section 4 of this same paper (used elsewhere in the
-platform as `algorithms/CRP_R/heuristic/caserta`) plus N retrievals, or
--- optionally -- the paper's own worst-case guarantee from Lemma 1
-(Section 2): for 2 <= W <= N,
-    k  = ceil((N-1)/(W-1))
-    UB = k(N-1) - k(k-1)/2 * (W-1)
-(UB = N-1 for W > N).  Either bound is individually valid (a proven
-upper bound on the optimal relocation count), so T = min(both) + 1 (the
-"+1" leaves one idle period of slack) is always large enough to contain
-an optimal solution.
-
-Variables (1-indexed; W = stacks, H = tiers, N = containers, T = periods)
----------------------------------------------------------------------------
-  b[i,j,n,t] = 1  if block n is in slot (i,j) at the start of period t
-  v[n,t]     = 1  if block n has already been retrieved by some period
-                   t0 in {1,...,t-1}          (DECISION variable here --
-                   contrast with BRP-II, where it is a fixed parameter)
-  x[i,j,k,l,n,t] = 1  if block n is relocated from (i,j) to (k,l)
-                       during period t
-  y[i,j,n,t] = 1  if block n is retrieved from (i,j) during period t
-
-Constraints implemented: (1)-(7) of the paper, verbatim (no Assumption
-A1, no additional pruning of the x/y domains beyond the structurally
-necessary tier-height bounds).  Objective: maximise sum_t v[N,t]
-(equivalently: minimise the period at which the last block leaves the
-bay, i.e. the total number of moves used).
-
-WARNING -- variable-count explosion.  The paper reports this model
-generating ``2*W*H*N*T + (W*H)^2*N*T + N*T`` binary variables; even a
-tiny 3x5,N=9 instance with T=20 needs > 46,000 variables, and the paper
-itself could not solve instances beyond ~3x3 in the allotted time. This
-module is therefore only practical for very small toy instances. A hard
-guard (``extra["max_vars"]``, default 200,000) aborts before building
-an unreasonably large model.
-
-Requires: Gurobi with a valid license (Named-User Academic or
-commercial).
+ blocks relocation problem",
+European Journal of Operational Research 219 (2012) 96–104.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

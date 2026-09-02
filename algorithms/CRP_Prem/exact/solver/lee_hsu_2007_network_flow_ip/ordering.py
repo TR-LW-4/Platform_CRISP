@@ -1,20 +1,12 @@
 """
-Post-processing (Lee & Hsu 2007, Section 5): the movement arcs solved
-per time *segment* only say which (source, destination) stack pairs
-exchange a container -- they carry no execution order within the segment.
-When several moves share a segment (multi-move relaxation), some orders
-are physically infeasible (a container cannot be picked up before the one
-above it is removed) and, worse, the moves solved for one segment can form
-a cycle (e.g. stack 1 -> 3 and 3 -> 1 "at the same time"), which is not
-directly executable by a single crane.
+Type-ordering helpers for LeeHsu2007NetworkFlowIP.
 
-This module reconstructs a valid, sequential move list:
-  1. Within each segment, repeatedly execute any move whose source stack
-     currently has an exposed top and whose destination stack has room.
-  2. If no move can proceed, the remaining moves form a cycle. Break it by
-     rerouting one of the moves through a spare stack not otherwise
-     touched this segment -- i.e. replace (src, dst) with (src, spare) and
-     (spare, dst), exactly as illustrated in the paper's own example.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

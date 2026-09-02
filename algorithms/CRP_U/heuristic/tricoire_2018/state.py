@@ -1,10 +1,12 @@
 """
-Pure-Python BRP state for Tricoire et al. (2018).
+Bay-state representation for TricoireHeuristic.
 
-Mirrors the C++ BRPState from block-relocation-master/brpstate.cpp with the
-same incremental LB1 tracking and relocation / retrieval semantics.
-
-Stacks are 0-indexed; items are 1..N (priority 1 = retrieved first).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

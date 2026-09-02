@@ -1,13 +1,13 @@
 """
-CRP-Time – Container retrieval with fixed order; primary objective is total
-crane working time (RMGC model in core.objectives, Lee & Lee style defaults).
+CRP-Time
+<time> <distinct> <CRP-Time>
+Fixed-order retrieval minimizing crane working time
 
-Dynamics match CRP-R: strict priorities 1…N, relocate only the top
-blocker when the target is buried, auto-retrieve when the target is on top.
-
-Step interface: terminal reward = negative total crane time (seconds); invalid
-destination actions use a small −0.5 penalty. Episode trajectory is recorded
-as a RelocationPlan via hooks on CRP_R for compute_crane_time().
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -25,10 +25,7 @@ class CRP_Time(CRP_R):
     """Fixed-order retrieval; minimise total crane working time."""
 
     name         = "CRP-Time"
-    description  = (
-        "Container retrieval with fixed order: minimise total crane working time "
-        "(gantry / trolley / spreader; defaults from Lee & Lee 2010)."
-    )
+    description  = "Crane-aware container retrieval with a working-time objective."
     tags         = ["crp", "time", "fixed-order", "yard-only"]
     metric_names = ["time", "crane_time", "relocations", "steps"]
 

@@ -1,27 +1,20 @@
 """
-Bortfeldt & Forster (2012) heuristic tree search for the container
-pre-marshalling problem.
+BortfeldtForster2012TreeSearch
+<2012> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Compound-move tree search for the CPMP
+n_succ --- 5 --- Successor compound moves per node
+time_limit_s --- 20 --- Search time limit (s)
 
-Reference
----------
+------------------------------- Reference --------------------------------
 A. Bortfeldt, F. Forster,
 "A tree search procedure for the container pre-marshalling problem",
-European Journal of Operational Research 217 (2012) 531-540.
-
-Embedding scope
-----------------
-* Section 4 definitions and Table 1 quantities (badly-placed with transitive
-  contagion, potential supply, clean supply, move classification).
-* Section 5 Proposition 1 lower bound n0_m = n0_BX + n0_GX.
-* Section 6 tree search with compound moves (§6.1 normal, §6.2 extra) and
-  the paper's three-rule filtering scheme in each branch.
-* Section 7.5 ablation switches V0-V4 exposed as ``config.extra`` toggles so
-  the paper's Table 9 experiment can be reproduced once a benchmark set is
-  connected.
-
-Compatibility
--------------
-Compatible problem: ``CRP-Prem``. Single-bay, per-bay pre-marshalling.
+European Journal of Operational Research 217 (2012) 531–540.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

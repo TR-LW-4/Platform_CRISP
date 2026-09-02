@@ -53,7 +53,7 @@ class WebApiTests(unittest.TestCase):
                 }
             )
 
-            started = client.post(
+            rejected = client.post(
                 "/api/jobs",
                 json={
                     "problem_name": "CRP-R",
@@ -69,32 +69,26 @@ class WebApiTests(unittest.TestCase):
                     "algorithm_config": {},
                 },
             )
-            self.assertEqual(started.status_code, 201, started.text)
-            job_id = started.json()["id"]
-
-            deadline = time.monotonic() + 30
-            job = started.json()
-            while job["status"] not in {"completed", "failed", "stopped"}:
-                self.assertLess(time.monotonic(), deadline, "Web job timed out")
-                time.sleep(0.1)
-                job = client.get(f"/api/jobs/{job_id}").json()
-
-            self.assertEqual(job["status"], "completed", job.get("error"))
-            self.assertGreater(job["record_count"], 0)
-            self.assertTrue(job["records"])
-
-            if job.get("result_file"):
-                Path(job["result_file"]).unlink(missing_ok=True)
+            self.assertEqual(rejected.status_code, 422, rejected.text)
+            self.assertIn("standard benchmark", rejected.json()["detail"])
 
     def test_benchmark_index_and_first_only_job(self) -> None:
         with TestClient(app) as client:
             payload = client.get("/api/benchmarks", params={"problem": "CRP-R"})
             self.assertEqual(payload.status_code, 200)
             sources = {item["id"]: item for item in payload.json()["sources"]}
-            self.assertIn("random", sources)
+            self.assertNotIn("random", sources)
             self.assertIn("caserta", sources)
             self.assertIn("zhu", sources)
             self.assertTrue(sources["caserta"]["available"])
+
+            time_sources = {
+                item["id"]: item
+                for item in client.get(
+                    "/api/benchmarks", params={"problem": "CRP-Time"}
+                ).json()["sources"]
+            }
+            self.assertIn("random", time_sources)
 
             heights = sources["caserta"]["heights"]
             self.assertTrue(heights)
@@ -155,6 +149,14 @@ class WebApiTests(unittest.TestCase):
             dup_ids = {item["id"] for item in dup["sources"]}
             self.assertIn("zhu_dup", dup_ids)
             self.assertNotIn("caserta", dup_ids)
+            self.assertNotIn("random", dup_ids)
+
+            u_ids = {
+                item["id"] for item in available_for_problem("CRP-U")["sources"]
+            }
+            self.assertNotIn("random", u_ids)
+            self.assertIn("caserta", u_ids)
+            self.assertIn("zhu", u_ids)
 
 
 if __name__ == "__main__":

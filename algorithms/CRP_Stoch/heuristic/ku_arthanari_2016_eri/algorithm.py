@@ -1,33 +1,20 @@
 """
-Ku & Arthanari (2016) — Expected Reshuffling Index (ERI) heuristic.
+ExpectedReshufflingIndex
+<2016> <heuristic> <stochastic> <single-bay> <CRP-Stoch>
+Expected reshuffling index under time-window uncertainty
+revelation_model --- batch --- Revelation: batch or online
+num_samples --- 5000 --- Monte-Carlo realizations for E[R]
 
-ERI extends Murty et al.'s (2005) deterministic Reshuffle Index (RI) to
-the case where several containers share the same departure time window
-(the *retrieval order within a window is unknown*): the column score
-becomes the *expected* number of containers that depart earlier than the
-one being relocated, using the closed-form ``f_n = n/2`` derived in the
-paper (Section 4).  The blocking container is relocated to the column
-with the lowest ERI (ties broken toward the taller, then leftmost,
-column).
-
-This is the paper's main practical contribution — the exact SDP +
-abstraction search from the same paper is intentionally not embedded
-here (see ``algorithms/CRP_Stoch/README.md`` for the rationale); the
-Galle et al. PBFS/PBFSA exact tree search (``exact/galle_2017_pbfs/``)
-provides an equivalent exact benchmark for the same problem class.
-
-Ported from the reference implementation
-------------------------------------------
-`https://github.com/vgalle/StochasticCRP` (vendored at
-`/data/liuw2/StochasticCRP-master`, files `retrieveERI.m` + `heuristic.m`
-/ `heuristic_Online.m`).  Core logic lives in
-:mod:`core.stoch.galle_2017_source`.
-
-Reference
----------
-D. Ku, T. S. Arthanari, "Container relocation problem with time windows
-for container departure", *European Journal of Operational Research*
-252 (2016) 1031-1039.  DOI: 10.1016/j.ejor.2016.01.055
+------------------------------- Reference --------------------------------
+D. Ku, T.S. Arthanari,
+"Container relocation problem with time windows for container departure",
+European Journal of Operational Research 252 (2016) 1031–1039.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

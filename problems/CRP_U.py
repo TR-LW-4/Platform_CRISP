@@ -1,17 +1,13 @@
 """
-CRP-U – unrestricted *relocations* (Jovanović, Tuba & Voß, EJOR 2019).
+CRP-U
+<unrestricted> <distinct> <CRP-U>
+Unrestricted Block Relocation Problem (cleaning moves allowed)
 
-Semantics (aligned with literature rBRP vs uBRP)
-------------------------------------------------
-- **Retrieval order is fixed**: only the current smallest due-date / priority
-  container may leave the yard (strict 1 … N), same as CRP-R.
-- **Unrestricted** refers to **which container may be relocated** in the next
-  move: the crane may move the **top container of any stack** to any other
-  non-full stack — not only blockers sitting on the **target** stack
-  (restricted BRP).
-
-This is **not** “free choice of retrieval order” (where the agent freely
-chooses which container to retrieve next).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -32,10 +28,8 @@ class CRP_U(CRP_R):
 
     name = "CRP-U"
     description = (
-        "Unrestricted BRP (Jovanović et al., EJOR 2019): fixed retrieval order "
-        "1…N; each step may relocate the top container of **any** stack. "
-        "Contrasts with CRP-R / restricted BRP, where only the top blocker on "
-        "the target's stack may be moved."
+        "Unrestricted container relocation with fixed retrieval order; "
+        "any stack-top container may be relocated."
     )
     tags         = ["crp", "unrestricted", "unrestricted-brp", "fixed-order", "yard-only"]
     metric_names = ["relocations", "steps", "time"]

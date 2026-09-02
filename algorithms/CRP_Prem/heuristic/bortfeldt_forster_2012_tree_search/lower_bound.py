@@ -1,24 +1,12 @@
 """
-Lower bounds on the number of moves needed to reach a final layout.
+Proposition-1 lower bound for BortfeldtForster2012TreeSearch.
 
-Proposition 1 (Bortfeldt & Forster 2012, EJOR 217, §5):
-
-  (i)   n0_BX = nb + min{ nb(s) | s = 1..S }                 [BX-move bound]
-        (If a clean stack already exists, min{nb(s)} = 0.)
-
-  (ii)  Let g* = argmax_g Ds(g), where Ds(g) = D(g) - Sp(g).
-        Potential GX stacks: stacks whose highest well-placed item has group
-        g' < g*.
-        ns_GX = max(0, ceil(Ds(g*) / H))
-        n0_GX = sum of the ns_GX smallest ng*(s) among potential GX stacks,
-        where ng*(s) is the count of well-placed items in stack s with
-        group < g*.
-
-  (iii) n0_m = n0_BX + n0_GX
-
-Also exposes the naive baseline used in the paper's §7.5 ablation:
-
-  n0_BG = nb                                                  [BG-move bound]
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

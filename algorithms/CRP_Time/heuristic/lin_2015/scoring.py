@@ -1,32 +1,12 @@
 """
-Lin, Lee & Lee (2015) SSI heuristic – action-selection logic.
+SSI destination scoring for Lin2015Heuristic.
 
-Reference
----------
-D.-Y. Lin, Y.-J. Lee, Y. Lee,
-"The container retrieval problem with respect to relocation",
-Transportation Research Part C 52 (2015) 132–143.
-
-Algorithm (matches baselines/lin2015.py in Shin et al. TRC 2026)
------------------------------------------------------------------
-Each decision step returns a *list* of (src_action, dst_action) pairs
-that the outer loop should execute sequentially via env.step().
-
-Rule 1 – Ideal stacks exist (min_priority(s) > target_top_priority):
-    SSI(s) = min_priority(s) + P_r * row(s) + P_b * |bay(s) - bay(target)|
-    Choose argmin-SSI among ideal stacks.
-
-Rule 2 – Pre-moves (optional, triggered when `restricted=False`):
-    Before the main move, attempt to pull high-priority containers
-    from OTHER stacks into the chosen ideal dest, as long as:
-      (a) dest has at least 2 spare tiers, and
-      (b) a candidate source has top_priority in the range
-          (target_top_priority, min_priority(dest)) and
-          min_priority(dest) - 5 < top_priority(candidate) < min_priority(dest).
-
-Rule 3 – No ideal stacks:
-    Among all valid (non-full, non-target) stacks pick the one with the
-    maximum min_priority (= fewest future re-relocations).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

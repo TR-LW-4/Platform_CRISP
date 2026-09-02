@@ -1,15 +1,12 @@
 """
-Candidate selection, relocation, and giant moves for the Wang, Jin, Lim
-(2015) target-guided heuristic (§4).
+Giant-move helpers for WangJinLim2015TGH.
 
-Sections implemented
----------------------
-§4.1  Candidate container / candidate stack selection.
-§4.2  Target-pair evaluation ``(f(c,s), fixed_height[s])`` (smallF-lowT).
-§4.3  Giant move (Case 1: same-stack target; Case 2: different-stack
-      target), each with its 3 / 4 ``nslot``-based sub-scenarios.
-§4.4  Container relocation with the 5-priority destination rule and
-      one-move-at-a-time fulfillment.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

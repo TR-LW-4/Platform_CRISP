@@ -1,9 +1,12 @@
 """
-Lee & Lee (2010) – Phase 1: Greedy initial feasible sequence.
+Phase-1 greedy feasible sequence for LeeLeeRetrievalHeuristic.
 
-Retrieves containers in priority order 1…N.
-When the target is buried, relocates all blockers to the nearest
-available stack (Manhattan distance), greedily.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

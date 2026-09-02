@@ -153,6 +153,8 @@ char * _FILENAME;               //!< Data file (read from command line)
 std::vector< std::vector<int> > bay;
 std::vector < std::vector< std::vector<int> > > path;
 std::vector < std::vector< std::vector<int> > > bestPath;
+std::vector<CMMove> pathMoves;
+std::vector<CMMove> bestMoves;
 int * lambda;
 int m;				//!< Number of Stacks
 int n;				//!< Max height of each Stack
@@ -200,6 +202,9 @@ int main(int argc, char *argv[])
     }
 
     int random_seed = time(0);
+    const char * seed_env = getenv("CRISP_SEED");
+    if (seed_env != NULL)
+        random_seed = atoi(seed_env);
     srand(random_seed);
     best_z = _MAXRANDOM;
 
@@ -210,6 +215,20 @@ int main(int argc, char *argv[])
     tTime.resetTime();		// start clock
 
     bestPath.push_back(bay); // copy initial configuration
+
+    // Seed the upper bound with a complete, executable greedy solution.
+    // Unlike bestPath's historical state snapshots, bestMoves records every
+    // relocation and retrieval and can be replayed by Platform_CRISP.
+    {
+        int h_seed = (constantV == 1) ? n : (bay[0].size() + n);
+        std::vector < std::vector< std::vector<int> > > seedPath;
+        std::vector<CMMove> seedMoves;
+        best_z = block_heuristic(
+            bay, m, h_seed, nels, 1, seedPath, seedMoves
+        );
+        bestMoves = seedMoves;
+        best_time = 0.0;
+    }
 
     while(!stopping_criterion())
     {
@@ -234,6 +253,11 @@ int main(int argc, char *argv[])
 #ifdef W_OUT
     cout <<"Algorithm terminates because time limit was reached. Best solution found requires " << best_z << " relocations." << endl;
 #endif
+    cout << "CM_MOVES_BEGIN" << endl;
+    for (unsigned k = 0; k < bestMoves.size(); k++)
+        cout << "CM_MOVE " << bestMoves[k].container << " "
+             << bestMoves[k].src << " " << bestMoves[k].dst << endl;
+    cout << "CM_MOVES_END" << endl;
     cout << "CM : Solution found with " << best_z << " moves." << endl;	
 
     return 0;
@@ -634,7 +658,10 @@ int neighborhood_search(std::vector< std::vector <int> > state, int row, int h, 
 
         // now complete the solution using the heuristic
         std::vector < std::vector< std::vector<int> > > heurPath;
-        int heur_value = block_heuristic(aux, m, h, nels, l, heurPath);
+        std::vector<CMMove> heurMoves;
+        int heur_value = block_heuristic(
+            aux, m, h, nels, l, heurPath, heurMoves
+        );
         // cout << "heur value is " << heur_value << endl;
 
 #ifdef W_GRASP
@@ -649,7 +676,12 @@ int neighborhood_search(std::vector< std::vector <int> > state, int row, int h, 
         }
         // count also the current relocation (+1)
         if ((heur_value + z_cum + 1) < best_z)
+        {
             update_best(heur_value + z_cum + 1, bay, path, heurPath);
+            bestMoves = pathMoves;
+            bestMoves.push_back(CMMove(state[row].back(), row, i));
+            bestMoves.insert(bestMoves.end(), heurMoves.begin(), heurMoves.end());
+        }
     }
 
     return target;
@@ -669,6 +701,9 @@ void search_trajectory()
     int row, col, n_rel;
     int h;
     bool no_relocations = true;
+
+    path.clear();
+    pathMoves.clear();
 
     if (constantV == 1)
         h = n;
@@ -707,6 +742,7 @@ void search_trajectory()
         n_rel       = state[row].size() - col - 1;
         if (n_rel == 0)
         {  // no alternatives (the target block is already on top of the stack)
+            pathMoves.push_back(CMMove(l, row, -1));
             state[row].pop_back();
             path.push_back(state);
             continue;
@@ -729,10 +765,13 @@ void search_trajectory()
                 return;
             }
 
-            state[target_stack].push_back(state[row].back());
+            int moved = state[row].back();
+            pathMoves.push_back(CMMove(moved, row, target_stack));
+            state[target_stack].push_back(moved);
             state[row].pop_back();
         }
         // now remove element
+        pathMoves.push_back(CMMove(l, row, -1));
         state[row].pop_back();
         path.push_back(state);
     }

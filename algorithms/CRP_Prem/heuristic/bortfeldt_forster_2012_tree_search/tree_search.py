@@ -1,19 +1,12 @@
 """
-Recursive tree-search driver perform_compound_moves (Bortfeldt & Forster 2012,
-§6, Fig. 4).
+Tree-search driver for BortfeldtForster2012TreeSearch.
 
-Design notes
-------------
-* We iterate compound-move branches at each node up to ``n_succ`` (§6). Only
-  ``normal`` (BG-only) compound moves are considered whenever they are
-  available; otherwise the search falls back to ``extra`` compound moves.
-* The search is naturally aborted on time limit and on reaching the paper's
-  optimality target (``lb_moves(L_init)``, since the number of moves in any
-  final layout cannot go below the lower bound).
-* Python recursion depth: bounded by the longest solution path, which is at
-  worst ``n * max_tiers``. For BF instances (n <= 128) this comfortably fits
-  in the default recursion limit; we do not raise it here to avoid affecting
-  the host process globally.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

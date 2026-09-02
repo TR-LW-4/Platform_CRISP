@@ -1,33 +1,12 @@
 """
-Layout state for the Wang, Jin, Lim (2015) target-guided heuristic (TGH).
+Bay-state representation for WangJinLim2015TGH.
 
-Reference: N. Wang, B. Jin, A. Lim, "Target-guided algorithms for the
-container pre-marshalling problem", Omega 53 (2015) 67-77.
-
-Key mechanic
-------------
-TGH fixes containers one at a time, always into "the lowest unfixed slot" of
-the target stack (paper §4.3). This means fixed containers in any given
-stack always form a contiguous prefix from the bottom. We therefore track,
-per stack, only a single integer ``fixed_height[s]``: the number of bottom
-tiers that are permanently fixed. Tiers ``< fixed_height[s]`` are fixed;
-tiers ``>= fixed_height[s]`` are unfixed.
-
-Group-label convention (paper §3, matches Bortfeldt & Forster 2012): a final
-(clean) layout has group labels *non-increasing* from bottom to top, i.e. an
-item that ships earlier (smaller group index) sits above items that ship
-later. "Clean"/"dirty" here use the same transitive definition as
-"well placed"/"badly placed" in BF (2012): once a stack violates the
-non-increasing order at some tier, every tier above it is dirty too.
-
-CPMP with dummy stack (CPMPDS, paper §3)
------------------------------------------
-When ``dummy`` is set, that stack index:
-  - is always treated as dirty, regardless of contents (containers placed
-    in it are also always "dirty" containers);
-  - is excluded from being a *candidate stack* (fix target), but can still
-    be used as ordinary temporary storage during the search;
-  - must be *empty* in the final layout (in addition to all stacks clean).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

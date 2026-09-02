@@ -1,74 +1,21 @@
 """
-Tanaka & Voß (2022) — IP-based exact algorithm for restricted BRP.
+TanakaVossIP2022
+<2022> <exact> <restricted> <single-bay> <CRP-R>
+IP-based exact algorithm (Algorithm 1) wrapper
+tanaka2022ip_time_limit_sec --- 3600 --- Wall-clock limit per instance (s)
+tanaka2022ip_n_threads --- 1 --- Gurobi threads (0 = auto)
 
-Paper
------
-S. Tanaka and S. Voß,
+------------------------------- Reference --------------------------------
+S. Tanaka, S. Voß,
 "An exact approach to the restricted block relocation problem based on
-a new integer programming formulation,"
-European Journal of Operational Research, 296(2):485-503, 2022.
-
-This module wraps the **primary Algorithm 1** from the paper
-(as opposed to ``tanaka_voss_2022`` B&B, which wraps the comparison B&B).
-
-Algorithm overview (Sections 3–4)
-----------------------------------
-1. Enumerate relocation sequences for each blocking block.
-2. Build a relaxed IP (RP) using truncated sequences → lower bound.
-3. Build an upper-bound IP (UP) using complete sequences.
-4. Iteratively expand truncated sequences and re-solve until gap = 0.
-
-The binary ``rbrp_ip`` uses **Gurobi** internally to solve each RP/UP
-subproblem.  It is the first algorithm to solve all Caserta benchmark
-instances with ≤ 100 blocks to proven optimality.
-
-Vendor C++ source
------------------
-vendor/restricted-distinct-ip-1.0/
-    bay.cpp / baystate.cpp     : bay state representation
-    sequence.cpp / ipmodel.cpp : sequence enumeration + Gurobi IP model
-    greedy.cpp                 : greedy upper-bound initialisation
-    solve.cpp / main.cpp       : main loop (Algorithm 1)
-    Makefile                   : compile with ``make``
-
-Compilation
------------
-Requires Gurobi C++ headers/libraries and Boost (program_options).
-
-  1. Edit ``Makefile``:
-       GUROBI_ROOT = /path/to/your/gurobi/linux64
-       GUROBI_LIBS = -lgurobi_g++5.2 -lgurobi<version>
-  2. ``cd vendor/restricted-distinct-ip-1.0 && make``
-  3. This produces ``rbrp_ip``.
-
-Binary interface
-----------------
-Usage: rbrp_ip [options] <input_file>
-   -T N   maximum number of tiers (height limit)
-   -E N   number of empty tiers (alternative to -T)
-   -t N   time limit in seconds (float)
-   -m N   number of threads (Gurobi parameter)
-   -s N   threshold for sequence expansion (default 100)
-   -v N   verbose level
-   -g     disable greedy upper bound
-   -u     disable upper bounding
-
-stdout : solution move list (if feasible)
-stderr : diagnostic lines including:
-           solved  /  not solved
-           optimal_value=N          (when lb == ub → proven optimal)
-           lower_bound=N            (best lb when not proven)
-           upper_bound=N            (best ub / best solution)
-           upper_bound=infeasible   (if no feasible solution found)
-           iterations=N
-           total_time=N.NNN
-           ...
-
-Input format
-------------
-Identical to other Tanaka solvers (Caserta format):
-    Line 1:  <n_stacks> <n_blocks>
-    Line 2+: for each stack: <height> <p_1> ... <p_h>  (bottom → top)
+ a new integer programming formulation",
+European Journal of Operational Research 296 (2022) 485–503.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -86,47 +33,37 @@ import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
+from core.plan import Movement, RelocationPlan
+from core.yard import Yard
+from algorithms.CRP_R.solver_ip.common import (
+    merge_solver_and_plan_metrics,
+    plan_to_moves_extra,
+    priority_to_container_id,
+    sequential_retrieval_plan,
+    stack_keys,
+)
 
 from .tanaka_export import yard_to_tanaka_instance
 
+from .model import (
+    _plan_from_tanaka_relocations,
+)
+
 
 class TanakaVossIP2022(BaseAlgorithm):
-    """
-    Tanaka & Voß (2022) IP-based exact solver — Algorithm 1.
-
-    Wraps the ``rbrp_ip`` binary (vendor/restricted-distinct-ip-1.0).
-
-    ``rbrp_ip`` must be compiled before use:
-        cd vendor/restricted-distinct-ip-1.0
-        # edit Makefile: set GUROBI_ROOT and GUROBI_LIBS
-        make
-
-    Alternatively, set ``extra["tanaka2022ip_binary"]`` or the environment
-    variable ``TANAKA2022IP_RBRP_IP`` to the full path of a pre-built binary.
-
-    Key parameters (``AlgorithmConfig.extra``)
-    ------------------------------------------
-    tanaka2022ip_time_limit_sec : int   wall-clock limit per instance (default 3600)
-    tanaka2022ip_n_threads      : int   Gurobi threads; 0 = auto (default 1)
-    tanaka2022ip_threshold      : int   sequence-expansion threshold (default 100)
-    tanaka2022ip_binary         : str   override binary path (optional)
-    """
 
     name                = "Tanaka & Voß (2022) IP"
     category            = "Exact"
     requires_solver     = True
     solver_backend      = "gurobi"
-    description         = (
-        "IP-based exact algorithm (Algorithm 1) for restricted BRP with distinct priorities. "
-        "Tanaka & Voß — EJOR 296 (2022). "
-        "First method to solve all ≤100-block Caserta instances to optimality. "
-        "Requires Gurobi (via compiled rbrp_ip binary). "
-        "[Requires Gurobi license]"
-    )
+    description         = "Tanaka & Voß (EJOR 2022) IP-based exact algorithm."
     compatible_problems = ["CRP-R"]
     # Output patterns from solve.cpp (written to stderr)
     _OPT_RE   = re.compile(r"optimal_value=(\d+)")
     _UB_RE    = re.compile(r"upper_bound=(\d+)")
+    _RELOC_RE = re.compile(
+        r"Relocation\s+\d+:\s*\[\s*(\d+)\s*\]\s*(\d+)->(\d+)"
+    )
     _LB_RE    = re.compile(r"lower_bound=(\d+)")
     _SOLVED   = re.compile(r"^solved$", re.MULTILINE)
     _TIME_RE  = re.compile(r"total_time=([\d.]+)")
@@ -168,16 +105,17 @@ class TanakaVossIP2022(BaseAlgorithm):
         time_limit_sec: float,
         n_threads: int,
         threshold: int,
-    ) -> Tuple[Optional[int], bool, str]:
+    ) -> Tuple[Optional[int], bool, str, List[Tuple[int, int, int]]]:
         """
         Run ``rbrp_ip`` on *instance_text* and parse results.
 
         Returns
         -------
-        (relocations, optimal_proven, debug_blob)
+        (relocations, optimal_proven, debug_blob, reloc_records)
             relocations   : int if a feasible solution was found, else None
             optimal_proven: True iff lb == ub (proven optimal)
             debug_blob    : tail of combined stderr+stdout for diagnostics
+            reloc_records : list of (priority, src_stack, dst_stack) 1-indexed
         """
         binary = self._resolve_binary()
         if not binary.is_file():
@@ -219,20 +157,22 @@ class TanakaVossIP2022(BaseAlgorithm):
                 pass
 
         blob = (proc.stderr or "") + "\n" + (proc.stdout or "")
+        reloc_records = [
+            (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            for m in self._RELOC_RE.finditer(blob)
+        ]
+        debug = blob[-6000:]
 
-        # Parse optimal value (lb == ub)
         m_opt = self._OPT_RE.search(blob)
         if m_opt:
-            return int(m_opt.group(1)), True, blob[-6000:]
+            return int(m_opt.group(1)), True, debug, reloc_records
 
-        # Parse best upper bound (feasible but not proven optimal)
         m_ub = self._UB_RE.search(blob)
         if m_ub:
-            return int(m_ub.group(1)), False, blob[-6000:]
+            return int(m_ub.group(1)), False, debug, reloc_records
 
-        # No feasible solution found (e.g. time limit before first UB)
         if "upper_bound=infeasible" in blob:
-            return None, False, blob[-6000:]
+            return None, False, debug, reloc_records
 
         raise RuntimeError(
             "rbrp_ip produced no optimal_value= / upper_bound= line.\n"
@@ -274,7 +214,7 @@ class TanakaVossIP2022(BaseAlgorithm):
             text = yard_to_tanaka_instance(env.config, env.yard)
 
             try:
-                n_reloc, optimal, debug = self._run_ip(
+                n_reloc, optimal, debug, reloc_records = self._run_ip(
                     text,
                     max_tiers     = env.config.max_tiers,
                     time_limit_sec= t_limit,
@@ -292,21 +232,47 @@ class TanakaVossIP2022(BaseAlgorithm):
                 )
                 continue
 
-            primary = float(n_reloc) if n_reloc is not None else float("inf")
+            plan = None
+            if n_reloc == 0:
+                plan = sequential_retrieval_plan(env.yard)
+            elif n_reloc is not None and reloc_records:
+                plan = _plan_from_tanaka_relocations(env.yard, reloc_records)
+
+            solver = {
+                "obj": n_reloc,
+                "optimal": optimal,
+                "time_out": False,
+                "n_vars": 0,
+                "n_constrs": 0,
+                "solve_time": 0.0,
+            }
+            if plan is not None:
+                metrics = merge_solver_and_plan_metrics(
+                    solver, env.validate_plan(plan),
+                )
+            else:
+                metrics = merge_solver_and_plan_metrics(
+                    solver,
+                    {
+                        "relocations": float(n_reloc) if n_reloc is not None else float("inf"),
+                        "crane_time": float("inf"),
+                        "time": float("inf") if n_reloc is None else 0.0,
+                        "feasible": 0.0 if n_reloc is None else 1.0,
+                        "completed": 0.0 if n_reloc is None else 1.0,
+                        "validated": 0.0,
+                    },
+                )
+            metrics["tanaka2022ip_time_limit_sec"] = float(t_limit)
+            all_metrics.append(metrics)
+            primary = float(metrics.get("relocations", float("inf")))
 
             if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []
-
-            metrics: Dict[str, float] = {
-                "relocations":    primary,
-                "steps":          primary,
-                "time":           0.0,
-                "optimal_proven": 1.0 if optimal else 0.0,
-                "feasible":       0.0 if n_reloc is None else 1.0,
-                "tanaka2022ip_time_limit_sec": float(t_limit),
-            }
-            all_metrics.append(metrics)
+                self._best_metric = primary
+                self._best_solution = [
+                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                    for m in (plan.movements if plan is not None else [])
+                    if m.to_pos is not None
+                ]
 
             self._push(
                 result_queue,
@@ -314,11 +280,17 @@ class TanakaVossIP2022(BaseAlgorithm):
                 metric   = primary,
                 metrics  = metrics,
                 progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
+                extra    = {
+                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                    "validation_errors": env.get_last_validation_errors(),
+                    "debug_tail": debug,
+                },
             )
             print(
                 f"[TanakaVossIP2022] seed={seed}  "
-                f"reloc={n_reloc}  optimal={optimal}  "
+                f"reloc={metrics.get('relocations')}  "
+                f"crane={metrics.get('crane_time')}  "
+                f"optimal={optimal}  "
                 f"N={len(env.containers)}  S={env.config.num_bays * env.config.num_rows}",
                 file=sys.stderr, flush=True,
             )

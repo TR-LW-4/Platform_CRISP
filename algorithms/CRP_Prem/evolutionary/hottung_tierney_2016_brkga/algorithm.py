@@ -1,10 +1,24 @@
 """
-Hottung & Tierney (2016) BRKGA for CPMP.
+HottungTierney2016BRKGA
+<2016> <evolutionary> <premarshalling> <single-bay> <CRP-Prem>
+Biased random-key GA with construction decoder
+population_size --- 80 --- BRKGA population size
+elite_fraction --- 0.20 --- Elite share of the population
+mutants_fraction --- 0.20 --- Mutant share of the population
+elite_bias --- 0.70 --- Elite-allele inheritance probability
+max_generations --- 250 --- Generations per layout
 
-Reference:
+------------------------------- Reference --------------------------------
 A. Hottung, K. Tierney,
 "A biased random-key genetic algorithm for the container pre-marshalling
-problem", Computers & Operations Research 75 (2016) 83-102.
+ problem",
+Computers & Operations Research 75 (2016) 83–102.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

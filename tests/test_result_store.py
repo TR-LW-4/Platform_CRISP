@@ -7,7 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.result_store import save_run, stable_result_stem
+from core.result_store import (
+    completed_layout_paths,
+    result_path_for,
+    save_run,
+    stable_result_stem,
+)
 
 
 class StableStemTests(unittest.TestCase):
@@ -59,6 +64,90 @@ class StableStemTests(unittest.TestCase):
             folder = p1.parent
             runs = [p for p in folder.glob("*.json")]
             self.assertEqual(len(runs), 1)
+
+    def test_result_path_for_matches_save_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            layout = base / "data5-4-19.dat"
+            saved = save_run(
+                problem="CRP-R",
+                algorithm="LA-N (2013)",
+                category="Heuristic",
+                seed=0,
+                prob_config={"layout_file_path": str(layout)},
+                algo_config={},
+                metrics={"relocations": 4.0},
+                history=[],
+                base_dir=base,
+            )
+            looked_up = result_path_for(
+                "CRP-R", "LA-N (2013)", layout, base_dir=base, mkdir=False,
+            )
+            self.assertEqual(saved, looked_up)
+
+    def test_completed_layout_paths_skips_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            done = base / "data3-4-1.dat"
+            pending = base / "data3-4-2.dat"
+            save_run(
+                problem="CRP-R",
+                algorithm="Caserta (2012) HEUR",
+                category="Heuristic",
+                seed=0,
+                prob_config={"layout_file_path": str(done)},
+                algo_config={},
+                metrics={"relocations": 1.0},
+                history=[],
+                base_dir=base,
+            )
+            found = completed_layout_paths(
+                "CRP-R",
+                "Caserta (2012) HEUR",
+                [done, pending],
+                base_dir=base,
+            )
+            self.assertEqual(found, [str(done)])
+
+    def test_continue_starts_at_first_unfinished(self) -> None:
+        """350-instance mental model: after 1..3 exist, remaining starts at 4."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            layouts = [base / f"data3-4-{i}.dat" for i in range(1, 6)]
+            for layout in layouts[:3]:
+                save_run(
+                    problem="CRP-R",
+                    algorithm="LA-N (2013)",
+                    category="Heuristic",
+                    seed=0,
+                    prob_config={"layout_file_path": str(layout)},
+                    algo_config={},
+                    metrics={"relocations": 1.0},
+                    history=[],
+                    base_dir=base,
+                )
+            done = set(completed_layout_paths(
+                "CRP-R",
+                "LA-N (2013)",
+                layouts,
+                base_dir=base,
+            ))
+            remaining = [str(p) for p in layouts if str(p) not in done]
+            self.assertEqual(Path(remaining[0]).name, "data3-4-4.dat")
+            self.assertEqual(len(remaining), 2)
+
+    def test_lookup_does_not_create_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            path = result_path_for(
+                "CRP-R",
+                "Missing Algo",
+                base / "data3-3-1.dat",
+                base_dir=base,
+                mkdir=False,
+            )
+            self.assertFalse(path.parent.exists())
+            self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

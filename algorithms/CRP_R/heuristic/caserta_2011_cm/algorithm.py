@@ -4,7 +4,6 @@ CasertaCM
 Corridor Method: DP-inspired search in a local relocation corridor
 delta --- 2 --- Horizontal corridor half-width
 time_limit --- 5.0 --- Wall-clock limit per instance in seconds
-cm_binary --- "" --- Optional path override for the CM binary
 
 ------------------------------- Reference --------------------------------
 M. Caserta, S. Voß, M. Sniedovich,
@@ -21,16 +20,16 @@ paper listed in the Reference section.
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 import re
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-import numpy as np
-
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
+from core.plan import Movement, RelocationPlan
 from .cm_export import yard_to_cm_instance
 
 
@@ -38,17 +37,10 @@ class CasertaCM(BaseAlgorithm):
 
     name                = "Caserta et al. (2011) CM"
     category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Caserta, Voß, Sniedovich (OR Spectrum 2011) Corridor Method for CRP-R. "
-        "DP-inspired metaheuristic: at each step, restricts feasible destinations "
-        "to a horizontal corridor [i±δ] and a vertical corridor (max height H+2). "
-        "Best greedy-scored move selected via roulette-wheel; multi-restart until "
-        "time limit. Standard baseline in BRP literature — outperforms Kim–Hong "
-        "by ~28% on 10×10 instances."
-    )
+    description         = "Caserta et al. (OR Spectrum 2011) corridor method heuristic."
     compatible_problems = ["CRP-R"]
     _MOVES_RE = re.compile(r"CM\s*:\s*Solution found with\s*(\d+)\s*moves")
+    _MOVE_LINE_RE = re.compile(r"^CM_MOVE\s+(\d+)\s+(\d+)\s+(-?\d+)$")
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -57,16 +49,8 @@ class CasertaCM(BaseAlgorithm):
     # Binary resolution                                                  #
     # ---------------------------------------------------------------- #
 
-    def _default_binary(self) -> Path:
-        return Path(__file__).resolve().parent / "vendor" / "brp_cm"
-
     def _resolve_binary(self) -> Path:
-        override = self.config.extra.get("cm_binary", "")
-        if override:
-            p = Path(override)
-            if p.is_file():
-                return p
-        p = self._default_binary()
+        p = Path(__file__).resolve().parent / "vendor" / "brp_cm"
         if not p.is_file():
             raise FileNotFoundError(
                 f"CM binary not found at {p}. "
@@ -75,6 +59,40 @@ class CasertaCM(BaseAlgorithm):
                 "timer.cpp options.cpp heuristic.cpp containers.cpp -o brp_cm"
             )
         return p
+
+    @classmethod
+    def _parse_cm_output(
+        cls, stdout: str
+    ) -> Tuple[int, List[Tuple[int, int, int]]]:
+        """Parse the machine-readable complete path emitted by ``brp_cm``."""
+        count_match = cls._MOVES_RE.search(stdout)
+        if count_match is None:
+            raise RuntimeError("CM output contains no solution count")
+
+        records: List[Tuple[int, int, int]] = []
+        in_moves = False
+        saw_begin = False
+        saw_end = False
+        for line in stdout.splitlines():
+            stripped = line.strip()
+            if stripped == "CM_MOVES_BEGIN":
+                in_moves = True
+                saw_begin = True
+                continue
+            if stripped == "CM_MOVES_END":
+                in_moves = False
+                saw_end = True
+                break
+            if not in_moves:
+                continue
+            move_match = cls._MOVE_LINE_RE.match(stripped)
+            if move_match is None:
+                raise RuntimeError(f"Malformed CM move line: {stripped!r}")
+            records.append(tuple(int(v) for v in move_match.groups()))
+
+        if not saw_begin or not saw_end or not records:
+            raise RuntimeError("CM binary returned a count but no replayable path")
+        return int(count_match.group(1)), records
 
     # ---------------------------------------------------------------- #
     # Core subprocess call                                               #
@@ -86,19 +104,21 @@ class CasertaCM(BaseAlgorithm):
         delta:         int,
         max_height:    int,
         time_limit:    float,
-    ) -> Tuple[int, str]:
+    ) -> Tuple[int, List[Tuple[int, int, int]], str]:
         """
         Write instance to a temp file, run the CM binary, and parse output.
 
         Parameters
         ----------
         delta      : horizontal corridor half-width (-d parameter)
-        max_height : maximum stack height (-n parameter; paper uses H+2)
+        max_height : maximum stack height (-n with -c 1); use env.config.max_tiers
         time_limit : wall-clock time limit in seconds (-t parameter)
 
         Returns
         -------
-        (relocations, raw_stdout)
+        (relocations, move_records, raw_stdout), where each move record is
+        ``(container_id, zero_based_src_stack, zero_based_dst_stack)`` and
+        destination ``-1`` denotes retrieval.
         """
         binary = self._resolve_binary()
 
@@ -116,24 +136,29 @@ class CasertaCM(BaseAlgorithm):
                     "-d", str(delta),
                     "-n", str(max_height),
                     "-t", str(int(time_limit)),
-                    "-c", "1",   # constant vertical corridor (H+2 style)
+                    "-c", "1",   # constant vertical corridor: -n is max stack height
                 ],
                 capture_output=True,
                 text=True,
                 timeout=time_limit + 30,
-                env={"CPLUS_INCLUDE_PATH": ""},  # prevent sandbox include-path interference
+                env={
+                    **os.environ,
+                    "CPLUS_INCLUDE_PATH": "",
+                    "CRISP_SEED": str(int(self.config.seed)),
+                },
             )
             stdout = result.stdout.strip()
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
-        m = self._MOVES_RE.search(stdout)
-        if m:
-            return int(m.group(1)), stdout
-        raise RuntimeError(
-            f"CM binary produced unexpected output: {stdout!r}\n"
-            f"stderr: {result.stderr[:300]!r}"
-        )
+        try:
+            relocations, records = self._parse_cm_output(stdout)
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"CM binary produced unexpected output: {stdout!r}\n"
+                f"stderr: {result.stderr[:300]!r}"
+            ) from exc
+        return relocations, records, stdout
 
     # ---------------------------------------------------------------- #
     # Training loop                                                      #
@@ -145,62 +170,73 @@ class CasertaCM(BaseAlgorithm):
         result_queue:    mp.Queue,
         stop_event:      mp.Event,
     ) -> None:
+        if stop_event.is_set():
+            return
+
         cfg        = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         delta      = int(cfg.extra.get("delta", 2))
-        time_limit = float(cfg.extra.get("time_limit", 60.0))
-        all_metrics: List[Dict] = []
+        time_limit = float(cfg.extra.get("time_limit", 5.0))
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        trace_layout(
+            f"CasertaCM.train: delta={delta}  time_limit={time_limit}s"
+        )
 
-            trace_layout(
-                f"CasertaCM.train: seed {seed+1}/{n_seeds}  "
-                f"delta={delta}  time_limit={time_limit}s"
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
+
+        max_height = int(env.config.max_tiers)
+        instance_text = yard_to_cm_instance(env.config, env.yard)
+        search_relocations, records, _ = self._run_cm(
+            instance_text, delta, max_height, time_limit
+        )
+
+        num_rows = int(env.config.num_rows)
+
+        def stack_pos(index: int) -> Tuple[int, int]:
+            return index // num_rows + 1, index % num_rows + 1
+
+        plan = RelocationPlan([
+            Movement(
+                container_id=container_id,
+                from_pos=stack_pos(src),
+                to_pos=None if dst < 0 else stack_pos(dst),
             )
+            for container_id, src, dst in records
+        ])
+        metrics = env.validate_plan(plan)
+        metrics["search_relocations"] = float(search_relocations)
+        metrics["count_match"] = float(
+            metrics["feasible"] == 1.0
+            and metrics["relocations"] == float(search_relocations)
+        )
+        metrics["progress"] = 1.0
+        solution = [
+            (move.to_pos[0] - 1) * num_rows + (move.to_pos[1] - 1)
+            for move in plan.movements
+            if move.to_pos is not None
+        ]
+        self._best_solution = solution
 
-            env = problem_factory()
-            env.reset(options={"skip_auto_retrieve": True})
-
-            max_height = int(env.config.max_tiers) + 2
-
-            instance_text = yard_to_cm_instance(env.config, env.yard)
-            relocations, _ = self._run_cm(instance_text, delta, max_height, time_limit)
-
-            metrics = {
-                "relocations": float(relocations),
-                "steps":       float(relocations),
-                "time":        float(relocations),
-                "progress":    1.0,
-            }
-            all_metrics.append(metrics)
-
-            if relocations < self._best_metric:
-                self._best_metric   = float(relocations)
-                self._best_solution = []
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = float(relocations),
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = self._best_metric,
-                metrics  = agg,
-                progress = 1.0,
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = float(metrics["relocations"]),
+            metrics  = metrics,
+            progress = 1.0,
+            extra={
+                "solution": solution[:],
+                "moves": [
+                    {
+                        "container_id": move.container_id,
+                        "from": list(move.from_pos),
+                        "to": list(move.to_pos) if move.to_pos is not None else None,
+                        "kind": "retrieve" if move.to_pos is None else "relocate",
+                    }
+                    for move in plan.movements
+                ],
+                "validation_errors": env.get_last_validation_errors(),
+            },
+        )
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
@@ -223,7 +259,7 @@ class CasertaCM(BaseAlgorithm):
                     "Blocks above the target may only be relocated to stacks "
                     "within [i−δ, i+δ].  Larger δ improves quality but increases "
                     "runtime.  Paper uses δ = 1 for most small instances, δ = 2 "
-                    "for larger ones (Tables 1–3)."
+                    "for larger ones."
                 ),
             },
             "time_limit": {
@@ -238,15 +274,6 @@ class CasertaCM(BaseAlgorithm):
                     "and returns the best solution found. "
                     "Default 5 s is sufficient for small/medium instances. "
                     "Paper uses 60 s for small/medium and 300 s for very large instances."
-                ),
-            },
-            "cm_binary": {
-                "type":    "str",
-                "default": "",
-                "label":   "Binary path override (optional)",
-                "help": (
-                    "Leave empty to use the pre-compiled binary in vendor/. "
-                    "Set an absolute path to use a custom build."
                 ),
             },
         })

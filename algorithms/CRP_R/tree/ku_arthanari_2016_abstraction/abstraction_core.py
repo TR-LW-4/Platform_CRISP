@@ -1,50 +1,12 @@
 """
-Ku & Arthanari (2016) — abstraction method + pattern-database (PDB)
-bidirectional search engine for the Restricted BRP (CRP-R).
+Abstraction + PDB search engine for KuArthanari2016Abstraction.
 
-Reference
----------
-D. Ku, T. S. Arthanari, "On the abstraction method for the container
-relocation problem", Computers & Operations Research 68 (2016) 110-122.
-
-This module is a *self-contained* depth-first branch-and-bound (DFBnB)
-engine operating on a lightweight, hashable layout representation --
-``State = Tuple[Tuple[int, ...], ...]`` (one inner tuple per stack,
-containers ordered bottom -> top by priority) -- the same convention
-used by ``exact/search/zhu_2012/ida_core.py``.  Independence between
-algorithm packages is a platform convention (see that module's
-docstring), so the small set of generic state-transition helpers below
-(``reduce_state`` / ``move_top`` / ``eligible_dsts``) is reimplemented
-locally rather than imported.
-
-Components implemented
------------------------
-- Section 3.4's abstraction mapping phi(s): drop empty columns, relabel
-  the remaining containers to contiguous ranks 1..r (preserving their
-  relative retrieval order) and sort columns ascending by base-slot
-  rank.  ``abstract_key()``.
-- Section 4.3's pattern database (PDB): built level-by-level (r = 0, 1,
-  2, ... up to a configurable depth K) via multi-source Dijkstra over
-  the graph of canonical r-unit abstract states -- a state is a "seed"
-  (whose value is already known, from PDB_{r-1}) iff its rank-1
-  container is already accessible; every other transition is a single
-  restricted-variant relocation, weight 1.  ``build_pdb()``.
-- Section 3.4's forward node caching (``CC_n``): visited nodes are
-  cached by their abstract key up to a configurable depth from the
-  root and a configurable maximum cache size; a node is pruned when a
-  previously cached node with an equal-or-lower ``g`` shares its
-  abstract key.
-- Section 4's bidirectional search: forward DFBnB with ``CC_n`` node
-  caching, terminating each branch early via an *exact* PDB lookup
-  (Section 3.3: because moving a container costs the same regardless
-  of destination column -- Section 3.4's extra assumption -- phi is
-  cost-preserving here, not merely admissible, so ``h_phi(s)`` equals
-  the true optimal cost-to-go once the search frontier reaches the
-  PDB's depth) once the remaining container count is within the PDB's
-  depth.
-
-Only *containers above the target's own stack* may ever be relocated
-(the restricted variant / Section 2's assumption (ii)), matching CRP-R.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

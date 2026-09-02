@@ -1,11 +1,20 @@
 """
-Lee & Chao (2009) neighborhood-search heuristic for export-container
-pre-marshalling, with a solver-assisted (BIP) sequence reduction stage.
+LeeChao2009NSIP
+<2009> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Threshold-accepting neighbourhood search plus BIP reduction
+max_outer_iterations --- 30 --- Outer neighbourhood-search rounds
+ip_time_limit --- 5 --- Sequence-reduction IP limit (s)
 
-Paper:
+------------------------------- Reference --------------------------------
 Y. Lee, S.-L. Chao,
 "A neighborhood search heuristic for pre-marshalling export containers",
-EJOR 196 (2009) 468-475.
+European Journal of Operational Research 196 (2009) 468–475.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

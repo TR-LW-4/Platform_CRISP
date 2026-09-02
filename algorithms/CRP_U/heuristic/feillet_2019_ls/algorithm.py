@@ -1,48 +1,20 @@
 """
-Feillet, Parragh, Tricoire (2019) — Local Search for CRP-U (uBRP).
+FeillletLS
+<2019> <heuristic> <unrestricted> <single-bay> <CRP-U>
+OPT(n) dynamic-programming local search for uBRP
+max_iter --- 0 --- Outer iterations (0 = until convergence)
+init --- greedy --- Initial solution: greedy or given
 
-Algorithm summary
------------------
-An *improvement heuristic* for the unrestricted BRP that refines an existing
-solution by iteratively reoptimising the relocation sub-sequence of each
-container n via the OPT(n) dynamic-programming operator (Algorithm 2).
-
-Two-phase structure
--------------------
-Phase 1 — Construction
-    A self-contained MinMax greedy (solution.build_greedy) generates an
-    initial solution S₀.  Any constructive heuristic that returns a
-    List[Step] can replace this; no GLAH coupling is required.
-
-Phase 2 — Local Search
-    Repeatedly iterate over all containers n = 1 … N.  For each n, call
-    OPT(n) which uses BFS on the S^−n state-space graph to find the
-    shortest relocation sub-sequence for n.  If an improving sub-sequence
-    is found the solution is updated in-place and the iteration flag is set.
-    Repeat until a full pass over all n yields no improvement.
-
-Coupling analysis
------------------
-This module has **zero coupling** to GLAH (or any other constructive
-heuristic).  The initial solution is produced internally by the MinMax
-greedy.  The only external dependencies are:
-  • core.base_algorithm  (platform interface)
-  • core.objectives      (KinematicsModel, lower_bound_relocations)
-  • .solution            (Step, build_greedy)
-  • .opt_operator        (opt_n)
-
-If you want to warm-start from GLAH instead, pass
-``extra={"init": "glah"}`` in the algorithm config; the code will then
-invoke GLAHHeuristic internally to build S₀.  Even in that mode, GLAH is
-used only to compute the initial step list — the LS itself remains decoupled.
-
-Reference
----------
-D. Feillet, S. Parragh, F. Tricoire,
-"A local-search based heuristic for the unrestricted block relocation
- problem",
+------------------------------- Reference --------------------------------
+D. Feillet, S.N. Parragh, F. Tricoire,
+"A local-search based heuristic for the unrestricted block relocation problem",
 Computers & Operations Research 108 (2019) 44–56.
-https://doi.org/10.1016/j.cor.2019.04.005
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

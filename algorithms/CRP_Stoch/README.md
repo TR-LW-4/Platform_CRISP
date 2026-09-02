@@ -41,9 +41,6 @@ algorithms/CRP_Stoch/
 │   ├── bacci_2022_rirh/          # Bacci, Mattia & Ventura, Soft Comp 2022
 │   │   ├── rirh_policy.py        # MinMax + RIRH (Alg. 3) + EM (Alg. 1)
 │   │   └── algorithm.py          # RIRH + ExpectedMinMax BaseAlgorithms
-│   ├── zehendner_2017_level/     # Zehendner, Feillet & Jaillet, EJOR 2017
-│   │   ├── policies.py           # L / R / M pick rules + Thm 1 bound
-│   │   └── algorithm.py          # LevelingHeuristic + R + M BaseAlgorithms
 │   ├── galle_2017_eg/            # Galle et al. SCRP repository (new heuristic)
 │   │   └── algorithm.py          # ExpectedGroupAssignment (EG)
 │   └── ku_arthanari_2016_eri/    # Ku & Arthanari, EJOR 2016
@@ -59,9 +56,6 @@ algorithms/CRP_Stoch/
 |---|---|---|---|
 | `RIRH` | Bacci et al. (2022) RIRH | Heuristic | Bacci, Mattia & Ventura, *Soft Computing* 2022 |
 | `ExpectedMinMax` | Galle et al. (2018) Expected MinMax | Heuristic | Galle, Manshadi, Barnhart & Jaillet, *Transp. Sci.* 2018 |
-| `LevelingHeuristic` | Zehendner et al. (2017) Leveling L | Heuristic | Zehendner, Feillet & Jaillet, *EJOR* 2017 |
-| `RandomStackHeuristic` | Zehendner et al. (2017) Random R | Heuristic | (same paper, baseline) |
-| `RightNeighbourHeuristic` | Zehendner et al. (2017) Right-Neighbour M | Heuristic | (same paper, baseline) |
 | `ExpectedGroupAssignment` | Galle et al. Expected Group (EG) | Heuristic | Galle et al. SCRP repository (new heuristic) |
 | `ExpectedReshufflingIndex` | Ku & Arthanari (2016) ERI | Heuristic | Ku & Arthanari, *EJOR* 2016 |
 | `PBFSBatchExact` | Galle et al. PBFS [batch exact] | Exact | Galle et al. SCRP repository |
@@ -72,10 +66,11 @@ algorithms/CRP_Stoch/
 
 The source repository (`/data/liuw2/StochasticCRP-master`) also ships
 `retrieveEM.m` and `retrieveL.m` / `retrieveRand.m`, but those already
-have native implementations in this platform (`bacci_2022_rirh`'s
-`ExpectedMinMax`, and `zehendner_2017_level`'s `LevelingHeuristic` /
-`RandomStackHeuristic`).  They were **not** re-embedded as separate
-"[ported]" classes to avoid duplicate GUI entries; the shared
+have native or primary homes elsewhere in this platform
+(`bacci_2022_rirh`'s `ExpectedMinMax`, and the primary
+`CRP_Online/heuristic/zehendner_2017_level/` implementation for
+Zehendner's online baselines). They were **not** re-embedded here as
+separate "[ported]" classes to avoid duplicate GUI entries; the shared
 `core.stoch.galle_2017_source.heuristics` module still contains the
 ported `EM`/`L`/`Rand` retrieval functions for internal reuse (e.g. as
 upper-bound heuristics inside `astar.py` / `tree_search.py`), they are
@@ -106,7 +101,3 @@ just not exposed as separate top-level algorithms.
 - D. Ku, T. S. Arthanari. "Container relocation problem with time
   windows for container departure." *European Journal of Operational
   Research* 252 (2016) 1031–1039.
-- E. Zehendner, D. Feillet, P. Jaillet. "An algorithm with performance
-  guarantee for the Online Container Relocation Problem."
-  *European Journal of Operational Research* 259 (2017) 48-62.
-  DOI: 10.1016/j.ejor.2016.09.011

@@ -1,23 +1,12 @@
 """
-Model extensions from Lee & Hsu (2007) Section 4.
+Cycle-breaking extensions for LeeHsu2007NetworkFlowIP.
 
-Embedding scope (v1, "main algorithm" focus): the two extensions that only
-constrain the *final* time slice (and therefore reuse variables the basic
-model already creates) are implemented here:
-
-* Eq. (27): pin the exact final layout (per-slot target type), used
-  instead of the "no larger type below" ordering constraint (20).
-* Eq. (28): require each stack to hold at most one container type in the
-  final layout.
-
-The third extension (Eq. 29-30, containers concurrently leaving the yard
-during premarshalling) is out of scope for this embedding: it introduces a
-new node/arc type whose time indexing is inconsistently stated across the
-paper's text (Eq. 30 is indexed over TIME\\{1} while the pop-out
-conservation constraint it replaces, Eq. 19, is indexed over TIME\\{T}),
-and it does not correspond to a scenario CRP-Prem itself models (CRP-Prem
-has no concept of containers leaving mid-premarshalling). It can be added
-later as its own follow-up if needed.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

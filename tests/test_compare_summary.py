@@ -101,6 +101,46 @@ class CompareSummaryTests(unittest.TestCase):
             self.assertEqual(removed, 2)
             self.assertEqual(len(list_result_folders("CRP-R", base_dir=root)), 1)
 
+    def test_compare_rows_sorted_by_numeric_hw(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            a = root / "CRP-R" / "Algo_A"
+            b = root / "CRP-R" / "Algo_B"
+            _write_run(
+                a,
+                problem="CRP-R",
+                algorithm="Algo A",
+                layout="/data/x/data10-10-1.dat",
+                relocations=1.0,
+                name="20260101_000001",
+            )
+            _write_run(
+                a,
+                problem="CRP-R",
+                algorithm="Algo A",
+                layout="/data/x/data5-4-1.dat",
+                relocations=1.0,
+                name="20260101_000002",
+            )
+            _write_run(
+                b,
+                problem="CRP-R",
+                algorithm="Algo B",
+                layout="/data/x/data3-3-1.dat",
+                relocations=1.0,
+                name="20260101_000003",
+            )
+            table = compare_algorithms(
+                "CRP-R",
+                ["Algo A", "Algo B"],
+                metric="relocations",
+                base_dir=root,
+            )
+            self.assertEqual(
+                [row["label"] for row in table["rows"]],
+                ["3×3", "5×4", "10×10"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

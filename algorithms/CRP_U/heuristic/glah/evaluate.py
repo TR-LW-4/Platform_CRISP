@@ -1,20 +1,12 @@
 """
-GLAH evaluation heuristic – port of Probing.java (Bo Jin, 2015).
+Evaluation heuristic for GLAHHeuristic.
 
-evaluation_heuristic(state) clears the bay by:
-  1. Picking the urgent target c* (fewest blockers above).
-  2. For each blocker above c* (top-down):
-       Case A  (S1 non-empty): relocate to stack with min support_capacity ≥ blocker priority
-       Case B  (vacating):     find a well-placed top that can make room
-       Case C  (fallback):     relocate to stack with max support_capacity
-  3. During each X-Good relocation, squeeze in additional BG relocations
-     from other stacks to fully utilize the destination's gap
-     (gap_utilization).
-  4. Retrieve c* once it is accessible.
-  5. Repeat until bay is empty.
-
-This is called both standalone (to get an initial solution) and
-at every leaf node of the look-ahead tree.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

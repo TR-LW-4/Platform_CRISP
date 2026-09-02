@@ -1,26 +1,20 @@
 """
-Forster & Bortfeldt (2012) retrieval tree-search adaptation for CRP-Time.
+ForsterBortfeldt2012Retrieval
+<2012> <heuristic> <time> <multi-bay> <CRP-Time>
+Per-bay tree search merged by global lowest-group retrieval
+per_bay_time_limit_s --- 3 --- Time limit per bay (s)
+n_succ --- 5 --- Successor compound moves per node
 
-Reference
----------
+------------------------------- Reference --------------------------------
 F. Forster, A. Bortfeldt,
 "A tree search heuristic for the container retrieval problem",
-Operations Research Proceedings 2011, Springer (2012).
-
-Paper adaptation idea (Section 3.2)
------------------------------------
-1) Solve each bay independently as a single-bay relocation/search problem.
-2) Merge bay-level move sequences into one block-level sequence:
-   repeatedly select bays containing the global lowest group, and execute
-   their pending moves until that group is removed.
-
-Implementation notes
---------------------
-- Compatible with CRP-Time (fixed retrieval order, crane-time objective).
-- Uses the existing single-bay tree search core from the platform's
-  Forster-Bortfeldt CRP-D package for bay-level solving.
-- Merging logic is implemented here and kept independent from other
-  CRP-Time heuristics.
+Operations Research Proceedings 2011, Springer, 2012.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,25 +1,20 @@
 """
-Tierney, Pacino & Voß (2017) A*/IDA* for the pre-marshalling problem.
+TierneyPacinoVoss2017AStarIDAStar
+<2017> <exact> <premarshalling> <single-bay> <CRP-Prem>
+A*/IDA* search with EMO bound and symmetry breaking
+backend --- astar --- Search: astar or idastar
+time_limit_s --- 30 --- Per-instance wall-clock limit (s)
 
-Paper:
-K. Tierney, D. Pacino, S. Voß, "Solving the Pre-Marshalling Problem to
-Optimality with A* and IDA*", Flexible Services and Manufacturing Journal
-29(2), 223-259, 2017.
-
-Embedding scope (v1):
-  - A* (Algorithm 1) and IDA* (Algorithm 2) exact graph search
-  - "direct" and EMO (Bortfeldt & Forster 2012) cost estimation heuristics,
-    with the paper's Section 4.3 parent-clamp fix for the EMO bound's lack
-    of consistency
-  - Section 5 branching rules: move reversal prevention, unrelated move
-    symmetry breaking (directly-successive / successive, both directions),
-    transitive move avoidance (directly-successive / successive), and
-    empty stack symmetry breaking
-  - A*-specific state memoization and two-stage tie breaking (Section 4.4)
-
-No external MIP/CP solver is used anywhere in this embedding -- both
-algorithms are pure graph search. This module is self-contained and does
-not import from any other algorithm folder.
+------------------------------- Reference --------------------------------
+K. Tierney, D. Pacino, S. Voß,
+"Solving the Pre-Marshalling Problem to Optimality with A* and IDA*",
+Flexible Services and Manufacturing Journal 29 (2017) 223–259.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,24 +1,12 @@
 """
-Jovanović, Tuba, Voß (2019) — scoring and greedy primitives for ACO uBRP (CRP-U).
+Gre-C candidate list and pheromone helpers for JovanovicACO_uBRP.
 
-All functions operate on a plain dict representation of the bay:
-  stacks : Dict[Any, List[int]]
-    key        = any hashable stack identifier (e.g. (bay, row) tuple)
-    List[int]  = container due-dates bottom-to-top; 1 = retrieved first
-
-Implements the Gre-C (extended greedy) algorithm from Section 4.2:
-  - Candidate list Ĉ (Eqs. 9–23) allows relocating ANY non-well-located top
-    (Or moves), and well-located tops in specific look-ahead cases (Ow moves).
-  - Heuristic dife (Eq. 21) penalises relocating well-located containers by
-    N, offset by the improvement imp(c) gained in the source stack.
-
-Reference
----------
-R. Jovanović, M. Tuba, S. Voß,
-"An efficient ant colony optimization algorithm for the blocks relocation
- problem",
-European Journal of Operational Research 274 (2019) 78–90.
-https://doi.org/10.1016/j.ejor.2018.09.038
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

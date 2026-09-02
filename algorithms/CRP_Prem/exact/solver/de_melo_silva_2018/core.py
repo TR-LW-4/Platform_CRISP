@@ -1,26 +1,12 @@
 """
-Shared state helpers for de Melo da Silva, Toulouse & Wolfler Calvo (2018)
-"A new effective unified model for solving the Pre-marshalling and Block
-Relocation Problems", European Journal of Operational Research 271 (2018)
-40-56 -- the **PMPm1** (Pre-marshalling) part of the paper, Sections 3.1-3.3.
+PMPm1 shared helpers for DeMeloSilva2018PMP.
 
-This folder is self-contained on purpose: the paper's BRP / r-BRP formulations
-(Sections 3.4-3.7) are already embedded independently under
-``algorithms/CRP_U/exact/solver/de_melo_silva_2018/``,
-``algorithms/CRP_R/exact/solver/de_melo_silva_2018/`` and
-``algorithms/CRP_D/exact/solver/de_melo_silva_2018/``. Nothing here imports
-from those modules (or vice versa) so each embedding can evolve
-independently; a small amount of duplicated boilerplate (stack helpers) is
-the accepted trade-off, matching how every other paper folder under
-``exact/solver/`` in this platform is organised.
-
-Convention (shared with this platform's other CRP-Prem embeddings, e.g.
-``lee_hsu_2007_network_flow_ip``): stacks are lists of priority values,
-bottom to top; smaller values are retrieved earlier and therefore belong
-closer to the top. A stack is well located iff its values are
-non-increasing from bottom to top -- this matches both
-``core.yard.Stack.is_sorted_by_priority`` and the paper's own sorted-final-
-layout rule, Eq. (7).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

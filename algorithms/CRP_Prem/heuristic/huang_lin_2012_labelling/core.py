@@ -1,3 +1,14 @@
+"""
+Type-A labelling and buffer logic for HuangLin2012LabellingTypeA.
+
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import math

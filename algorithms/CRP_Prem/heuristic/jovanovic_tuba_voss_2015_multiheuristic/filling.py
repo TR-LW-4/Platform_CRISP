@@ -1,24 +1,12 @@
 """
-Stage 4 (Sec. 3.4): stack filling, and the four competing filling policies
-(the Hf set): None, Standard, Safe, Stop.
+Stack-filling heuristics for JovanovicTubaVoss2015MultiHeuristic.
 
-After a container is well-located onto s*, it sits at the top of s*. Filling
-exploits any remaining empty tiers of s* by greedily adding accessible
-not-well-located containers (highest due-date value first, since it must
-stay <= the current top to remain well located) from elsewhere in the bay.
-
-* None: no filling.
-* Standard: fill greedily until s* is full or no candidate remains
-  (Exposito-Izquierdo et al. 2012's original policy).
-* Safe: only commit the (simulated) standard fill if it leaves at most ``a``
-  empty tiers in s* afterwards -- i.e. only do it if it would make s* "close
-  to full" -- else skip filling entirely for this stack.
-* Stop: a look-ahead variant of Standard that halts *before* placing a
-  candidate ca (currently sitting directly above some cb in its own stack,
-  with p(cb) > p(ca)) whenever doing so would foreclose the possibility of
-  later well-locating cb onto the same destination (i.e. the destination's
-  current top cs' already satisfies p(cs') > p(cb), so cb could still fit
-  there if ca were not placed first).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

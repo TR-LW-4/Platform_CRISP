@@ -1,28 +1,20 @@
 """
-Tanaka & Tierney (2018) IDBB.
+TanakaTierney2018IDBB
+<2018> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Iterative-deepening branch-and-bound for pre-marshalling
+time_limit_s --- 30 --- Per-instance wall-clock limit (s)
 
-Reference:
-S. Tanaka, K. Tierney, "Solving real-world sized container pre-marshalling
-problems with an iterative deepening branch-and-bound algorithm", European
-Journal of Operational Research 264 (2018) 165-180.
-
-Embedding scope: this vendors the authors' own public C release
-(``vendor/pmp-1.02/``, see ``vendor/pmp-1.02/VENDOR_README.md``) rather than
-reimplementing the branch-and-bound search from scratch in Python -- the
-algorithm's performance is inseparable from the low-level lower-bound and
-dominance-rule implementation details described in the paper, which the
-reference code already encodes exactly (default-on: the Bortfeldt &
-Forster lower bound plus the two "improved" IBF1/IBF2 tightenings, and
-``TYPE1`` dominance pruning). ``bridge.py`` compiles that C source on first
-use and drives it as a subprocess per instance.
-
-This folder is fully self-contained: it does not import from (or get
-imported by) any of the platform's other CRP-Prem embeddings, including
-``exact/solver/parreno_torres_alvarez_valdes_ruiz_2019_ips_models/`` (a
-*different*, later 2019 paper by an overlapping author list that this
-platform's tooling initially confused this one for -- that 2019 paper's own
-Section 4 branch-and-bound builds on and extends this 2018 IDBB, but is not
-what is embedded here).
+------------------------------- Reference --------------------------------
+S. Tanaka, K. Tierney,
+"Solving real-world sized container pre-marshalling problems with an
+ iterative deepening branch-and-bound algorithm",
+European Journal of Operational Research 264 (2018) 165–180.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

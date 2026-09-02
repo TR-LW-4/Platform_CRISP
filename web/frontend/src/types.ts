@@ -103,6 +103,8 @@ export interface JobSummary {
   instance_source?: string
   batch_total?: number | null
   batch_index?: number | null
+  completed_count?: number | null
+  pending_count?: number | null
   status: JobStatus
   created_at: string
   started_at: string | null
@@ -127,6 +129,8 @@ export interface RecordsResponse {
   batch_summary?: BatchSummary | null
   batch_total?: number | null
   batch_index?: number | null
+  completed_count?: number | null
+  pending_count?: number | null
   instance_source?: string
 }
 

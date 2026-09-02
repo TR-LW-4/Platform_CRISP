@@ -1,41 +1,18 @@
 """
-P1 – Block Relocation Problem (Fixed Retrieval Order)
+CRP-R
+<restricted> <distinct> <CRP-R>
+Classical Block Relocation Problem with fixed retrieval order
 
-Rules
------
-- Containers in a yard have pre-assigned priorities 1 … N.
-- Must retrieve in strict order: priority 1 first, then 2, … then N.
-- When the target is buried, every container above it must be relocated
-  to another stack before the target can be retrieved.
-- Objective: minimise total relocations.
-
-Gym interface
--------------
-Observation : flat yard state + current target priority (normalised)
-Action      : destination stack index (bay×row, flattened) for the
-              topmost blocker.  When target is already on top the
-              environment retrieves automatically with no action needed.
-Reward      : 0 at each step; −1 terminal penalty per relocation.
-             (dense variant: −1 every relocation during episode)
-
-Plan interface (for batch planners building RelocationPlan)
------------------------------------------------------------
-evaluate_plan(plan: RelocationPlan) → metrics dict
-  Simulates a complete RelocationPlan on a fresh episode and returns
-  relocations, crane_time (if kinematics configured), and other metrics.
-  Reset uses ``options={"skip_auto_retrieve": True}`` so simulation starts
-  from the full layout file / random placement (opening top-target retrieves
-  appear in the plan, matching batch planners).
-  Kinematics parameters are read from ProblemConfig.extra:
-    gantry_s_per_bay  (default 3.5 s)
-    trolley_s_per_row (default 1.2 s)
-    gantry_accel_s    (default 40 s)
-    spreader_s        (default 30 s)
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import copy
+from numbers import Integral
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -44,7 +21,7 @@ import gymnasium as gym
 from core.base_problem import BaseProblem, ProblemConfig
 from core.container import Container, make_containers
 from core.yard import Move, Yard
-from core.plan import RelocationPlan, simulate_plan
+from core.plan import Movement, RelocationPlan
 from core.objectives import KinematicsModel, compute_crane_time, lower_bound_relocations
 from core.layout_trace import trace_layout
 from core.benchmark_keys import layout_path_from_extra
@@ -53,8 +30,10 @@ from core.benchmark_keys import layout_path_from_extra
 class CRP_R(BaseProblem):
 
     name         = "CRP-R"
-    description  = ("Block Relocation Problem with fixed (known) retrieval order. "
-                    "Minimise total relocations.")
+    description = (
+        "Restricted container relocation with fixed retrieval order; "
+        "only blockers above the current target may be moved."
+    )
     tags         = ["relocation", "fixed-order", "yard-only"]
     metric_names = ["relocations", "time", "steps"]
 
@@ -68,10 +47,7 @@ class CRP_R(BaseProblem):
         self._total_relocations: int       = 0
         self._total_steps: int             = 0
         self._done: bool                   = False
-
-    # ---------------------------------------------------------------- #
-    # Episode hooks (override in subclasses, e.g. CRP-Time)              #
-    # ---------------------------------------------------------------- #
+        self._last_validation_errors: List[str] = []
 
     def _hooks_clear_episode(self) -> None:
         """Called in reset() after yard.clear(), before _build_episode()."""
@@ -87,21 +63,13 @@ class CRP_R(BaseProblem):
     def _hook_after_retrieve(self, bay: int, row: int, container_id: int) -> None:
         """Called after each automatic retrieval in _advance_auto_retrievals()."""
 
-    # ---------------------------------------------------------------- #
-    # Spaces                                                             #
-    # ---------------------------------------------------------------- #
-
     def _setup_spaces(self) -> None:
         cfg = self.config
         n_stacks = cfg.num_bays * cfg.num_rows
-
-        # Observation: flat yard (bays×rows×tiers × 5 attrs) + target priority
         obs_size = cfg.num_bays * cfg.num_rows * cfg.max_tiers * 5 + 1
         self.observation_space = gym.spaces.Box(
             low=0, high=255, shape=(obs_size,), dtype=np.int32
         )
-
-        # Action: choose which destination stack to send the blocker
         self.action_space = gym.spaces.Discrete(n_stacks)
 
     # ---------------------------------------------------------------- #
@@ -114,12 +82,10 @@ class CRP_R(BaseProblem):
         options: Optional[Dict] = None,
     ) -> Tuple[np.ndarray, Dict]:
         """
-        Gymnasium reset.
+        Load a layout and start retrieval from priority 1.
 
-        ``options["skip_auto_retrieve"]``: when truthy, the yard keeps **all**
-        containers after layout load (opening retrieves remain explicit in batch
-        plans). Typical batch workflow: ``reset(..., skip)``, clone ``yard``,
-        then ``_finish_reset_after_layout_loaded()`` for step-interface snapshots.
+        ``options["skip_auto_retrieve"]``: keep every container after load so
+        opening retrievals can appear explicitly in a plan.
         """
         super().reset(seed=seed)
         if seed is not None:
@@ -134,7 +100,6 @@ class CRP_R(BaseProblem):
         self._build_episode()
         opts = options if options is not None else {}
         if opts.get("skip_auto_retrieve"):
-            # Full yard for batch planners; consecutive top-target retrieves stay in-plan.
             self._current_target_priority = 1
             obs  = self._get_obs()
             info = self._get_info()
@@ -142,11 +107,7 @@ class CRP_R(BaseProblem):
         return self._finish_reset_after_layout_loaded()
 
     def _finish_reset_after_layout_loaded(self) -> Tuple[np.ndarray, Dict]:
-        """
-        Layout is already on ``yard`` (file or random). Next: set retrieval
-        cursor, apply zero-cost retrievals (targets already on stack tops),
-        then expose observation — same end state as before this refactor.
-        """
+        """Set the retrieval cursor and take any targets already on stack tops."""
         self._current_target_priority = 1
 
         self._advance_auto_retrievals()
@@ -156,7 +117,11 @@ class CRP_R(BaseProblem):
         return obs, info
 
     def _build_episode(self) -> None:
-        """Fill yard from ``extra['layout_file_path']`` (Caserta/Zhu-style file), else random."""
+        """Fill yard from ``extra['layout_file_path']`` (Caserta/Zhu-style file).
+
+        CRP-R / CRP-U require a layout file. Subclasses such as CRP-Time and
+        CRP-Stoch still fall back to a random yard when no file is set.
+        """
         cfg = self.config
         path_str = layout_path_from_extra(cfg.extra)
         if path_str:
@@ -168,6 +133,12 @@ class CRP_R(BaseProblem):
             p = Path(path_str)
             self.containers = apply_caserta_file_to_yard(self.yard, cfg, p)
             return
+
+        if self.name in ("CRP-R", "CRP-U"):
+            raise ValueError(
+                f"{self.name} requires a Caserta/Zhu layout file "
+                "(set extra['layout_file_path']). Random layouts are disabled."
+            )
 
         rng = np.random.RandomState(cfg.seed)
 
@@ -213,8 +184,6 @@ class CRP_R(BaseProblem):
                 return
             if stack.top == target:
                 stack.pop()
-                # Record retrieve for move_history / crane-time export.
-                # (yard.retrieve() is not used here; auto-retrieve pops directly.)
                 self.yard.move_history.append(
                     Move("retrieve", target.id, (stack.bay, stack.row), None)
                 )
@@ -222,7 +191,7 @@ class CRP_R(BaseProblem):
                 self.yard.total_retrievals += 1
                 self._current_target_priority += 1
             else:
-                return   # blocked – wait for agent action
+                return   # blocked — wait for the next relocation
 
     # ---------------------------------------------------------------- #
     # Step                                                               #
@@ -260,7 +229,6 @@ class CRP_R(BaseProblem):
         reward = 0.0
 
         if dst_stack is None or dst_stack.is_full or dst == src:
-            # Invalid action → penalise slightly
             reward = -0.5
         else:
             blocker = src_stack.top
@@ -276,15 +244,8 @@ class CRP_R(BaseProblem):
         info = self._get_info()
         return obs, reward, self._done, False, info
 
-    # ---------------------------------------------------------------- #
-    # Evaluate (for EA)                                                  #
-    # ---------------------------------------------------------------- #
-
     def evaluate(self, solution: List[int]) -> Dict[str, float]:
-        """
-        Simulate the solution on a fresh episode.
-        solution[i] = destination stack index for the i-th relocation step.
-        """
+        """Replay destination indices; invalid moves are skipped, not rejected."""
         saved_seed = self.config.seed
         self.reset()
         total_reloc = 0
@@ -294,9 +255,120 @@ class CRP_R(BaseProblem):
             _, reward, _, _, _ = self.step(action)
             if reward <= -1.0:
                 total_reloc += 1
-        # Restore
         self.config.seed = saved_seed
         return {"relocations": total_reloc, "steps": self._total_steps, "time": float(total_reloc)}
+
+    def validate_actions(self, solution: List[int]) -> Dict[str, float]:
+        """
+        Strictly replay a complete restricted-BRP destination sequence.
+
+        Unlike :meth:`evaluate`, this method is intended as the common
+        publication-facing validator.  Invalid, extra, or incomplete action
+        sequences are rejected instead of being silently scored as partial
+        solutions.
+        """
+        saved_seed = self.config.seed
+        self._last_validation_errors = []
+
+        self.reset(options={"skip_auto_retrieve": True})
+        lb = lower_bound_relocations(self.yard)
+        self._finish_reset_after_layout_loaded()
+
+        n_stacks = self.config.num_bays * self.config.num_rows
+        for step_index, raw_action in enumerate(solution):
+            if self._done:
+                self._last_validation_errors.append(
+                    f"action {step_index}: extra action after all containers were retrieved"
+                )
+                break
+            if isinstance(raw_action, bool) or not isinstance(raw_action, Integral):
+                self._last_validation_errors.append(
+                    f"action {step_index}: destination index must be an integer"
+                )
+                break
+
+            action = int(raw_action)
+            if action < 0 or action >= n_stacks:
+                self._last_validation_errors.append(
+                    f"action {step_index}: destination index {action} outside [0, {n_stacks})"
+                )
+                break
+
+            target = self._get_target_container()
+            src_stack = self.yard._find_stack(target) if target is not None else None
+            if src_stack is None or src_stack.top == target:
+                self._last_validation_errors.append(
+                    f"action {step_index}: no blocker is available to relocate"
+                )
+                break
+
+            src = (src_stack.bay, src_stack.row)
+            dst = self._action_to_stack(action)
+            dst_stack = self.yard.stacks.get(dst)
+            if dst == src:
+                self._last_validation_errors.append(
+                    f"action {step_index}: destination equals source {src}"
+                )
+                break
+            if dst_stack is None:
+                self._last_validation_errors.append(
+                    f"action {step_index}: destination stack {dst} does not exist"
+                )
+                break
+            if dst_stack.is_full:
+                self._last_validation_errors.append(
+                    f"action {step_index}: destination stack {dst} is full"
+                )
+                break
+
+            before = self._total_relocations
+            self.step(action)
+            if self._total_relocations != before + 1:
+                self._last_validation_errors.append(
+                    f"action {step_index}: relocation was not executed"
+                )
+                break
+
+        completed = self._done
+        if not completed and not self._last_validation_errors:
+            self._last_validation_errors.append(
+                "action sequence ended before all containers were retrieved"
+            )
+
+        feasible = completed and not self._last_validation_errors
+        plan = RelocationPlan([
+            Movement(container_id=m.container_id, from_pos=m.src, to_pos=m.dst)
+            for m in self.yard.move_history
+            if m.kind in ("relocate", "retrieve")
+        ])
+        crane_time = (
+            compute_crane_time(
+                plan, KinematicsModel.from_config_extra(self.config.extra)
+            )
+            if feasible
+            else float("inf")
+        )
+        executed_relocations = float(self._total_relocations)
+        relocations = executed_relocations if feasible else float("inf")
+        self.config.seed = saved_seed
+        return {
+            "relocations": relocations,
+            "executed_relocations": executed_relocations,
+            "crane_time": crane_time,
+            "total_moves": float(plan.num_moves()),
+            "lower_bound": float(lb),
+            "lb_ratio": float(relocations / max(lb, 1)),
+            "steps": float(self._total_steps),
+            "feasible": float(feasible),
+            "completed": float(completed),
+            "validation_conflicts": float(len(self._last_validation_errors)),
+            "validated": 1.0,
+            "time": crane_time,
+        }
+
+    def get_last_validation_errors(self) -> List[str]:
+        """Return human-readable errors from the most recent strict validation."""
+        return list(self._last_validation_errors)
 
     # ---------------------------------------------------------------- #
     # Metrics                                                            #
@@ -306,7 +378,7 @@ class CRP_R(BaseProblem):
         return {
             "relocations": float(self._total_relocations),
             "steps":       float(self._total_steps),
-            "time":        float(self._total_relocations),   # 1 reloc = 1 time unit
+            "time":        float(self._total_relocations),
             "progress":    self._current_target_priority / max(self.config.num_containers, 1),
         }
 
@@ -349,45 +421,150 @@ class CRP_R(BaseProblem):
                 mask[i] = True
         return mask
 
-    # ---------------------------------------------------------------- #
-    # Plan-based evaluation (for batch planning algorithms)             #
-    # ---------------------------------------------------------------- #
-
     def evaluate_plan(self, plan: RelocationPlan) -> Dict[str, float]:
+        """Alias for :meth:`validate_plan`."""
+        return self.validate_plan(plan)
+
+    def validate_plan(self, plan: RelocationPlan) -> Dict[str, float]:
         """
-        Evaluate a complete RelocationPlan on a fresh episode.
+        Strictly validate a complete explicit plan under CRP-R rules.
 
-        Unlike evaluate() which takes a step-wise action-index list,
-        this method accepts a RelocationPlan (container_id + positions)
-        as produced by planning algorithms such as Lee & Lee (2010).
-
-        Kinematics (crane working time) are computed when RMGC parameters
-        are present in ProblemConfig.extra; otherwise crane_time = relocations.
-
-        Returns
-        -------
-        dict with keys: relocations, crane_time, total_moves, lower_bound,
-                        lb_ratio, steps, feasible
+        Every retrieval must follow priority order and every relocation must
+        move the top blocker from the *current target's* stack.  Consequently,
+        cleaning moves from unrelated stacks are rejected for CRP-R.
         """
+        saved_seed = self.config.seed
+        self._last_validation_errors = []
         self.reset(options={"skip_auto_retrieve": True})
-        kin    = KinematicsModel.from_config_extra(self.config.extra)
-        result = simulate_plan(self.yard, plan, self.config.max_tiers)
-        lb     = lower_bound_relocations(self.yard)
+        lb = lower_bound_relocations(self.yard)
+        relocations = 0
+        retrievals = 0
+        executed_moves = 0
+        expected_priority = 1
 
-        if result.feasible:
-            crane_time = compute_crane_time(plan, kin)
-        else:
-            crane_time = float("inf")
+        for step_index, move in enumerate(plan.movements):
+            if expected_priority > self.config.num_containers:
+                self._last_validation_errors.append(
+                    f"move {step_index}: extra move after all containers were retrieved"
+                )
+                break
 
+            src_stack = self.yard.stacks.get(move.from_pos)
+            if src_stack is None or src_stack.is_empty:
+                self._last_validation_errors.append(
+                    f"move {step_index}: source stack {move.from_pos} is empty or missing"
+                )
+                break
+            if src_stack.top.id != move.container_id:
+                self._last_validation_errors.append(
+                    f"move {step_index}: container {move.container_id} is not on top of "
+                    f"{move.from_pos}"
+                )
+                break
+
+            container = src_stack.top
+            if move.is_retrieval:
+                if container.priority != expected_priority:
+                    self._last_validation_errors.append(
+                        f"move {step_index}: expected priority {expected_priority}, "
+                        f"got {container.priority}"
+                    )
+                    break
+                src_stack.pop()
+                self.yard.move_history.append(
+                    Move("retrieve", container.id, move.from_pos, None)
+                )
+                self.yard.total_retrievals += 1
+                self._hook_after_retrieve(
+                    move.from_pos[0], move.from_pos[1], container.id
+                )
+                expected_priority += 1
+                retrievals += 1
+                executed_moves += 1
+                continue
+
+            target = next(
+                (c for c in self.containers if c.priority == expected_priority),
+                None,
+            )
+            target_stack = self.yard._find_stack(target) if target is not None else None
+            target_pos = (
+                (target_stack.bay, target_stack.row)
+                if target_stack is not None
+                else None
+            )
+            if target_pos is None or move.from_pos != target_pos:
+                self._last_validation_errors.append(
+                    f"move {step_index}: relocation is not from current target stack "
+                    f"{target_pos}"
+                )
+                break
+            if container == target:
+                self._last_validation_errors.append(
+                    f"move {step_index}: current target must be retrieved, not relocated"
+                )
+                break
+            if move.to_pos == move.from_pos:
+                self._last_validation_errors.append(
+                    f"move {step_index}: destination equals source {move.from_pos}"
+                )
+                break
+            dst_stack = self.yard.stacks.get(move.to_pos)
+            if dst_stack is None:
+                self._last_validation_errors.append(
+                    f"move {step_index}: destination stack {move.to_pos} does not exist"
+                )
+                break
+            if dst_stack.is_full:
+                self._last_validation_errors.append(
+                    f"move {step_index}: destination stack {move.to_pos} is full"
+                )
+                break
+
+            self.yard.relocate(move.from_pos, move.to_pos)
+            self._hook_after_relocate(
+                move.from_pos, move.to_pos, container.id
+            )
+            self._total_relocations += 1
+            relocations += 1
+            executed_moves += 1
+
+        completed = (
+            expected_priority > self.config.num_containers
+            and all(stack.is_empty for stack in self.yard.stacks.values())
+        )
+        if not completed and not self._last_validation_errors:
+            self._last_validation_errors.append(
+                "plan ended before all containers were retrieved"
+            )
+        feasible = completed and not self._last_validation_errors
+        self._current_target_priority = expected_priority
+        self._done = completed
+        self._total_steps = relocations
+
+        crane_time = (
+            compute_crane_time(
+                plan, KinematicsModel.from_config_extra(self.config.extra)
+            )
+            if feasible
+            else float("inf")
+        )
+        self.config.seed = saved_seed
+        official_relocations = float(relocations) if feasible else float("inf")
         return {
-            "relocations": float(result.num_relocations),
-            "crane_time":  crane_time,
-            "total_moves": float(result.num_moves),
+            "relocations": official_relocations,
+            "executed_relocations": float(relocations),
+            "crane_time": crane_time,
+            "total_moves": float(executed_moves),
+            "retrievals": float(retrievals),
             "lower_bound": float(lb),
-            "lb_ratio":    float(result.num_relocations / max(lb, 1)),
-            "steps":       float(result.num_moves),
-            "feasible":    float(result.feasible),
-            "time":        crane_time,
+            "lb_ratio": float(official_relocations / max(lb, 1)),
+            "steps": float(executed_moves),
+            "feasible": float(feasible),
+            "completed": float(completed),
+            "validation_conflicts": float(len(self._last_validation_errors)),
+            "validated": 1.0,
+            "time": crane_time,
         }
 
     # ---------------------------------------------------------------- #
@@ -397,8 +574,6 @@ class CRP_R(BaseProblem):
     @classmethod
     def config_schema(cls) -> Dict:
         schema = super().config_schema()
-        # Kinematics parameters for RMGC time model (Lee & Lee 2010 defaults).
-        # Keys not in ProblemConfig are automatically stored in config.extra by GUI.
         schema.update({
             "gantry_s_per_bay": {
                 "type": "float", "default": 3.5, "min": 0.5, "max": 20.0,

@@ -1,25 +1,12 @@
 """
-Target-guided heuristic (TGH) main loop -- Algorithm 1 (Wang, Jin, Lim 2015).
+Target-guided construction loop for WangJinLim2015TGH.
 
-::
-
-    TGH(inilay)
-    1  curlay = inilay
-    2  g = G
-    3  while g != 0
-    4      mark clean containers with group label g as fixed
-    5      conList = the set of candidate containers
-    6      while conList != empty
-    7          stkList = the set of candidate stacks
-    8          determine the target container and stack from conList and stkList
-    9          apply a giant move to fix the target container to the target stack
-    10     g = g - 1
-
-Termination (paper §4.5): only unfixed containers are ever chosen as targets
-or relocation subjects; a fixed container is moved only transiently inside a
-giant move's ``nslot == 0`` branch and is always restored before that giant
-move returns. Hence each outer iteration strictly reduces the number of
-unfixed containers, guaranteeing termination on any solvable instance.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,13 +1,12 @@
 """
-Shared state helpers for Lee & Hsu (2007) "An optimization model for the
-container pre-marshalling problem", Computers & Operations Research 34
-(2007) 3295-3313.
+Network-flow helpers for LeeHsu2007NetworkFlowIP.
 
-Convention (shared with the rest of this platform's CRP-Prem embeddings):
-stacks are lists of priority/"type" values, bottom to top; smaller values
-are retrieved earlier and therefore belong closer to the top. A stack is
-well located (paper's Eq. (20)) iff its values are non-increasing from
-bottom to top.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

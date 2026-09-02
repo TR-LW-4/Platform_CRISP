@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import {
+  downloadBlob,
+  downloadText,
+  exportStem,
+  tableToPngBlob,
+  toLatex,
+} from '../compareExport'
 import type { Catalog, CompareFolder, CompareTable } from '../types'
 
 interface CompareProps {
@@ -45,6 +52,7 @@ export function Compare({ catalog, active = true }: CompareProps) {
   const [table, setTable] = useState<CompareTable | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [savingPng, setSavingPng] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -163,13 +171,36 @@ export function Compare({ catalog, active = true }: CompareProps) {
 
   const downloadCsv = () => {
     if (!table) return
-    const blob = new Blob([toCsv(table)], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `compare_${table.problem}_${table.metric}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadText(`${exportStem(table)}.csv`, toCsv(table), 'text/csv;charset=utf-8')
+  }
+
+  const downloadLatex = () => {
+    if (!table) return
+    downloadText(`${exportStem(table)}.tex`, toLatex(table), 'text/plain;charset=utf-8')
+  }
+
+  const copyLatex = async () => {
+    if (!table) return
+    try {
+      await navigator.clipboard.writeText(toLatex(table))
+      setNotice('LaTeX table copied to the clipboard.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const downloadPng = async () => {
+    if (!table) return
+    setSavingPng(true)
+    setError('')
+    try {
+      const blob = await tableToPngBlob(table)
+      downloadBlob(`${exportStem(table)}.png`, blob)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSavingPng(false)
+    }
   }
 
   const metricOptions = useMemo(() => {
@@ -319,6 +350,11 @@ export function Compare({ catalog, active = true }: CompareProps) {
                 {table.dedup ? ' · deduped' : ''}
               </span>
               <button type="button" onClick={downloadCsv}>Export CSV</button>
+              <button type="button" onClick={downloadLatex}>Export LaTeX</button>
+              <button type="button" onClick={() => void copyLatex()}>Copy LaTeX</button>
+              <button type="button" disabled={savingPng} onClick={() => void downloadPng()}>
+                {savingPng ? 'Saving PNG…' : 'Save PNG'}
+              </button>
             </div>
           </div>
           <div className="table-card batch-summary-table">

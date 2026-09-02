@@ -1,44 +1,21 @@
 """
-Ting & Wu (2017) — Beam Search with VRH for CRP-R.
+TingWuBS
+<2017> <heuristic> <restricted> <single-bay> <CRP-R>
+Beam search with virtual relocation heuristic
+beam_width --- 5 --- Nodes retained at each level
+evaluator --- VRH --- Evaluation heuristic: VRH or SDH
 
-Algorithm overview
-------------------
-A breadth-first Beam Search (BS) that expands one relocation decision per
-level.  At each level, every beam node tries all feasible destination stacks
-for the topmost blocking container above the current target.  Each resulting
-child state is evaluated by the Virtual Relocation Heuristic (VRH), which
-greedily simulates the remaining retrieval sequence and counts relocations.
-
-The b best-scored children are retained as the next beam (dependent strategy,
-with independent tie-breaking for diversity across parent nodes).
-
-Two evaluators available:
-  VRH (default) — Ting & Wu (2017) two-phase virtual relocation heuristic.
-                  Phase I places least-urgent blockers first in no-deadlock
-                  slots; Phase II handles skipping containers via VRI score.
-  SDH           — Smallest Difference Heuristic (≡ Caserta Min–Max);
-                  included as a simpler baseline evaluator.
-
-VRH (standalone) already outperforms Caserta/Chain/Chain-F on all 48 test
-sizes (Table 1).  VRH embedded in BS with b = 5 matches or beats all heuristic
-and exact methods tested in the paper at a fraction of the time.
-
-Config parameters
------------------
-  beam_width     : int   — b (paper tests 5/10/15/20, default 5)
-  evaluator      : str   — "VRH" (recommended) or "SDH"
-                            using random-layout mode for stability analysis)
-
-Compatible problems
--------------------
-  CRP-R
-
-Reference
----------
+------------------------------- Reference --------------------------------
 C.-J. Ting, K.-C. Wu,
-"Optimizing container relocation operations at container yards with beam search",
-Transportation Research Part E, 103, 17–31, 2017.
-https://doi.org/10.1016/j.tre.2017.04.010
+"Optimizing container relocation operations at container yards with
+ beam search",
+Transportation Research Part E 103 (2017) 17–31.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -57,14 +34,7 @@ class TingWuBS(BaseAlgorithm):
 
     name                = "Ting & Wu (2017) BS"
     category            = "Heuristic"
-    description         = (
-        "[single-bay origin]  "
-        "Ting & Wu (Transp. Res. Part E 2017) Beam Search + VRH for CRP-R. "
-        "VRH (Virtual Relocation Heuristic) considers ALL blocking containers "
-        "simultaneously via a two-phase decision sequence; embedded in BS as "
-        "the evaluation function. Matches or beats Caserta, Chain, and Corridor "
-        "Method on all benchmark instances tested in the paper."
-    )
+    description         = "Ting & Wu (TRE 2017) beam search with VRH."
     compatible_problems = ["CRP-R"]
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)

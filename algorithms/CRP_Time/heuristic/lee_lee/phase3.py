@@ -1,11 +1,12 @@
 """
-Lee & Lee (2010) – Phase 3: Time reduction.
+Phase-3 crane-time waypoints for LeeLeeRetrievalHeuristic.
 
-Starting from the Phase 2 plan, iteratively tries alternate intermediate
-positions for Type B containers to reduce total RMGC crane time without
-increasing the number of moves.
-
-Terminates after `max_no_improve` consecutive non-improving iterations.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -32,6 +32,7 @@
 #include <iomanip>
 #include <limits>
 #include <stdlib.h>
+#include "heuristic.h"
 
 using namespace std;
 const long _MAXRANDOM   = numeric_limits<int>::max();       //!< Max Integer (2147483647)
@@ -164,7 +165,15 @@ int max_in_choosestack(int * choosestack, int el, int m)
         return pos;
 }
 
-int block_heuristic(std::vector < std::vector <int> > bay, int m, int h, int nels, int k, std::vector < std::vector< std::vector<int> > > & heurPath)
+int block_heuristic(
+    std::vector < std::vector <int> > bay,
+    int m,
+    int h,
+    int nels,
+    int k,
+    std::vector < std::vector< std::vector<int> > > & heurPath,
+    std::vector<CMMove> & moves
+)
 {
     int ki, kj;
 
@@ -185,6 +194,7 @@ int block_heuristic(std::vector < std::vector <int> > bay, int m, int h, int nel
         // last position 
         if (kj == (int)bay[ki].size() - 1)
         {
+            moves.push_back(CMMove(k, ki, -1));
             bay[ki].pop_back();
             k++;	 
         }
@@ -195,7 +205,9 @@ int block_heuristic(std::vector < std::vector <int> > bay, int m, int h, int nel
                 int mptystack = chkemptystack(bay, m);
                 if (mptystack > -1)
                 {
-                    bay[mptystack].push_back(bay[ki][bay[ki].size()-1]);
+                    int moved = bay[ki][bay[ki].size()-1];
+                    moves.push_back(CMMove(moved, ki, mptystack));
+                    bay[mptystack].push_back(moved);
                     
                     bay[ki].pop_back();
                     counter++;
@@ -214,7 +226,9 @@ int block_heuristic(std::vector < std::vector <int> > bay, int m, int h, int nel
                     }
 
                     int newi = max_in_choosestack(choosestack, bay[ki][bay[ki].size()-1], m);
-                    bay[newi].push_back(bay[ki][bay[ki].size()-1]);
+                    int moved = bay[ki][bay[ki].size()-1];
+                    moves.push_back(CMMove(moved, ki, newi));
+                    bay[newi].push_back(moved);
                     bay[ki].pop_back();
                     counter++;
 
@@ -224,10 +238,22 @@ int block_heuristic(std::vector < std::vector <int> > bay, int m, int h, int nel
             // cout << "counter now is " << counter << endl;
 
             assert(bay[ki][bay[ki].size()-1] == k);
+            moves.push_back(CMMove(k, ki, -1));
             bay[ki].pop_back();
             k++;
         }
         // print_node(bay, m);
+        heurPath.push_back(bay);
+    }
+
+    // The historical loop stops at nels-1 because the last block cannot
+    // require a relocation.  Export its retrieval explicitly so the path is
+    // complete and independently replayable.
+    if (find_element(nels, bay, ki, kj))
+    {
+        assert(kj == (int)bay[ki].size() - 1);
+        moves.push_back(CMMove(nels, ki, -1));
+        bay[ki].pop_back();
         heurPath.push_back(bay);
     }
     return counter;

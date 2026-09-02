@@ -1,9 +1,19 @@
 """
-Tanaka ``restricted-distinct-1.11`` branch-and-bound adapter (2018 revision).
+Tanaka2018BB
+<2018> <exact> <restricted> <single-bay> <CRP-R>
+Branch-and-bound wrapper (restricted-distinct-1.11)
+tanaka2018_time_limit_sec --- 600 --- Per-instance time limit (s)
 
-The upstream reader compresses original priorities into rank classes, so equal
-priorities remain equal after normalization (supports duplicate and non-duplicate
-instances).
+------------------------------- Reference --------------------------------
+S. Tanaka, K. Takii,
+"A faster branch-and-bound algorithm for the block relocation problem",
+IEEE Transactions on Automation Science and Engineering 13 (2016) 181–190.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -27,11 +37,7 @@ from .tanaka_export import yard_to_tanaka_instance
 class Tanaka2018BB(BaseAlgorithm):
     name                = "Tanaka (2018) B&B"
     category            = "Exact"
-    description         = (
-        "Exact B&B via Tanaka ``restricted-distinct-1.11`` (2018 revision). "
-        "Priority normalization supports both duplicate and non-duplicate priorities; "
-        "primary metric = relocation count."
-    )
+    description         = "Tanaka (2018) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
     _OPT_RE = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")

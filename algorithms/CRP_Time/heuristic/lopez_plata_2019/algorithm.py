@@ -1,30 +1,21 @@
 """
-López-Plata, Expósito-Izquierdo, Moreno-Vega (2019)
-Minimizing the operating cost of block retrieval operations in stacking facilities.
-Computers & Industrial Engineering, 136, 436–452.
-https://doi.org/10.1016/j.cie.2019.07.045
+LopezPlata2019Heuristic
+<2019> <heuristic> <time> <single-bay> <CRP-Time>
+Limited-depth A* heuristic for operating-cost BRP
+delta --- 3 --- Partial-search depth
+num_expansions --- 5 --- Expansion count in Step 2
 
-Heuristic algorithm based on A* for the Blocks Relocation Problem with Operating Costs (BRP-OC).
-
-Platform adaptation notes
--------------------------
-- The core idea is kept: (1) limited-depth A* to discover promising partial solutions,
-  (2) expansion of partial solutions by evaluating short sequences for the next μ blocks
-    using a composite quality function (move cost + resulting yard quality),
-  (3) post-processing to remove "temporary moves".
-- The implementation assumes the restricted relocation model used by CRP-Time
-  (only the direct top blocker above the current target may be relocated at each step).
-  Search branches only on legal moves of that blocker.
-- Operating cost uses the paper's linear model with configurable weights.
-  By default we use a setting that doubles the cost when the crane is loaded
-  (α2=β2=2, α1=β1=1), which is a reasonable default for "effort".
-- This implementation is provided only for CRP-Time (operating cost is the primary objective).
-- Distances: for multi-bay yards we use |flat_stack_index difference| as a simple proxy
-  (consistent with how the paper treats stacks as linearly indexed in experiments).
-  Users can override via extra if needed.
-
-Reference implementation targets the heuristic (the practical contribution for larger instances).
-The exact IP and pure A* are noted but not the focus for the platform.
+------------------------------- Reference --------------------------------
+I. López-Plata, C. Expósito-Izquierdo, J.M. Moreno-Vega,
+"Minimizing the operating cost of block retrieval operations in stacking
+ facilities",
+Computers & Industrial Engineering 136 (2019) 436–452.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

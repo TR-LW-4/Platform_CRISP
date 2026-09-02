@@ -1,21 +1,12 @@
 """
-Time-expanded multi-commodity flow network and basic model (Lee & Hsu 2007,
-Sections 3.1-3.2), constraints (1)-(26), plus the two relaxations the paper
-itself recommends for tractability (Section 5):
+Time-expanded flow MIP for LeeHsu2007NetworkFlowIP.
 
-* multi-move relaxation: constraint (4) (<=1 movement arc per segment) is
-  replaced by a cap ``max_moves_per_segment`` = K, and constraints
-  (3)/(5)/(21) are replaced by the paper's (33)/(34) so several containers
-  may be lifted from / placed onto stacks within one time segment.
-* cycle-breaking constraints (31)/(32): forbid length-2 and length-3
-  movement cycles from forming within a single segment. Longer cycles (if
-  K >= 4) can still occur and are broken in a post-processing step, see
-  ``ordering.py``.
-
-Indices below are all 0-based Python indices; the docstrings note the
-corresponding 1-based paper notation. Time point t=0 is the initial layout,
-time point t=T-1 is the final layout; "segment t" (0 <= t <= T-2) is the
-transition between time point t and time point t+1.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

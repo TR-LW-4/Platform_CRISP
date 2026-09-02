@@ -1,42 +1,22 @@
 """
-Jovanović, Tuba, Voß (2019) — Ant Colony Optimization for rBRP-Time (CRP-Time).
+JovanovicACO_CRPTime
+<2019> <heuristic> <time> <single-bay> <CRP-Time>
+Ant Colony System with crane-time objective
+n_iterations --- 5000 --- Colony iterations per layout
+n_ants --- 10 --- Ants per iteration
+q0 --- 0.9 --- Exploitation rate
 
-This is the Section 6 extension of the paper: the same rBRP-ACO algorithm
-(ACS, 4-D pheromone matrix, MinMax heuristic) with the objective function
-replaced by total crane working time instead of number of relocations.
-
-Differences from the CRP-R version
-------------------------------------
-1. best_cost  : float (seconds)  instead of int (relocations)
-2. lb_init    : n_nwl × spreader_s  instead of n_nwl count
-3. val(S)     : 1 / (crane_time(S) − lb_init + 1)
-4. Per-ant    : crane_pos + time_so_far tracked alongside stacks/loc/smin
-5. Each move  : accumulates move_time_inline() / retrieval_time_inline()
-6. Early stop : time_so_far + lb_curr×spreader_s ≥ best_cost
-7. Metrics    : crane_time (primary), relocations (secondary)
-
-Everything else (pheromone structure, transition rule, local/global update,
-stagnation reinitialisation, performance optimisations) is identical to
-the CRP-R version.
-
-Kinematics parameters are read from ProblemConfig.extra (same keys used by
-the CRP-Time problem's config_schema):
-  gantry_s_per_bay   default 3.5 s   (Lee & Lee 2010)
-  trolley_s_per_row  default 1.2 s
-  gantry_accel_s     default 40.0 s
-  spreader_s         default 30.0 s
-
-Pheromone matrix size: N × (N+W) × (MaxMoves+1) × N  (float32)
-  For N=39, W=8,  MaxMoves=10: ≈ 793 K entries ≈ 3 MB
-  For N=100,W=10, MaxMoves=10: ≈ 12 M entries ≈ 48 MB
-
-Reference
----------
+------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
 "An efficient ant colony optimization algorithm for the blocks relocation
  problem",
 European Journal of Operational Research 274 (2019) 78–90.
-https://doi.org/10.1016/j.ejor.2018.09.038
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

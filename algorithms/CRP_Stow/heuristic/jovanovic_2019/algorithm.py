@@ -1,71 +1,18 @@
 """
-Jovanović et al. (2019) – GRASP for the Blocks Relocation Problem with Stowage Plan.
+JovanovicGRASP
+<2019> <heuristic> <stowage> <multi-bay> <CRP-Stow>
+Greedy-with-correction and GRASP for the BRLP
 
-Reference
----------
-Jovanović, R., Tanaka, S., Nishi, T., & Voß, S. (2019). A GRASP approach for solving
-the Blocks Relocation Problem with Stowage Plan.
-Flexible Services and Manufacturing Journal, 31(3), 702–729.
-https://doi.org/10.1007/s10696-018-9320-3
-
-Benchmark dataset
------------------
-Jovanović (2017). http://mail.ipb.ac.rs/~rakaj/brlp/brlp.htm
-Already in: benchmark/crp_stow/
-
-Problem mapping (CRP-Stow platform)
--------------------------------------
-    c.group    = vs(c) — vessel stack (0-based)
-    c.priority = vt(c) — vessel tier  (0-based, 0 = bottom)
-    env._is_retrievable(c): cdd(c) == 0  ⟺  c.priority == _vessel_loaded[c.group]
-    env._mode:               "high" (select target) | "low" (relocate blocker)
-    Action in "high":        flat stack index 0…YS-1  (env targets topmost retrievable)
-    Action in "low":         destination flat stack index
-
-Implemented algorithms
-----------------------
-JovanovicGRC   (§5, §6.1)
-    Greedy with Correction (GR-C).  Uses MM4CB + MBW4CB heuristics.
-    Applies the correction procedure once after the initial greedy run.
-
-JovanovicGRASP (§5.3, §6.3)
-    Full GRASP: n_grasp_iters randomised GR-C runs, returns best.
-    More expensive but typically 10-15% better on large instances.
-
-Key concepts
-------------
-Well-located (§4.2):
-    c is well-located iff no container d below c in the same yard stack has
-    vs(d) == vs(c) and vt(d) < vt(c)  (d would be loaded before c, but c blocks it).
-
-Due date dd(S, c) (§5.1, Eq. 6):
-    min{ vt(i) : i ∈ S, vs(i) == vs(c) }  or  N+1 if none exists.
-
-Relevant 4-cycle (§4.3):
-    A minimal 4-cycle in the precedence graph whose all 4 nodes are well-located.
-    Pattern: c →_y d →_v d' →_y x →_v c
-    (all edges alternate between vessel and yard precedence).
-
-HR – Relocation heuristics (§5.1)
-    MinMax4CB  Best:  prefer stacks where c is well-located (dd(S,c) > vt(c));
-                      among those, prefer ones that don't create 4-cycles (M penalty);
-                      tie-break by cdd(S); fallback: max dd(S,c) stack.
-    MinMax     As above without 4-cycle penalty (for comparison).
-    LT         Lowest Tier: stack with fewest containers (simplest baseline).
-
-HL – Retrieval heuristics (§5.2)
-    MinW4CB    Best:  M·AboveWL* + K·Above4CBlocking + AboveNWL, ascending.
-    MinW       As above without 4-cycle information.
-    MinB       Minimum blockers above topmost retrievable (simplest).
-
-Correction procedure (Algorithm 2, §5.3.1)
-    Suspicious move criteria:
-      CMM – first relocation of a container relocated ≥ MM times.
-      CMB – last relocation of a previously-relocated container whose retrieval
-            required ≥ MB obstructing containers to be cleared.
-      CMS – a well-located relocation that is undone before the container is retrieved.
-    For each suspicious LOW move: try alternative destinations (excluding previously
-    tried stacks) and re-complete greedily; keep the best result.
+------------------------------- Reference --------------------------------
+R. Jovanović, S. Tanaka, T. Nishi, S. Voß,
+"A GRASP approach for solving the Blocks Relocation Problem with Stowage Plan",
+Flexible Services and Manufacturing Journal 31 (2019) 702–729.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -79,6 +79,8 @@ export const api = {
     }),
   stopJob: (id: string) =>
     request<JobSummary>(`/api/jobs/${id}/stop`, { method: 'POST' }),
+  continueJob: (id: string) =>
+    request<JobSummary>(`/api/jobs/${id}/continue`, { method: 'POST' }),
   deleteJob: (id: string, deleteFiles = false) =>
     request<JobSummary>(
       `/api/jobs/${id}?delete_files=${deleteFiles ? 'true' : 'false'}`,

@@ -1,26 +1,20 @@
 """
-Expósito-Izquierdo et al. (2015) Branch-and-Bound for Restricted BRP.
+ExpositoBB2015
+<2015> <exact> <restricted> <single-bay> <CRP-R>
+Best-first branch-and-bound with α-restricted branching
+alpha --- 0 --- Max children per node (0 = unlimited / optimal)
+time_limit_s --- 600 --- Per-instance wall-clock limit (s)
 
-Reference
----------
+------------------------------- Reference --------------------------------
 C. Expósito-Izquierdo, B. Melián-Batista, J.M. Moreno-Vega,
 "An exact approach for the Blocks Relocation Problem",
 Expert Systems with Applications 42 (2015) 6408–6422.
-
-Algorithm overview (Section 5)
---------------------------------
-Best-first B&B on a tree of height N+1.
-  - Level i  = all blocks with priority ≤ i already retrieved.
-  - Each *descending node* represents the yard state reached after
-    relocating ALL blockers O(c*) in some assignment and then
-    auto-retrieving the target c* plus any further accessible targets.
-  - Scoring: f(n) = g(n) + h(n)   (Eq. 17)
-      g(n)  = relocations from root to n
-      h(n)  = admissible lower bound           (Eq. 18)
-  - α-restriction: at most α descending nodes per parent, ranked by
-    attractiveness w(n, w)                     (Eq. 19)
-    α = 0 (unlimited) guarantees optimality.
-  - Initial upper bound: greedy run with α = 1 (Section 5.6).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -509,29 +503,10 @@ def _run_bb(
 # ================================================================ #
 
 class ExposioBB2015(BaseAlgorithm):
-    """
-    Branch-and-Bound exact solver for Restricted BRP.
-
-    Reference: Expósito-Izquierdo, Melián-Batista, Moreno-Vega (2015).
-
-    Parameters
-    ----------
-    alpha : int
-        Maximum descending nodes per B&B tree node.
-        0 = unlimited (guarantees optimality).
-        Smaller values trade optimality for speed.
-    time_limit_s : float
-        Per-seed wall-clock time limit in seconds (default 600).
-    """
 
     name                = "Expósito-Izquierdo (2015) B&B"
     category            = "Exact"
-    description         = (
-        "Best-first branch-and-bound for the Restricted BRP "
-        "(Expósito-Izquierdo et al., ESWA 2015). "
-        "Admissible lower bound h(n) + α-restricted branching. "
-        "α=0 (unlimited) guarantees optimality; α=1..5 gives fast near-optimal results."
-    )
+    description         = "Expósito-Izquierdo et al. (ESWA 2015) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)

@@ -1,13 +1,12 @@
 """
-T-search driver for the Lee & Hsu (2007) network-flow IP.
+Ascending-T solve driver for LeeHsu2007NetworkFlowIP.
 
-The basic model needs a fixed time horizon T (number of time points) to be
-chosen up front; too small and the model is infeasible, too large and it
-is needlessly slow to solve. This module tries a small ascending sequence
-of T candidates (optionally starting from a cheap heuristic move-count
-estimate) under an overall wall-clock budget, and reconstructs an
-executable move sequence from the first horizon that yields a feasible
-(and, ideally, provably optimal) solution.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

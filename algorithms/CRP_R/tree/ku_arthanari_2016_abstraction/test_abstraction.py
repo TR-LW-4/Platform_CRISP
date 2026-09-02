@@ -1,23 +1,12 @@
 """
-Regression / sanity checks for the Ku & Arthanari (2016) abstraction +
-PDB embedding.  Not part of an automated test runner -- run directly
-with:
+Sanity checks for KuArthanari2016Abstraction.
 
-    cd Platform_CRISP
-    python -m algorithms.CRP_R.exact.search.ku_arthanari_2016_abstraction.test_abstraction
-
-Checks
-------
-1. ``combinatorics.py`` formulas reproduce the paper's own worked
-   example exactly (Table 2: r=8 units, n=5 columns, m=3 tiers).
-2. The PDB (``build_pdb``) agrees with an independent brute-force
-   shortest-path solver on every canonical abstract state, for several
-   small (n_cols, m_tiers, depth) combinations.
-3. ``solve()`` finds the same optimal relocation count as an
-   independent exhaustive B&B (adapted from ``zhu_2012/test_ida.py``)
-   on random instances, both with the abstraction disabled (pdb_depth=0,
-   cache_depth=0 -- a plain DFBnB) and enabled (nonzero PDB/cache),
-   confirming the abstraction only *prunes*, never changes, the answer.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

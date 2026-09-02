@@ -1,8 +1,20 @@
 """
-Platform adapter for Petering & Hussein's BRP-III formulation.
+PeteringHussein2013BRPIII
+<2013> <exact> <unrestricted> <single-bay> <CRP-U>
+BRP-III mixed-integer program with cleaning moves
+time_limit_s --- 3600 --- Gurobi time limit (s)
 
-BRP-III permits cleaning moves, so it is registered for CRP-U. The LA-1
-algorithm from the same paper supplies the feasible move-horizon upper bound.
+------------------------------- Reference --------------------------------
+M.E.H. Petering, M.I. Hussein,
+"A new mixed integer program and extended look-ahead heuristic algorithm
+ for the block relocation problem",
+European Journal of Operational Research 231 (2013) 120–130.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

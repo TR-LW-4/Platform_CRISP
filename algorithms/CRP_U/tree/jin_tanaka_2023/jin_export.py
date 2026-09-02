@@ -1,17 +1,12 @@
 """
-Export a CRP-U yard snapshot to Jin & Tanaka (2023) UCRP-IDBB input format.
+Yard → Jin–Tanaka IDBB binary input for JinTanaka2023ForCRPU.
 
-Jin format (from instance.c / solve.c)
----------------------------------------
-  Line 0 : n_stacks  n_tiers  n_blocks
-  Line k  : h_k  p[k][1]  p[k][2]  ...  p[k][h_k]   (bottom → top)
-
-For CRP-U the priority value written for each container is its **unique
-integer priority** (``container.priority``, a distinct 1…N permutation as
-loaded from Caserta/Zhu benchmark files or generated randomly).
-
-Stack order: flat index  i  →  bay = i // num_rows + 1,
-                                row = i %  num_rows + 1.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

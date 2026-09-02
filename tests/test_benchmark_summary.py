@@ -78,6 +78,28 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertAlmostEqual(c34["metrics"]["relocations"]["mean"], 10.0)
         self.assertAlmostEqual(c34["metrics"]["relocations"]["std"], 0.0)
 
+    def test_caserta_classes_sorted_by_numeric_hw(self) -> None:
+        runs = [
+            {
+                "prob_config": {"layout_file_path": "/data/bench/data10-10-1.dat"},
+                "metrics": {"relocations": 1.0},
+            },
+            {
+                "prob_config": {"layout_file_path": "/data/bench/data5-10-1.dat"},
+                "metrics": {"relocations": 1.0},
+            },
+            {
+                "prob_config": {"layout_file_path": "/data/bench/data5-4-1.dat"},
+                "metrics": {"relocations": 1.0},
+            },
+            {
+                "prob_config": {"layout_file_path": "/data/bench/data3-3-1.dat"},
+                "metrics": {"relocations": 1.0},
+            },
+        ]
+        labels = [row["label"] for row in summarize_run_dicts(runs)["classes"]]
+        self.assertEqual(labels, ["3×3", "5×4", "5×10", "10×10"])
+
     def test_summarize_result_files_reads_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

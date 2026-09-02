@@ -1,49 +1,12 @@
 """
-IPS6 -- Parreno-Torres, Alvarez-Valdes & Ruiz (2019), Section 5.4, the
-paper's own best-performing model ("we present the whole IPS6 model which
-is our best proposal for solving the pre-marshalling problem").
+IPS6 Gurobi formulation for ParrenoTorresAlvarezValdesRuiz2019IPS6.
 
-Time is discretized into ``n_time_points`` time points (index t = 0 is the
-given initial layout, index t = n_time_points - 1 must be fully sorted);
-moves happen in the ``n_time_points - 1`` segments between consecutive time
-points, at most one move per segment (matching every other exact PMP model
-already embedded in this platform).
-
-Variables (0-based indices in code; paper uses 1-based s/h/p/t):
-  x[t,s,h,p]  = 1 if at time point t there is a priority-p container in
-                slot (s,h), t = 0 .. n_time_points-1.
-  w[t,s,h,p]  = 1 if, during segment t (transition t -> t+1), a priority-p
-                container is moved OUT of slot (s,h), t = 0 .. n_time_points-2.
-  z[t,s,h,p]  = 1 if, during segment t, a priority-p container is moved
-                INTO slot (s,h).
-
-Constraints implemented (paper numbering, Eq. 26-38):
-  (26) objective: minimise total drop-offs (== total relocations)
-  (27) per-priority flow balance within a segment (what leaves == what enters)
-  (28) at most one pick-up / one drop-off per segment (K=1)
-  (29) OPTIONAL ("earliest time" push): only meaningful when solving with a
-       single, deliberately oversized T; the paper's own Section 6 notes
-       this becomes unnecessary once the ascending iterative T-search is
-       used (the default solve strategy here, see solve.py), so it is off
-       by default.
-  (30) bottom-slot guard: a drop can target the bottom tier of a stack only
-       if it is empty in the state just before the segment.
-  (31) sorted-final-layout rule, applied only at the last time point --
-       identical role to Lee-Hsu's Eq.(20) / de Melo da Silva's Eq.(7).
-  (32) flow link between consecutive states and the movement variables.
-  (33) LIFO: a stack's tier h+1 can only be occupied (by inheritance, a
-       drop, or staying put) if tier h is currently occupied; a pick-up
-       from h or a drop into h+1 both require h to already hold a container
-       (nothing can be lifted "through" an occupied slot above it).
-  (34) strengthening: two consecutive occupied tiers cannot both be
-       disturbed (picked from / dropped into) within the same segment.
-  (35)/(36) transitive-move and same-priority-symmetry breaking across two
-       consecutive segments (a container that just arrived at s cannot
-       immediately leave s again; a priority group that just left s cannot
-       have another member of the same priority arrive at s right after).
-  (37)/(38) variable fixing in the very last segment: the top-priority
-       group can never be the subject of the very last move (it never
-       blocks anything below it), and non-bottom... see docstring in code.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,23 +1,12 @@
 """
-Valid-task set construction and the six-tuple lexicographic task ranking
-(paper §5.2).
+Six-tuple task selection for WangJinZhangLim2017FBH.
 
-The six-tuple, minimized lexicographically over all valid tasks (c -> s):
-
-1. tier-protection indicator (0 preferred): a task is "tier-protected" when
-   its aim stack has ``f(s) <= P1`` and moving c there would touch an
-   "affected demand" (of the group values it displaces) ``>= P2``. The
-   paper describes tier-protection as removing such tasks from T outright;
-   we instead encode it as the primary (least-significant-first, i.e. most
-   dominant) tuple key so that T never becomes accidentally empty in a
-   pathological state where *every* remaining valid task happens to be
-   tier-protected -- a strictly safer implementation of the same intent.
-2. the number of movements STAP would need to accomplish the task.
-3. the number of currently-stable-but-unfixed containers on the aim stack,
-   ``sh(s) - f(s)`` (fewer disturbed stable containers preferred).
-4. the affected demand ``sum_{phi=g(c)+1}^{g(s,f(s))} d(phi)``.
-5. the fixed height of the aim stack, ``f(s)`` (prefer less-fixed stacks).
-6. the negative of ``g(c)`` (prefer larger group values first).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

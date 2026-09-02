@@ -1,25 +1,12 @@
 """
-GLAH look-ahead tree search – port of Lookahead.java (Bo Jin, 2015).
+Look-ahead probing for GLAHHeuristic.
 
-Lookahead.most_promising_relocation(state) selects the next relocation
-for the greedy outer loop by:
-  1. Classifying all valid (from_s, to_s) relocations into 6 types:
-       FT-BG : freeing-target  Bad→Good
-       NF-BG : non-freeing     Bad→Good
-       FT-BB : freeing-target  Bad→Bad
-       NF-BB : non-freeing     Bad→Bad
-       GG    : Good→Good
-       GB    : Good→Bad
-  2. Sorting each category by its priority score and keeping at most
-     n_X candidates per category.
-  3. Building a depth-limited look-ahead tree; at each leaf calling
-     evaluation_heuristic to estimate the remaining cost.
-  4. Returning the relocation that leads to the best leaf.
-
-State is explored via GlahState.go_one_step / .undo without deep-copying
-the entire layout (incremental updates), which is the key performance win.
-
-Hash-based cycle detection prevents revisiting duplicate states.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

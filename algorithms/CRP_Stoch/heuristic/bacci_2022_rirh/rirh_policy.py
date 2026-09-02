@@ -1,35 +1,12 @@
 """
-Realization-Independent Reallocation Heuristic (RIRH).
+Policy-tree builders for RIRH and Expected MinMax.
 
-Reference
----------
-T. Bacci, S. Mattia, P. Ventura,
-"The realization-independent reallocation heuristic for the stochastic
-container relocation problem", Soft Computing (2022).
-https://doi.org/10.1007/s00500-022-07070-3
-
-Design map
-----------
-- ``minmax_pick_stack``      : Galle et al. (2018) refined MinMax rule
-  (Section 2 of Bacci 2022), used both as the fallback policy inside
-  RIRH and as the standalone Expected-MinMax (EM) baseline
-  (Algorithm 1 in Bacci 2022 / Algorithm 1 in Galle 2018).
-- ``em_retrieve_batch``      : execute one batch under a specific
-  realization using MinMax  →  DecisionNode.  Used by EM baseline (one
-  DecisionNode per realization) AND by RIRH's fallback path.
-- ``rirh_try_batch``         : attempt Algorithm 3 (Bacci 2022) — the
-  realization-independent MinMax that assigns disjoint destination
-  columns to each batch member.  Returns ``None`` on failure.
-- ``build_policy_tree``      : outer driver (Algorithm 2 in Bacci 2022):
-  greedy per-batch attempt of ``rirh_try_batch``, falling back to full
-  enumeration of |Ω_k|! realizations when needed.
-
-Yard representation
--------------------
-All routines operate on a plain ``Dict[Tuple[int,int], List[int]]`` where
-each list is the priorities of a stack bottom → top.  Container IDs and
-priorities are identified 1-to-1 (as in the Bacci 2022 problem set: each
-priority is unique).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

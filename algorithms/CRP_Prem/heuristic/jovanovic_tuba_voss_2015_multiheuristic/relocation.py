@@ -1,28 +1,12 @@
 """
-Stage 3 (Sec. 3.3): relocating the blocking blocks necessary to well-locate
-a container, and the three competing "which stack to relocate to" heuristics
-(the Hw set): TLP, LPI, MinMax.
+Relocation-target heuristics for JovanovicTubaVoss2015MultiHeuristic.
 
-* TLP (Zhang 2000): relocate to the stack with the fewest used tiers
-  (balance the bay).
-* LPI (Exposito-Izquierdo et al. 2012): relocate to the stack whose current
-  top is *not well located* and has the highest due-date value (i.e. the
-  least urgent "damage"); a stack whose top is well located (or is empty)
-  is always preferred over any not-well-located option.
-* MinMax (Caserta, Schwarze, Voss 2011b / Unluyurt & Aydin 2012): if the
-  relocated block would become well located on some candidate stack, prefer
-  the tightest fit (smallest top value still >= the block's own value);
-  otherwise prefer the stack with the smallest maximal due-date value
-  currently present (avoid spreading badly-mixed groups around). The paper
-  cites this heuristic rather than fully specifying it; this is the
-  standard formulation used across the BRP/PMP literature it references.
-
-Per Sec. 3.3, when the source and destination stack coincide (the block c
-being well-located must be temporarily parked out of its own stack), "the
-heuristic function should be used with inverse values": we implement this
-by negating the ranking key, and also avoid ever leaving a stack completely
-full when a heuristic other than TLP is used ("reaching the top tier of a
-stack should also be avoided").
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

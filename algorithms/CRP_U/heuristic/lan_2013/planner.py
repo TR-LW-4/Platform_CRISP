@@ -1,43 +1,12 @@
 """
-LA-N look-ahead planner (Petering & Hussein, EJOR 2013).
+Look-ahead planner leftover for the CRP-U packaging of LAN.
 
-Builds a complete RelocationPlan by running the LA-N algorithm on a
-deep copy of the initial yard.  No randomness; deterministic for a
-given (yard, N) pair.
-
-Key concepts
-------------
-c*         : current target container (lowest remaining priority)
-s*         : Stack(c*) = the stack that contains c*
-Low(s)     : lowest-numbered (= earliest-retrieved) container in stack s
-Stacks[a]  : set of stacks that contain one of the a lowest-priority
-             remaining containers
-Top[Q]     : top containers of stacks in set Q
-Topr[Q]    : rth highest-numbered element in Top[Q]  (r=1 = highest)
-
-Algorithm (Steps 0-6 from the paper)
--------------------------------------
-Outer loop (step 1): auto-retrieve all targets already on top.
-Inner single-move decision (steps 2-6):
-  2. N' = min(N, remaining);  r = 1
-  3. Shrink N' while Stacks[N'] covers ALL stacks OR every
-     non-Stacks[N'] stack is at max height.
-  4. Consider n = Topr[Stacks[N']] (iterate r = 1, 2, …):
-       · n == Top(s*)  →  forced relocation (step 6)
-       · else          →  check for good cleaning move (step 5)
-  5. Good cleaning move exists iff
-       E = {s | Low(s) > n_priority, Height(s) < mxHeight}  is non-empty
-       AND n is NOT the lowest-priority container in its own stack.
-     No good move → r += 1, back to step 4.
-  6. Relocate n:
-       D non-empty → stack in D with lowest Low(s)   (conserve good slots)
-       D empty     → non-full stack with highest Low(s) (delay re-relocation)
-
-Reference
----------
-M.E.H. Petering, M.I. Hussein, "A new mixed integer program and extended
-look-ahead heuristic algorithm for the block relocation problem",
-European Journal of Operational Research 231 (2013) 120–130.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

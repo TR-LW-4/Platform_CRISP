@@ -1,39 +1,20 @@
 """
-Wang, Jin, Zhang, Lim (2017) feasibility-based heuristic (FBH) for the
-container pre-marshalling problem.
+WangJinZhangLim2017FBH
+<2017> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Feasibility-based task selection for the CPMP
+tier_protection_p1 --- 0 --- Tier-protection weight P1
+tier_protection_p2 --- 1 --- Tier-protection weight P2
 
-Reference
----------
-N. Wang, B. Jin, Z. Zhang, A. Lim, "A feasibility-based heuristic for the
-container pre-marshalling problem", European Journal of Operational
-Research 256 (2017) 90-101.
-
-Embedding scope
-----------------
-* §4 state representation, container/state stability, surplus vector
-  ``Delta = R - D``, extreme/pre-extreme/dead-end state predicates.
-* §5.2 the six-tuple lexicographic task-selection rule, including the
-  tier-protection dead-end-avoidance mechanism (thresholds ``P1``, ``P2``
-  exposed as config parameters).
-* §5.3 STAP: the exact helper machinery (alpha, EvalMove, Interim /
-  InterimFull, BiSender / BiReceiver) and the full immediate / internal
-  (I1-I3) / external (E1-E4) case analysis for accomplishing one task.
-
-Only the main FBH greedy loop (Algorithm 1) is embedded; the paper has no
-evolutionary/beam-search extension, so there is nothing else to add here.
-
-Documented simplification: for internal tasks (target and aim slot in the
-same stack) in the tight-capacity regime (cases I2/I3), STAP's paper
-pseudocode routes surplus containers through a second temp-stack hand-off
-tied to an exact slot-count formula that could not be reconstructed
-unambiguously from the printed algorithm boxes without risking silent
-mis-tracking of the target container. We use a provably retrieval-safe
-reconstruction instead (see ``stap.py`` module docstring for the full
-rationale); it matches the paper's move-count formulas whenever they are
-achievable and otherwise reports the task as infeasible gracefully rather
-than mis-placing a container. External tasks (E1-E4) have no such
-ambiguity (the drained aim stack itself is always available as overflow)
-and are implemented exactly as printed.
+------------------------------- Reference --------------------------------
+N. Wang, B. Jin, Z. Zhang, A. Lim,
+"A feasibility-based heuristic for the container pre-marshalling problem",
+European Journal of Operational Research 256 (2017) 90–101.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

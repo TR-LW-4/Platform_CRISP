@@ -1,27 +1,12 @@
 """
-IS and IS* — MIP-relaxation-based iterative exact algorithms
-(Lu, Zeng & Liu 2019, Section IV-B + Appendix E).
+IS* iterative exact driver for LuZengLiu2019BRP.
 
-IS  (basic):
-  1. L ← LB4 (strong lower bound)
-  2. While L < L':
-       solve BRP-m3R (without height limit) with T = L turns
-       L' ← optimal value (= L + remaining direct blockages)
-       if L' == L → optimal solution found
-  3. Return optimal solution
-
-IS* (enhanced) adds:
-  a. Fast heuristics to generate initial solutions at each iteration
-  b. Solve BRP-m3R without height limit first; verify height limit
-  c. Reparation heuristic if height limit is violated
-  d. Fall back to BRP-m3R with height limit if reparation fails
-
-Fast heuristics (Appendix E, self-contained)
---------------------------------------------
-  Heuristic 1 — minimise direct blockages at each turn
-  Heuristic 2 — minimise LB4 after each turn
-
-Both return a list of (from_stack, to_stack) relocation actions.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

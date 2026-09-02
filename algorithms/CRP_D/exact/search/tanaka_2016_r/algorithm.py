@@ -1,50 +1,19 @@
 """
-Tanaka & Takii (2016) — Restricted-duplicate branch-and-bound for CRP-D.
+Tanaka2016BBDuplicate
+<2016> <exact> <grouped> <single-bay> <CRP-D>
+Branch-and-bound for restricted BRP with duplicate priorities
+tanaka_time_limit_sec --- 600 --- Per-instance wall-clock limit (s)
 
-Paper
------
-Shunji Tanaka and Kenta Takii,
-"A Faster Branch-and-Bound Algorithm for the Block Relocation Problem,"
-IEEE Transactions on Automation Science and Engineering,
-vol. 13, no. 1, pp. 181–190, January 2016.
-DOI: 10.1109/TASE.2015.2434417
-
-Problem variant
----------------
-Restricted BRP with **duplicate** priorities (CRP-Dr / "duplicate" in paper).
-- Retrieval order: by group; within a group any accessible block may leave.
-- Relocation rule: only the top of the stack above the currently selected
-  target-group member may be relocated (restricted).
-- Objective: minimise total relocations.
-
-Algorithm
----------
-Iterative branch-and-bound (§VI):
-  1. Greedy upper-bound heuristic (§VI-C).
-  2. B&B with depth-first search; target block chosen by branching (§VI-A).
-  3. Lower bound: LB4e (§V-B) — extension of LB4 to duplicate priorities.
-     LB4 is the paper's primary contribution over prior LB3 (Zhu et al. 2012).
-
-Vendor binary
--------------
-``vendor/restricted-duplicate-1.02/brp_bb``  (BSD licence, Shunji Tanaka).
-Compile with ``make`` inside that directory before first use.
-Override via ``extra["tanaka_binary"]`` or env var ``TANAKA_CRPD_BB``.
-
-CLI interface (from main.c)
----------------------------
-  brp_bb [-v|-s] [-S S] [-T T] [-t L] <input_file>
-  -s : silent mode (suppress verbose output; stderr still has opt=/best=)
-  -T T: max tiers (stack height cap)
-  -t L: time limit in seconds
-
-stdout: full solution trace + ``relocations=N``
-stderr: ``opt=N`` (proven optimal) or ``best=N`` (time-limited)
-
-Coupling
---------
-No imports from any other algorithm in the platform.  Depends only on
-``core.base_algorithm`` and this package's ``tanaka_export``.
+------------------------------- Reference --------------------------------
+S. Tanaka, K. Takii,
+"A Faster Branch-and-Bound Algorithm for the Block Relocation Problem",
+IEEE Transactions on Automation Science and Engineering 13 (2016) 181–190.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

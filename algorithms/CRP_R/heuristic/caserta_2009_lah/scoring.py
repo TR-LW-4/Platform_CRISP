@@ -11,7 +11,7 @@ corresponding original algorithm paper.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -70,8 +70,20 @@ def greedy_simulate(
     Run the deterministic greedy heuristic to completion.
     Returns total relocations — used as the greedy score g(A').
     """
+    total, _ = greedy_trajectory(stacks_in, n_total, max_tiers, all_keys)
+    return total
+
+
+def greedy_trajectory(
+    stacks_in: Dict[Any, List[int]],
+    n_total:   int,
+    max_tiers: int,
+    all_keys:  List[Any],
+) -> Tuple[int, List[Any]]:
+    """Return the greedy relocation count and its destination-stack sequence."""
     stacks = {k: list(v) for k, v in stacks_in.items()}
     total  = 0
+    moves: List[Any] = []
 
     for target in range(1, n_total + 1):
         src_key = next((k for k, p in stacks.items() if target in p), None)
@@ -85,12 +97,13 @@ def greedy_simulate(
                 break
             stacks[src_key].pop()
             stacks[dst].append(blocker)
+            moves.append(dst)
             total += 1
 
         if stacks[src_key] and stacks[src_key][-1] == target:
             stacks[src_key].pop()
 
-    return total
+    return total, moves
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -164,7 +177,7 @@ def run_trajectory(
     all_keys:    List[Any],
     rng:         np.random.RandomState,
     ub:          int,
-) -> int:
+) -> Tuple[int, List[Any]]:
     """
     Execute one complete trajectory using the look-ahead + roulette-wheel
     approach (Algorithm 1, lines 4–23).
@@ -176,10 +189,12 @@ def run_trajectory(
 
     Returns
     -------
-    Total relocations in this trajectory, or ub+1 if abandoned.
+    Total relocations and destination-stack sequence.  An abandoned
+    trajectory returns ``(ub+1, [])``.
     """
     stacks = {k: list(v) for k, v in stacks_init.items()}
     total  = 0
+    moves: List[Any] = []
 
     for target in range(1, n_total + 1):
         src_key = next((k for k, p in stacks.items() if target in p), None)
@@ -189,7 +204,7 @@ def run_trajectory(
         while stacks[src_key] and stacks[src_key][-1] != target:
             # Trajectory fathoming: if already at/above best, abandon
             if total >= ub:
-                return ub + 1
+                return ub + 1, []
 
             dst = look_ahead_step(stacks, n_total, max_tiers, all_keys, rng)
             if dst is None:
@@ -198,9 +213,10 @@ def run_trajectory(
             blocker = stacks[src_key][-1]
             stacks[src_key].pop()
             stacks[dst].append(blocker)
+            moves.append(dst)
             total += 1
 
         if stacks[src_key] and stacks[src_key][-1] == target:
             stacks[src_key].pop()
 
-    return total
+    return total, moves

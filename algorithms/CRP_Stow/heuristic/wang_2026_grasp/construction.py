@@ -1,19 +1,12 @@
 """
-Wang et al. (2026) POCRP-RC — Greedy construction (§5.2) and
-Greedy_Randomized_Construction (§5.3.2).
+TR/RR constructive greedy for Wang2026GRASP.
 
-Exports
--------
-run_greedy(env, rng=None)
-    One deterministic (rng=None) or randomised greedy episode.
-    Returns (action_seq, move_records, metrics).
-
-run_greedy_no_deadlock(env, rng=None)
-    Variant of Greedy_Randomized_noRRDL used by LNS to complete partial
-    solutions cheaply — skips deadlock counting in TR and RR (§5.3.3).
-
-replay_actions(env, actions)
-    Replay a saved action list and rebuild move records.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

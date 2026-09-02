@@ -1,22 +1,12 @@
 """
-Layout representation, transitive well-/badly-placed predicates, clean supply
-and move classification for the Bortfeldt & Forster (2012) tree search.
+Bay-state helpers for BortfeldtForster2012TreeSearch.
 
-All definitions follow the paper strictly (Section 4, Table 1). In particular
-the badly-placed predicate is *transitive*: an item is badly placed if the
-item immediately below it has a smaller group index **or** if any item below
-it is itself badly placed. Any item above a badly-placed item is therefore
-also badly placed.
-
-Stack representation
---------------------
-``Stacks[s]`` is a list of group indices bottom -> top. A smaller group index
-means higher priority (i.e. loaded earlier / should sit on top in a final
-layout). The final layout condition (paper §1) is:
-
-    for each stack s and each pair of tiers h > h': arr[h] <= arr[h']
-
-Equivalently, ``arr`` is non-increasing bottom -> top.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

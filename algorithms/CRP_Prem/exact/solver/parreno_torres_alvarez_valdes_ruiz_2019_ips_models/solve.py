@@ -1,22 +1,12 @@
 """
-Section 6 iterative T-search driver for IPS6.
+Iterative T-search driver for ParrenoTorresAlvarezValdesRuiz2019IPS6.
 
-Unlike Lee & Hsu (2007) or de Melo da Silva et al. (2018) -- both of which
-size their model from a heuristic upper bound of unknown tightness (and,
-per this paper's own Section 6, the de Melo da Silva heuristic can loop
-forever without returning a value on some instance shapes) -- this paper's
-own recommended procedure does not need an upper bound at all:
-
-  1. Start at the smallest T that *cannot* be ruled out: T = LB + 1 time
-     points (LB relocation-lower-bound segments), where LB is the cheap
-     "blocking containers" count from Section 3.
-  2. Solve. If Gurobi finds a feasible solution, it is automatically
-     *optimal* (there is no slack to exploit at the smallest feasible T).
-  3. Otherwise increase T by one time point (one more segment) and repeat.
-
-This also means the model does not need the "push moves as early as
-possible" constraint (Eq. 29): the paper notes it is only useful when
-solving with a single, deliberately oversized T.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

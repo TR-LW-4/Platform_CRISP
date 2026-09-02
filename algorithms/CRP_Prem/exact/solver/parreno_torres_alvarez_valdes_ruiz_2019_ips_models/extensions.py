@@ -1,20 +1,12 @@
 """
-Section 8 extensions from Parreno-Torres, Alvarez-Valdes & Ruiz (2019). All
-four are optional add-ons on top of the IPS6 model that only touch the last
-time point's ``x`` variables (or the objective with an infinitesimally
-small extra term), so none of them can change the optimal number of
-relocations -- they only break ties among equally-good solutions.
+Optional IPS strengthening for ParrenoTorresAlvarezValdesRuiz2019IPS6.
 
-* Eq. (40)/(41): cap the container-count difference between adjacent
-  stacks in the final layout (avoid "one empty stack next to a full one").
-* Eq. (42)/(43): forbid an empty or a completely full stack in the final
-  layout.
-* Objective term (h_max - h_min)/(H+1): prefer a more balanced final
-  layout without ever changing the optimal move count, since this term is
-  always < 1 (Section 8.3).
-* Objective term -sum(g_shp)/sum(n_p): prefer same-priority containers
-  stacked directly on top of each other in the final layout, again always
-  < 1 in magnitude (Section 8.4).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

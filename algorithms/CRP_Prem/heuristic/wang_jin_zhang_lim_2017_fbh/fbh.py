@@ -1,14 +1,12 @@
 """
-Algorithm 1: the main Feasibility-Based Heuristic (FBH) loop.
+Feasibility-based construction loop for WangJinZhangLim2017FBH.
 
-    (L, f) <- (L0, U * 1)                       # pre-fix unreachable tiers
-    if (L, f) is a dead end: fail
-    repeat N - S*U times:
-        select task (c -> s*) minimizing the six-tuple over valid tasks T
-        if T is empty: fail
-        accomplish the task via STAP
-        f(s*) <- f(s*) + 1
-    return the move sequence
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

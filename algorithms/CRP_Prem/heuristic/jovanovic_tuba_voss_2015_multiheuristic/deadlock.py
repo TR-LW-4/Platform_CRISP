@@ -1,35 +1,12 @@
 """
-Sec. 4.1: formalized deadlock avoidance (Eq. 7-9).
+Deadlock avoidance for JovanovicTubaVoss2015MultiHeuristic.
 
-The greedy scheme can paint itself into a corner: while temporarily parking
-a container c that is being well-located within its own stack (the s = s*
-case in ``relocation.py`` -- the paper states deadlocks can only arise in
-this sub-case), the tiers above c's temporary resting place become unusable
-(nothing may be stacked above a container that must be picked straight back
-up), which can "use up" bay-wide slack. If this happens repeatedly, some
-later relocation needed to clear c's own stack may have no valid
-destination at all.
-
-Documented simplification: the exact subscripts in the published Eq. 7-9
-are ambiguous (rendering artifacts leave "s(cr)" undefined relative to the
-surrounding text), and a literal "revert, borrow, redo" chain risks a
-capacity double-booking (the freed slot would be claimed by both the
-borrowed container and the redone relocation). We implement the same
-underlying ingredients -- undo an earlier relocation to free a slot, and
-(when that slot is off-limits as a final resting place) borrow one
-container from a random full stack through it -- but never "redo" the
-undone move; the container that was reverted simply becomes not-well-located
-again and is naturally reconsidered by a later iteration of the main loop.
-This preserves the paper's guarantee (progress can always resume) while
-remaining provably capacity-safe.
-
-To maximize the chance of finding a usable slot (rather than only ever
-considering the single most recent relocation), we scan backwards through
-the move history for the most recent relocation whose destination (a) is
-not the stuck stack, and (b) has not been touched (as source or
-destination) by any later move -- which guarantees its top container is
-still exactly what that move placed there, so reverting it in isolation is
-safe.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

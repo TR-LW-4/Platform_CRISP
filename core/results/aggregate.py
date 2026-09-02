@@ -21,6 +21,13 @@ SKIP_METRIC_KEYS = frozenset({
     "retrievals",
     "total_moves",
     "steps",  # usually ≈ relocations for CRP-R step heuristics
+    "feasible",
+    "completed",
+    "validated",
+    "validation_conflicts",
+    "executed_relocations",
+    "search_relocations",
+    "count_match",
 })
 # Back-compat alias
 _SKIP_METRIC_KEYS = SKIP_METRIC_KEYS
@@ -68,8 +75,38 @@ def _class_from_layout_path(path: Path) -> Optional[Tuple[str, str, Dict[str, in
     folder = _parse_zhu_folder_name(path.parent.name)
     if folder is not None:
         h, s, n = folder
-        return "zhu", f"{h}-{s}-{n}", {"h": h, "s": s, "n": n}
+        return "zhu", f"{h}-{s}-{n}", {"h": h, "s": s, "n_dim": n}
     return None
+
+
+def _int_dim(meta: Mapping[str, Any], *keys: str) -> int:
+    for key in keys:
+        raw = meta.get(key)
+        if raw is None:
+            continue
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def class_sort_key(meta: Mapping[str, Any]) -> Tuple:
+    """
+    Sort key for class rows: numeric H then w (Caserta), or H, S, N (Zhu).
+
+    Label strings like ``10×10`` must not be sorted lexicographically
+    (that would put 10 before 3, and 5×10 before 5×4).
+    """
+    source = str(meta.get("source") or "")
+    h = _int_dim(meta, "h")
+    w = _int_dim(meta, "w")
+    s = _int_dim(meta, "s")
+    n_dim = _int_dim(meta, "n_dim")
+    if n_dim == 0 and meta.get("s") is not None and meta.get("w") is None:
+        n_dim = _int_dim(meta, "n")
+    label = str(meta.get("label") or "")
+    return (source, h, w, s, n_dim, label)
 
 
 def _layout_path_from_run(data: Mapping[str, Any]) -> Optional[Path]:
@@ -165,7 +202,7 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
                 metric_values[key][str(name)].append(float(raw))
 
     classes: List[Dict[str, Any]] = []
-    for key in sorted(buckets.keys(), key=lambda k: (k[0], k[1])):
+    for key in sorted(buckets.keys(), key=lambda k: class_sort_key(buckets[k])):
         meta = dict(buckets[key])
         per_metric = metric_values.get(key, {})
         n = max((len(v) for v in per_metric.values()), default=0)

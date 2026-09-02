@@ -1,47 +1,19 @@
 """
-Expósito-Izquierdo, Melián-Batista & Moreno-Vega (2014) — Domain-Specific
-Knowledge-Based (DSK) Heuristic for the Blocks Relocation Problem.
+ExpositoDSK
+<2014> <heuristic> <unrestricted> <single-bay> <CRP-U>
+Domain-specific knowledge scores for unrestricted relocation
+alpha --- 1 --- Top-α randomization (1 = greedy)
 
-Algorithm overview
-------------------
-At each decision step the heuristic identifies the current *target* container
-(the one with the smallest remaining priority) and its *blockers* (all
-containers piled above it in the same stack).  It then enumerates every
-possible relocation of a stack-top container and scores the destination stack
-by the number of containers that would be *blocked* by placing the moving
-container there:
-
-    score(b → s) = |{c ∈ s : c.priority < b.priority}|
-
-A score of 0 means the container is *well-located* (will not cause any future
-relocation in stack s).
-
-For CRP-U (unrestricted BRP), the crane may pick the top container of ANY
-non-empty stack, not only blockers of the current target.  The selection
-therefore:
-  (1) Prefers moves that relocate a **blocker** of the current target.
-  (2) Among those, prefers the destination with the lowest score (0 = best).
-  (3) Non-blocker moves are used only when no blocker move exists.
-
-Top-α randomisation
---------------------
-Setting α > 1 allows independent restarts to explore different trajectories:
-the action is chosen uniformly at random from the α best-scored moves.
-With α = 1 (default) the algorithm is fully deterministic.
-
-Platform interface
-------------------
-- Compatible with **CRP-U** (unrestricted BRP).
-- Uses `env.step(action)` where action = src_i * n_stacks + dst_i.
-- Parameters exposed in `config_schema` (GUI / CLI).
-
-Reference
----------
+------------------------------- Reference --------------------------------
 C. Expósito-Izquierdo, B. Melián-Batista, J.M. Moreno-Vega,
-"A domain-specific knowledge-based heuristic for the Blocks Relocation
- Problem",
+"A domain-specific knowledge-based heuristic for the Blocks Relocation Problem",
 Applied Soft Computing 14 (2014) 1–20.
-https://doi.org/10.1016/j.asoc.2014.04.007
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

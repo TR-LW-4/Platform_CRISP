@@ -1,25 +1,12 @@
 """
-Layout state for the Wang, Jin, Zhang, Lim (2017) feasibility-based
-heuristic (FBH).
+Bay-state representation for WangJinZhangLim2017FBH.
 
-Reference: N. Wang, B. Jin, Z. Zhang, A. Lim, "A feasibility-based heuristic
-for the container pre-marshalling problem", EJOR 256 (2017) 90-101.
-
-State representation (paper §4, Definitions 1-2)
---------------------------------------------------
-A state is a pair ``(L, f)``: a layout ``L`` (stacks of group labels, bottom
-to top) and a fix vector ``f`` giving, per stack, the number of *fixed*
-containers. Fixed containers are orderly containers that have been locked to
-a slot; by construction they always form a contiguous prefix from the bottom
-of a stack (exactly as in Wang, Jin & Lim 2015's TGH), so -- as in that
-module -- we track only the integer ``fixed_height[s]``.
-
-Group-label convention: a container is *orderly* if it is supported by the
-ground or by another orderly container with an equal or larger group value;
-i.e. group labels are non-increasing from bottom to top (same convention as
-"clean" in the 2015 TGH paper and "well-placed" in Bortfeldt & Forster 2012).
-The ground is treated as an occupied slot at (conceptual) tier 0 with group
-value ``G`` (the paper's largest group value / weakest constraint).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

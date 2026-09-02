@@ -30,6 +30,8 @@ from core.zhu_dup_benchmark import (
 
 BENCH_PROBLEMS = frozenset({"CRP-R", "CRP-U"})
 BENCH_DUP_PROBLEMS = frozenset({"CRP-D"})
+# These problems only accept Caserta / Zhu / ZhuDup files — no random layouts.
+NO_RANDOM_PROBLEMS = BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
 
 SOURCE_RANDOM = "random"
 SOURCE_CASERTA = "caserta"
@@ -55,11 +57,13 @@ def dup_root() -> Path:
 
 def available_for_problem(problem_name: str) -> Dict[str, Any]:
     """Return selectable instance sources and indexes for one problem."""
-    sources: List[Dict[str, Any]] = [{
-        "id": SOURCE_RANDOM,
-        "label": "Random Layout",
-        "available": True,
-    }]
+    sources: List[Dict[str, Any]] = []
+    if problem_name not in NO_RANDOM_PROBLEMS:
+        sources.append({
+            "id": SOURCE_RANDOM,
+            "label": "Random Layout",
+            "available": True,
+        })
 
     if problem_name in BENCH_PROBLEMS:
         ws_by_height = index_ws_by_height(caserta_root())
@@ -203,6 +207,11 @@ def source_tag(source: str) -> str:
 
 def validate_source_for_problem(problem_name: str, source: str) -> None:
     if source == SOURCE_RANDOM:
+        if problem_name in NO_RANDOM_PROBLEMS:
+            raise ValueError(
+                f"{problem_name} uses standard benchmark instances only "
+                "(Caserta/Zhu for CRP-R/U, ZhuDup for CRP-D)"
+            )
         return
     if source in {SOURCE_CASERTA, SOURCE_ZHU} and problem_name not in BENCH_PROBLEMS:
         raise ValueError(f"{source} benchmark requires CRP-R or CRP-U")

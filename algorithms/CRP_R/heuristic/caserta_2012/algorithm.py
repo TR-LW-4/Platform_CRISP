@@ -64,6 +64,16 @@ class CasertaHeuristic(BaseAlgorithm):
             env.yard,
             getattr(env.config, "extra", None) or {},
         )
+        metrics["time"] = metrics["crane_time"]
+        metrics["feasible"] = float(done)
+        metrics["completed"] = float(done)
+        metrics["validated"] = 1.0
+        metrics["validation_conflicts"] = 0.0 if done else 1.0
+        if not done:
+            metrics["executed_relocations"] = float(
+                metrics.get("relocations", 0.0)
+            )
+            metrics["relocations"] = float("inf")
         primary = float(metrics.get("relocations", 0.0))
         self._best_solution = solution[:]
         moves = export_yard_moves(env.yard)
@@ -74,7 +84,6 @@ class CasertaHeuristic(BaseAlgorithm):
             metric=primary,
             metrics=metrics,
             progress=1.0,
-            snapshot=env.get_state_snapshot(),
             extra={
                 "moves": moves,
                 "solution": solution[:],

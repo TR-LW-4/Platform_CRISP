@@ -1,43 +1,12 @@
 """
-ENAR (Expected Number of Additional Relocations) for group-priority BRP.
+Group-priority ENAR scoring for KimHong2006GroupENAR.
 
-Implements:
-  - E(k, n)  via Equation (2) in Kim & Hong (2006), §3.2
-  - enar_stack()   total ENAR for one stack given current bay state
-  - enar_bay()     sum of enar_stack() over all stacks
-
-Reference
----------
-K.H. Kim and G.-P. Hong,
-"A heuristic rule for relocating blocks",
-Computers & Operations Research 33 (2006) 940–954.
-
-Notation (from paper)
----------------------
-  N   : total blocks currently in bay
-  T   : expected maximum stack height (= average current height, ≥ 1)
-  n   : "highest priority number" = highest group code currently in stack,
-        i.e. the group-code whose container would be retrieved last
-        (larger group code = retrieved later)
-  k   : number of empty slots in the stack (T − actual height; ≥ 0)
-  ni  : number of blocks with group code i remaining in the bay,
-        EXCLUDING blocks in the stack under consideration
-  E(k, n) : expected additional relocations from k empty slots in a stack
-            whose highest group code is n
-
-Equation (2):
-  E(0, n) = 0
-  E(k, n) = [Σ_{i=1}^{n} ni·E(k-1,i) + (N-T+k - Σ_{i=1}^{n} ni)·(1+E(k-1,n))]
-            / (N - T + k)
-
-T for a given stack is computed as:
-  max(1, average height of all stacks that are non-empty,
-         including a 1-slot allowance for full stacks)
-
-For stacks that are ALREADY at or above T:
-  we still allow exactly 1 virtual empty slot (T_eff = actual_height + 1),
-  unless the stack is at the hard capacity limit (is_full), in which case
-  it is excluded (ENAR = 0 and not a candidate destination).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

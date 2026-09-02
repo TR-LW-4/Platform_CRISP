@@ -1,32 +1,20 @@
 """
-Galle et al. — Pruning-Best-First-Search (PBFS / PBFSA) for the SCRP.
+PBFSBatchExact
+<2018> <exact> <stochastic> <single-bay> <CRP-Stoch>
+Pruning-best-first search on the SCRP chance/decision tree
+time_limit_s --- 3600 --- Search time limit (s)
+error_gap --- 0 --- PBFSA average-error gap (0 = exact)
 
-Three algorithms from the same reference implementation, following the
-grouping convention used elsewhere in this codebase (e.g.
-``zehendner_2017_level/algorithm.py`` bundles L + R + M in one file):
-
-- ``PBFSBatchExact``  : exact batch-model solver (``PBFS`` in the paper),
-  run here via ``PBFSA`` with ``error_gap=0``.
-- ``PBFSAApprox``     : randomized approximate batch-model solver with a
-  bounded average error (``PBFSA``, Section 4 of the paper).
-- ``PBFSOnlineExact`` : exact online-model solver (``PBFS_Online``).
-
-All three explore a chance/decision tree with best-first pruning driven
-by the Blocking lower bound and a rolling look-ahead lower bound, and
-fall back to a deterministic A* tail solver (also ported) once the full
-retrieval order of the last batch is known.
-
-Ported from the reference implementation
-------------------------------------------
-`https://github.com/vgalle/StochasticCRP` (vendored at
-`/data/liuw2/StochasticCRP-master`).  Core search logic lives in
-:mod:`core.stoch.galle_2017_source`.
-
-Reference
----------
-V. Galle, S. Borjian Boroujeni, V. H. Manshadi, C. Barnhart, P. Jaillet,
-"The Stochastic Container Relocation Problem", 2017 (source repository);
-published as Galle et al., *Transportation Science* 52(5), 2018.
+------------------------------- Reference --------------------------------
+V. Galle, S. Borjian Boroujeni, V.H. Manshadi, C. Barnhart, P. Jaillet,
+"The Stochastic Container Relocation Problem",
+Transportation Science 52 (2018) 1030–1047.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,51 +1,12 @@
 """
-Python <-> vendored-C bridge for Tanaka & Tierney (2018)'s IDBB solver.
+Python–C bridge for TanakaTierney2018IDBB.
 
-The vendored program (``vendor/pmp-1.02/``, copied verbatim from the
-authors' own public release, see ``vendor/pmp-1.02/VENDOR_README.md``) is a
-single-threaded, iterative-deepening branch-and-bound (IDBB) search over the
-number of relocations, with:
-  * the Bortfeldt & Forster lower bound plus the two "improved" tightenings
-    the paper calls LB_BF (its own IBF1/IBF2 refinements), enabled by
-    default in the vendored ``solve.c``;
-  * dominance rules pruning unrelated / transitive / same-group-symmetric
-    moves (``TYPE1`` dominance check, also default-on);
-  * a greedy heuristic used only to seed the initial upper bound.
-
-This module handles everything needed to treat that C program as an
-in-process function call from Python:
-  1. lazily compiling it (``make``) the first time it is needed, caching the
-     resulting binary next to the vendored sources;
-  2. encoding this platform's ``Stacks`` representation into the program's
-     plain-text instance format;
-  3. running it as a subprocess with a wall-clock time limit;
-  4. parsing its stdout/stderr back into a move list plus solved/optimal
-     flags.
-
-Instance format (verified empirically against the compiled binary; see
-``main.c:read_file``'s ``file_type == 1`` branch):
-
-    Tiers: <max_tiers>
-    Stacks: <n_stacks>
-    Containers: <n_containers>
-    Stack 1: <bottom> ... <top>
-    Stack 2: ...
-    ...
-
-Each ``Stack k:`` line lists that stack's priority values left-to-right,
-bottom of stack first -- i.e. exactly this platform's own ``Stacks`` list
-convention, no reordering needed. Priority values need not be contiguous or
-unique: the C program internally re-ranks them into compact 0-indexed
-groups (``problem->duplicate`` handling in ``main.c``), so groups of
-containers that already share a priority value are treated as mutually
-interchangeable, exactly like this platform's own well-located definition.
-
-Known upstream limitation (compile-time constant, not something this
-wrapper can change without patching the vendored source): the program
-gives up with "No feasible solution found." if the optimal solution needs
-more than ``MAX_N_RELOCATION = 200`` relocations. This is far beyond what
-any reasonably-sized pre-marshalling instance should need, but is
-documented here for completeness.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

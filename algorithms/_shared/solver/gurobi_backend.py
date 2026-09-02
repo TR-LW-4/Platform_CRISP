@@ -1,9 +1,12 @@
 """
-Shared Gurobi utilities for Platform_CRISP MIP/IP algorithms.
+Shared Gurobi solve/export helpers for MIP algorithms.
 
-All gurobipy imports are deferred to function bodies so that this module
-can be imported safely even when Gurobi is not installed (the registry
-scanner will simply skip solver algorithms if they fail to build a model).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 from core.results.aggregate import (
     SKIP_METRIC_KEYS,
     _layout_path_from_run,
+    class_sort_key,
     summarize_run_dicts,
 )
 
@@ -199,22 +200,21 @@ def compare_algorithms(
     if metric not in available_metrics and available_metrics:
         metric = available_metrics[0]
 
-    # Union of class labels preserving caserta/zhu sort via summarize order.
-    class_order: List[str] = []
+    # Union of class labels, then sort by numeric H×w (not first-algorithm order).
     class_meta: Dict[str, Dict[str, Any]] = {}
     for algo in algos:
         for row in (per_algo_summary[algo].get("classes") or []):
             label = str(row.get("label") or "?")
             if label not in class_meta:
-                class_order.append(label)
                 class_meta[label] = {
                     "label": label,
                     "source": row.get("source"),
                     "h": row.get("h"),
                     "w": row.get("w"),
                     "s": row.get("s"),
-                    "n_dim": row.get("n"),
+                    "n_dim": row.get("n_dim"),
                 }
+    class_order = sorted(class_meta.keys(), key=lambda lab: class_sort_key(class_meta[lab]))
 
     lower_better = metric in _LOWER_IS_BETTER
     rows: List[Dict[str, Any]] = []

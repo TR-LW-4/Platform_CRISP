@@ -1,36 +1,19 @@
 """
-Tanaka & Mizuno (2018) branch-and-bound adapter for the Unrestricted BRP.
+TanakaMizuno2018BB
+<2018> <exact> <unrestricted> <single-bay> <CRP-U>
+Branch-and-bound for unrestricted BRP with distinct priorities
+tanaka_mizuno2018_time_limit_sec --- 600 --- Per-instance wall-clock limit (s)
 
-Wraps the ``unrestricted-distinct-1.01`` C binary (``ubrp_bb``) which
-accompanies:
-
-  S. Tanaka and F. Mizuno,
-  "An exact algorithm for the unrestricted block relocation problem",
-  Computers & Operations Research, 95:12-31, 2018.
-
-The binary implements a branch-and-bound search tailored to CRP-U:
-  - Blocks may be relocated from the top of *any* stack (not only the
-    target's stack), corresponding to the unrestricted variant (CRP-U).
-  - Lower bounds: LB1 (badly-placed count), LB2 (Caserta et al.), LB3
-    (improved Caserta), LB4 (Tanaka & Mizuno strengthened bound).
-  - Dominance rules to prune symmetric search paths.
-  - Greedy initial upper bound from heuristics.c.
-
-Input/output format is identical to the restricted solver
-(``restricted-distinct-1.11``), so the same export helper is reused.
-
-Command-line flags used:
-  -s          silent (no verbose output)
-  -T T        stack height limit (max tiers)
-  -t L        wall-clock time limit in seconds
-
-Unlike the 2022 restricted solver, this binary does NOT support OpenMP
-(-m) or backtrack-restart (-b).
-
-Binary path resolution (first match wins):
-  1. ``extra["tanaka_mizuno2018_binary"]``
-  2. Env var ``TANAKA_MIZUNO2018_UBRP_BB``
-  3. Bundled ``vendor/unrestricted-distinct-1.01/ubrp_bb``
+------------------------------- Reference --------------------------------
+S. Tanaka, F. Mizuno,
+"An exact algorithm for the unrestricted block relocation problem",
+Computers & Operations Research 95 (2018) 12–31.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

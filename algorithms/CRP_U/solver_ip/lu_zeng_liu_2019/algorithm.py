@@ -1,52 +1,21 @@
 """
-Lu, Zeng & Liu (2019) — Strong MIP formulations and LB4 for CRP-U.
+LuZengLiu2019BRP
+<2019> <exact> <unrestricted> <single-bay> <CRP-U>
+LB4, BRP-m3, and IS* iterative MIP solver
+mode --- IS* --- LB4-only or IS* exact mode
+time_limit_s --- 3600 --- Gurobi time limit (s)
 
-Paper
------
+------------------------------- Reference --------------------------------
 C. Lu, B. Zeng, S. Liu,
 "A Study on the Block Relocation Problem: Lower Bound Derivations
  and Strong Formulations",
 IEEE Transactions on Automation Science and Engineering, 2019.
-arXiv:1904.03347
-
-Contributions embedded
------------------------
-1. **LB4** — strongest known lower bound for CRP-U (Section III).
-   Uses virtual-layer structures to dominate LB1, LB2, LB3 and LB-N.
-   Computed via algorithms A5/A5*/A7/A8 (O(B²S) time).
-
-2. **BRP-m3** — new MIP formulation (Section IV-A).
-   Uses block-adjacency variables instead of stack-position variables.
-   Significantly smaller model than BRP-m2 (da Silva 2018); often 100×
-   faster on standard benchmark instances.
-
-3. **IS / IS\*** — MIP-relaxation-based iterative exact algorithm (IV-B).
-   IS:   iterate BRP-m3R (relaxed) with LB4 warm-start → usually 1–2 iters.
-   IS\*: enhanced with fast heuristics, reparation, and height-limit handling.
-
-Platform configuration (extra parameters)
-------------------------------------------
-mode          : str   'IS*' (default) | 'IS' | 'BRP-m3' | 'LB4-only'
-time_limit_s  : float 3600.0 (default). Gurobi / overall time budget per seed.
-output_flag   : int   0 (default, silent). 1 = Gurobi console output.
-verbose       : bool  False. Print per-seed summary.
-
-Mode descriptions
------------------
-'IS*'      — Enhanced iterative scheme (recommended).  Uses LB4 init +
-             heuristics + BRP-m3R iterations + reparation.
-'IS'       — Basic iterative scheme.  Simpler but slightly slower.
-'BRP-m3'   — Solve BRP-m3 directly with Gurobi (single MIP solve).
-             Requires Gurobi with adequate license for the instance size.
-'LB4-only' — Only compute and report LB4 (no MIP solve).  Useful for
-             benchmarking lower bound quality without Gurobi.
-
-Coupling / dependencies
-------------------------
-This module is **fully self-contained**:
-  - No imports from other platform algorithms.
-  - Only standard deps: core.base_algorithm, core.yard (Yard read-only).
-  - Gurobi (gurobipy) is imported lazily; 'LB4-only' mode needs no solver.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

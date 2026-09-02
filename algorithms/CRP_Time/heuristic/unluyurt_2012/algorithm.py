@@ -1,58 +1,18 @@
 """
-Ünlüyurt & Aydın (2012) — Difference1 heuristic for CRP-R / CRP-Time.
+UnluyurtAydinDifference
+<2012> <heuristic> <time> <single-bay> <CRP-Time>
+Difference1 three-rule destination selection
 
-Reference
----------
+------------------------------- Reference --------------------------------
 T. Ünlüyurt, C. Aydın,
 "Improved rehandling strategies for the container retrieval process",
 Journal of Advanced Transportation 46 (2012) 378–393.
-https://doi.org/10.1002/atr.1193
-
-Algorithm — Difference1 (§4.2)
--------------------------------
-When container X must be relocated, choose the destination stack by three
-priority rules applied in order:
-
-  Rule 1 — Ideal stack (top_priority > X):
-    The relocating container will be retrieved before the current top of
-    the destination stack, so no new blocking is created.
-    Among all ideal stacks, select the one whose top_priority is closest
-    to X from above (minimise top_priority − X).
-
-  Rule 2 — Reverse-order buffer (top_priority < X):
-    No ideal stack is available; a future rehandle is unavoidable.
-    Stack containers in reverse order so they are easiest to re-sort later.
-    Among these stacks, select the one whose top_priority is closest to X
-    from below (minimise X − top_priority).
-
-  Rule 3 — Fallback:
-    Neither Rule 1 nor Rule 2 applies. Minimise |top_priority − X|
-    unconditionally. Empty stacks are treated as top_priority = N + 1.
-
-Paper context (§2, §4.2)
--------------------------
-The paper focuses on a **single bay** with two objectives:
-  Objective1: min number of relocations  (= CRP-R objective)
-  Objective2: min A × pickups + B × horizontal_distance
-
-Difference1 was designed for Objective1.  The three Rules do not depend
-on any time formula; they solely use retrieval priority order.
-Primary metric here is ``relocations``.  On CRP-Time environments the
-environment additionally computes ``crane_time`` via Lee & Lee (2010)
-kinematics.
-
-Bay support
------------
-[single-bay origin]  The paper assumes a single bay.
-On multi-bay instances, Rules 1–3 consider all valid stacks across bays
-without penalising cross-bay gantry travel. The relocation count is still
-correct, but crane_time on multi-bay yards is only approximated.
-Use num_bays=1 for faithful replication of the paper's intended behaviour.
-
-Numerical results (Table VI, paper)
-------------------------------------
-Objective1 (min relocations): avg optimality gap 1.83 %, finds optimal
-for 72.55 % of instances — best among all three proposed heuristics.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

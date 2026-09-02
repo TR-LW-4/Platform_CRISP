@@ -1,15 +1,20 @@
 """
-Huang & Lin (2012) labelling heuristics for pre-marshalling.
+HuangLin2012LabellingTypeA
+<2012> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Type-A R/W stack-labelling heuristic
+b --- 0.4 --- Buffer-stack fraction
+num_restarts --- 1 --- Randomized restarts
 
-This embedding implements Type-A from:
+------------------------------- Reference --------------------------------
 S.-H. Huang, T.-H. Lin,
 "Heuristic algorithms for container pre-marshalling problems",
-Computers & Industrial Engineering 62 (2012) 13-20.
-
-Type-A objective:
-  - rearrange stacks so higher-priority containers (smaller index) are above
-    lower-priority ones in each stack
-  - minimize relocations heuristically via stack-state labelling
+Computers & Industrial Engineering 62 (2012) 13–20.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

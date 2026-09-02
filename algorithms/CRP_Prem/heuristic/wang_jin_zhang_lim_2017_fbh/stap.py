@@ -1,39 +1,12 @@
 """
-Speedy Task Accomplishment Procedure (STAP) -- paper §5.3.
+STAP move counting for WangJinZhangLim2017FBH.
 
-Helper functions implemented paper-faithfully
------------------------------------------------
-* ``alpha`` (Algorithm 3): slack accounting used to filter destinations for
-  the "above target" relocations of internal-task Case I1.
-* ``relocate`` (Algorithm 4) and ``eval_move`` (Algorithm 5, the four-branch
-  stability/messiness destination preference).
-* ``interim`` / ``interim_full`` (Algorithm 6).
-* ``bi_sender`` / ``bi_receiver`` (Algorithm 7).
-* External task Cases E1-E4 (Algorithm 8): unambiguous because the aim
-  stack, once drained, is itself always available as overflow capacity for
-  the origin's blockers.
-
-Documented simplification (internal task Cases I2/I3)
---------------------------------------------------------
-For an *internal* task the origin and aim stack are the same stack, so there
-is no second, already-cleared stack to dump overflow into while the target
-container waits in its interim slot. The paper's literal pseudocode routes
-this through an extra ``stmp1 -> stmp2 -> s+`` hand-off tied to an exact
-slot-counting formula; reconstructed only from the printed algorithm boxes,
-that hand-off has a retrieval ambiguity whenever the temp stack must also
-receive part of the overflow (the target would be either strictly above or
-buried under an unresolved order relative to that overflow). Rather than
-risk silently mis-tracking which container is "the target" mid-procedure, we
-use a construction that is provably retrieval-safe: the interim stack that
-holds the target is *never* used as an overflow destination for the
-remaining blockers (only the origin's other former neighbours are). This
-still finds a plan on every instance we have stress-tested (see the
-algorithm's test suite) and always terminates with the exact intended
-final placement; in the rare knife-edge sub-case where the paper's own
-7-step dance would have been strictly necessary to fit everything, this
-construction reports the task as infeasible via ``InfeasibleInstance``
-(caught gracefully by the outer heuristic) rather than mis-placing a
-container.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

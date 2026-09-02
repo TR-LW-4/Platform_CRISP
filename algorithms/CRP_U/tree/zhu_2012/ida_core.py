@@ -1,39 +1,12 @@
 """
-Zhu, Qin, Lim & Zhang (2012) IDA* search engine — unrestricted variant.
+IDA* search core for Zhu2012IDAStarU.
 
-W. Zhu, H. Qin, A. Lim, H. Zhang, "Iterative deepening A* algorithms for
-the container relocation problem", IEEE Transactions on Automation
-Science and Engineering 9(4) (2012) 710-722.
-
-Self-contained IDA* engine (Algorithm 1 / Algorithm 2 of the paper) for
-the *unrestricted* variant (CRP-U): a relocation may move the top
-container of *any* stack (not only blockers above the current target)
-to any other non-full stack.
-
-Deliberately duplicates the state representation, LB1/LB3 and the
-PR1-PR4 destination-selection helpers already written for the
-restricted variant (``CRP_R/exact/search/zhu_2012/ida_core.py``) rather
-than importing them, so this package stays independent and can be
-added/changed/removed without touching CRP_R (same convention as the
-platform's other paired R/U implementations, e.g. GLAH).
-
-Components implemented
------------------------
-- Minimum equivalent layout reduction (shared with CRP-R: only the
-  *retrieval* semantics are identical between R and U -- only the set
-  of legal *relocation* moves differs).
-- LB1 (Eq. 1, admissible for both variants) and, optionally, LB3
-  (Eqs. 3-4) reused *as-is* from the restricted analysis; the paper
-  notes LB3 is **not proven admissible for the unrestricted variant**
-  but that the more aggressive pruning it produces can still yield
-  better solutions under a strict time budget (IDA*-UM3) -- at the
-  cost of never being able to certify optimality.
-- Probe heuristics PU1 / PU2 (Section V-B.2), built on top of the
-  restricted PR3 / PR4 destination rule with the "relocate a helper
-  stack's own local minimum out of the way first" refinement.
-- IDA* main loop with an optional transposition table (dict of
-  ``state -> best depth seen``) to avoid re-exploring identical
-  layouts reached via different move sequences (IDA*-UM).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

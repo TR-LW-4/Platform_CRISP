@@ -13,7 +13,7 @@ python main.py list
 python main.py test
 
 # Run a single experiment from the command line
-python main.py run --problem "CRP-Stow" --algo "Genetic Algorithm" --iterations 200
+python main.py run --problem "CRP-R" --algo "Caserta (2012) HEUR"
 
 # Run one benchmark layout (Caserta .dat or Zhu .txt) without the web UI — prints metrics
 python main.py layout-run --problem "CRP-R" --algo "Caserta (2012) HEUR" \\

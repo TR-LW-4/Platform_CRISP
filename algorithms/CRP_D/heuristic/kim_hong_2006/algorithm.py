@@ -1,42 +1,18 @@
 """
-Kim & Hong (2006) — Group-priority ENAR heuristic for CRP-D.
+KimHong2006GroupENAR
+<2006> <heuristic> <grouped> <single-bay> <CRP-D>
+Group-priority ENAR relocation rule
 
-Paper
------
-K.H. Kim and G.-P. Hong,
+------------------------------- Reference --------------------------------
+K.H. Kim, G.-P. Hong,
 "A heuristic rule for relocating blocks",
 Computers & Operations Research 33 (2006) 940–954.
-§3.2 (Equation 2) + §3.3.2 (group-priority heuristic rule).
-
-What is implemented
--------------------
-This module implements the **group-priority** portion of Kim & Hong (2006):
-
-  - **ENAR formula (Eq. 2)** — estimates the expected number of additional
-    relocations caused by future blocks landing in a stack's empty slots,
-    accounting for each group's remaining count (ni).
-
-  - **§3.3.2 heuristic** — at each step:
-    1. Enumerate all accessible target-group containers (candidates).
-    2. For each candidate, greedily assign destinations for its blockers
-       top-down using the ENAR scoring R[a] = E(S') - E(S) + r.
-    3. Choose the candidate (target container) with minimum total R[a].
-    4. Execute the first relocation of the winning candidate's plan.
-
-    This reduces the exponential action space to O(|candidates| × |blockers|)
-    greedy evaluations per step.
-
-Scope
------
-  - Compatible with CRP-D (duplicate / group-priority, unrestricted moves).
-  - CRP-R individual-priority ENAR is already in CRP_R/heuristic/kim_hong/.
-  - B&B exact algorithm (§2) is NOT implemented here (NP-hard, slow for large
-    instances; see kim_hong/CRP_R for the individual-priority reference).
-
-Action space
-------------
-  CRP-D: Discrete(S²), action = src_idx * S + dst_idx  (S = num_stacks).
-  The algorithm always relocates the topmost container of a chosen source stack.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

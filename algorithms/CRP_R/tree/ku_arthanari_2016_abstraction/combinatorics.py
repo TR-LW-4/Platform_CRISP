@@ -1,37 +1,12 @@
 """
-Ku & Arthanari (2016) — enumeration formulas for the abstraction method.
+Enumeration formulas for KuArthanari2016Abstraction.
 
-Reference
----------
-D. Ku, T. S. Arthanari, "On the abstraction method for the container
-relocation problem", Computers & Operations Research 68 (2016) 110-122,
-Section 4.1 ("Enumeration of stacking configurations").
-
-This module implements the paper's combinatorial results in isolation
-(pure counting functions, no search) so that:
-  (a) the abstraction search engine (``abstraction_core.py``) can size
-      its pattern database / warn the user before spending memory, and
-  (b) the results are independently checkable against the paper's own
-      worked example (Table 2: r=8 units on an n=5, m=3 stack) --
-      see ``test_abstraction.py``.
-
-Definitions / equations reproduced
------------------------------------
-Definition 3   nHr        -- r-combinations with unlimited repetition of
-                              an n-element set (Eq. before Lemma 1).
-Lemma 1        g(n,r,m,i) -- number of stacking profiles with >= i
-                              columns overloaded (>= m+1 units each).
-Corollary 2    illegal(n,r,m) -- |union of illegal profiles| via
-                              inclusion-exclusion on Lemma 1's g(i).
-Theorem 1      C(n,r,m)   -- number of *stacking profiles* (shapes,
-                              column identity forgotten) of r units on
-                              an n x m stack (Eq. C = nHr - illegal).
-Theorem 2      P(n,r,m)   -- number of *stacking configurations*
-                              (distinct units 1..r, column identity
-                              kept) = C(n,r,m) * r!  (Eq. 3).
-Theorem 3      A(n,r,m)   -- number of *abstract states* (column
-                              identity forgotten, i.e. the size of the
-                              PDB's index space at r units).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -44,8 +19,7 @@ def _comb(n: int, r: int) -> int:
     """
     C(n, r), with the paper's convention C(n,r) = 0 for r < 0 or r > n.
     Hand-rolled (iterative multiplicative formula) instead of
-    ``math.comb`` for Python 3.7 compatibility (``math.comb`` needs 3.8+,
-    and this platform targets 3.7 -- see other ``exact/search/*`` modules).
+    ``math.comb`` for Python 3.7 compatibility (``math.comb`` needs 3.8+).
     """
     if r < 0 or n < 0 or r > n:
         return 0

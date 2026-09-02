@@ -1,16 +1,12 @@
 """
-Export a CRP-D yard snapshot to Tanaka ``restricted-duplicate`` input format.
+Yard → Tanaka–Takii B&B binary input for Tanaka2016BBDuplicate.
 
-Tanaka's reader (``main.c``) expects:
-  Line 1: ``n_stack n_block``
-  Line 2: whitespace-separated sequence of ``height priority_0 … priority_{h-1}``
-           repeated for each stack 0 … n_stack-1 (bottom → top, tier 0 first).
-
-This format is identical to the CRP-R export; the binary natively handles
-duplicate priorities (group IDs).  A group ID repeated across containers is
-valid input — the solver branches on target-block selection within the group.
-
-Stack order: index i → bay i // num_rows + 1, row i % num_rows + 1.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,47 +1,12 @@
 """
-Normal and extra compound-move generation (Bortfeldt & Forster 2012, §6.1-6.2).
+BG/BB/GG/GB compound moves for BortfeldtForster2012TreeSearch.
 
-A compound move is a permitted sequence of moves that share the same donator
-stack and belong to a single move-type family:
-
-  * Normal compound move: only BG moves. Extended until no further BG move
-    from the donator is possible (i.e. max length).
-  * Extra compound move : only non-BG moves (BB, GG, GB). Every non-empty
-    permitted prefix is admissible.
-
-Filtering rules
----------------
-Normal (§6.1):
-  (N1) Discard moves whose ``dg = g(receiver_top) - g(item)`` is not minimum;
-       empty receiver contributes ``g(receiver_top) = G``.
-  (N2) Keep only moves with the highest receiver slot (``prmax``).
-  (N3) Pick the first survivor.
-
-Extra (§6.2):
-  (E1) If any GG move exists, discard all BB / GB. Otherwise, if any move has
-       a dirty receiver, discard moves with a clean receiver.
-  (E2) Compute ``dg`` with empty receiver contributing ``0`` (**note the
-       difference vs. normal**). If any move has ``dg <= 0``, discard moves
-       with ``dg > 0``.
-  (E3) Keep only moves with the highest receiver slot.
-  (E4) Pick the first survivor.
-
-Sorting (§6.1, §6.2)
---------------------
-Normal: (num_moves desc, clean_supply desc).
-Extra : (num_moves asc,  clean_supply desc). The compound move with the
-        globally maximum clean supply is guaranteed to be among the top
-        ``n_succ`` returned.
-
-Acceptance
-----------
-A compound move ``cm`` from partial solution ``s_imported`` on layout ``L`` is
-accepted only when
-
-    nm(s_imported) + nm(cm) + lb_moves(L_after) < target
-
-where ``target`` is ``nm(s*)`` if a best solution ``s*`` already exists, else
-``round(pub * lb_moves(L_init))`` (paper §6.1).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

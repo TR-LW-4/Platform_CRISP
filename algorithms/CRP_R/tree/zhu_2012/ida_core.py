@@ -1,28 +1,12 @@
 """
-Zhu, Qin, Lim & Zhang (2012) IDA* search engine — restricted variant.
+IDA* search engine for Zhu2012IDAStarR.
 
-W. Zhu, H. Qin, A. Lim, H. Zhang, "Iterative deepening A* algorithms for
-the container relocation problem", IEEE Transactions on Automation
-Science and Engineering 9(4) (2012) 710-722.
-
-This module is a *self-contained* IDA* engine (Algorithm 1 / Algorithm 2
-of the paper) operating on a lightweight, hashable layout representation
--- ``State = Tuple[Tuple[int, ...], ...]`` (one inner tuple per stack,
-containers ordered bottom -> top by *priority*).  Using plain tuples
-(instead of cloning ``core.yard.Yard`` at every node, as ``kim_hong_2006``
-does) keeps node generation cheap, which matters a lot for IDA* since it
-revisits shallow nodes many times across iterations.
-
-Components implemented
------------------------
-- Minimum equivalent layout reduction (auto-retrieve consecutive tops).
-- Lower bounds LB1, LB2, LB3 (Section V-A, Eqs. 1-4).
-- Probe heuristics PR1-PR4 (Section V-B) for the restricted variant.
-- IDA* main loop (Algorithm 1) + depth-first branch-and-bound with
-  probing (Algorithm 2).
-
-Only *containers above the target's own stack* may ever be relocated
-(the restricted variant / Assumption A1), matching CRP-R.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

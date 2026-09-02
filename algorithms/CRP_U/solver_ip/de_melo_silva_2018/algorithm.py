@@ -1,19 +1,21 @@
 """
-de Melo da Silva, Toulouse, Wolfler Calvo (2018)
+DeMeloSilva2018BRP
+<2018> <exact> <unrestricted> <single-bay> <CRP-U>
+Time-indexed MIP for unrestricted BRP (m1 / m2)
+variant --- m1 --- Formulation: m1 (T=UB+N) or m2 (T=UB)
+time_limit_s --- 3600 --- Gurobi time limit (s)
+
+------------------------------- Reference --------------------------------
+M. de Melo da Silva, S. Toulouse, R. Wolfler Calvo,
 "A new effective unified model for solving the Pre-marshalling and
-Block Relocation Problems"
+ Block Relocation Problems",
 European Journal of Operational Research 271 (2018) 40–56.
-
-This module implements the **Unrestricted BRP** formulations:
-  m1 (BRP m1): Eq. (23)–(38).  Stronger LP relaxation; T = UB + N.
-  m2 (BRP m2): Eq. (39)–(50).  More compact; T = UB (relocations only).
-
-The unrestricted BRP allows relocating the top container of *any* stack
-(not only the target's stack), corresponding to CRP-U in this platform.
-
-Select with  extra["variant"] = "m1"  (default) or  "m2".
-
-Solver: Gurobi (gurobipy).  Academic Named-User License recommended.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

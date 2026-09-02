@@ -1,16 +1,20 @@
 """
-Parreno-Torres, Alvarez-Valdes, Ruiz, Tierney (2020) CPMPCT.
+ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT
+<2020> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Exact crane-time branch-and-bound for CPMPCT
+bb_time_limit_s --- 120 --- Branch-and-bound time limit (s)
+backend --- auto --- Search backend
 
-Paper:
-C. Parreno-Torres, R. Alvarez-Valdes, R. Ruiz, K. Tierney,
+------------------------------- Reference --------------------------------
+C. Parreño-Torres, R. Alvarez-Valdes, R. Ruiz, K. Tierney,
 "Minimizing crane times in pre-marshalling problems",
 Transportation Research Part E 137 (2020) 101917.
-
-Embedding scope (v1):
-  - crane-time objective with loaded/unloaded, vertical/horizontal travel
-  - acceleration-aware movement-time function + twistlock approximation
-  - exact search backend (iterative deepening Branch-and-Bound)
-  - MIP backend entrypoint available (currently routed to B&B engine)
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

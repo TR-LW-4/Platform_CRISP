@@ -1,56 +1,13 @@
 """
-CRP-Stow — Blocks Relocation Problem with Stowage Plan (BRLP / POCRP / POCRP-RC)
+CRP-Stow
+<stowage> <partial-order> <CRP-Stow>
+Block Relocation Problem with a stowage plan
 
-Problem (Jovanović et al. 2019; Ji et al. 2015; Wang et al. 2026)
------------------------------------------------------------------
-- N containers occupy a 1-D yard bay: YS stacks each at most YT tiers high.
-- A vessel bay has VS stacks; vessel stack s has a maximum tier H_v[s].
-- Every ORDINARY container (OC) c has a designated vessel position:
-      vs(c)  – vessel stack index  (stored as c.group,    0-based, A=0 B=1 …)
-      vt(c)  – vessel tier index   (stored as c.priority, 0-based, bottom = 0)
-- OC c is RETRIEVABLE (cdd(c) == 0) iff its vessel tier equals the
-  number of OCs already loaded into vessel stack vs(c).  In other words,
-  the OCs within each vessel stack must be loaded bottom-up by tier.
-- (Optional, Wang et al. 2026) ROLLED CONTAINERS (RCs): a fraction ``rc_ratio``
-  of containers are RCs.  They have LOWER priority than every OC and are
-  NEVER retrieved — they stay in the yard forever.  RCs are flagged via
-  ``c.attrs["is_rolled"] = True``; algorithms can query it through
-  ``env._is_rc(c)``.  ``rc_ratio == 0.0`` reduces the problem to plain POCRP
-  (=  original CRP-Stow behaviour, fully backward-compatible).
-- Only the TOP container of each yard stack can be accessed.
-- When the target is buried, every blocker above it must be relocated to
-  another yard stack first — each relocation costs +1.
-- Once retrieved to the vessel an OC cannot be moved again.
-- Objective: minimise total yard relocations while retrieving all OCs.
-
-Two-phase Gym interface
------------------------
-Action space : Discrete(YS) — flat yard stack index  0 … YS-1.
-
-Phase "high"  (H_L — retrieval selection, Jovanović 2019 §5.2)
-    Agent selects a YARD STACK that contains at least one retrievable container.
-    The env automatically targets the HIGHEST (topmost) retrievable container
-    in that stack (fewest blockers = easiest to expose).
-    · If the target is already on top → auto-retrieve, stay "high".
-    · Otherwise → switch to "low" (record target + source stack).
-
-Phase "low"  (H_R — relocation, Jovanović 2019 §5.1)
-    Agent selects a DESTINATION YARD STACK for the TOP blocker of the source stack.
-    · Blocker is relocated; relocations += 1.
-    · If the new top of source == target → auto-retrieve, return to "high".
-    · Otherwise stay "low" (same source + target).
-
-Reward   : −1 per relocation, 0 otherwise; terminal when all containers loaded.
-Metrics  : relocations (primary, matches Jovanović paper), steps, vessel_utilisation.
-
-Benchmark support
------------------
-Set extra["layout_file_path"] = "/path/to/Bay-A-VS-YS-YT_seed.pro"
-to load a Jovanović / Ji benchmark .pro instance.  The problem config is
-updated in-place from the file (YS, YT, VS, H_v).
-
-For generated simulation instances without a .pro file set num_bays=YS,
-max_tiers=YT, num_groups=VS (num_rows is always forced to 1).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -159,14 +116,7 @@ class CRP_Stow(BaseProblem):
     """
 
     name         = "CRP-Stow"
-    description  = (
-        "Blocks Relocation Problem with Stowage Plan (BRLP, Jovanović 2019). "
-        "Load N containers from a 1-D yard bay into their designated vessel "
-        "positions, minimising yard relocations.  Each container has a fixed "
-        "vessel stack (vs) and vessel tier (vt); within each vessel stack "
-        "containers must be loaded bottom-up.  Supports Jovanović benchmark "
-        ".pro files via extra[\"layout_file_path\"]."
-    )
+    description  = "Yard-to-vessel retrieval under stowage-plan precedence constraints."
     tags         = ["relocation", "stowage", "brlp", "vessel",
                     "two-phase", "jovanovic-2019", "pocrp-rc", "wang-2026"]
     metric_names = ["relocations", "steps", "vessel_utilisation"]

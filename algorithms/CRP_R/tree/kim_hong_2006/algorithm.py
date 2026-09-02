@@ -1,55 +1,19 @@
 """
-Kim & Hong (2006) exact Branch-and-Bound for the Restricted BRP (CRP-R).
+KimHong2006BB
+<2006> <exact> <restricted> <single-bay> <CRP-R>
+Depth-first branch-and-bound over bay configurations
+time_limit_s --- 300 --- Per-instance wall-clock limit (s)
 
-Reference
----------
-K.H. Kim, G.-P. Hong, "A heuristic rule for relocating blocks",
-Computers & Operations Research 33 (2006) 940-954, Section 2
-(case with precedence relationships among *individual* blocks,
-Section 2.1 -- this is the case that matches CRP-R's single, fully
-serial priority chain 1..N).
-
-Algorithm overview (Section 2 / 2.1)
--------------------------------------
-This is a *combinatorial* branch-and-bound: it searches directly over
-bay-configuration states, with no IP/LP formulation and no LP-relaxation
-bound underneath it (unlike the ``exact/solver`` algorithms in this
-platform, e.g. ``wan_2009`` or ``caserta_2012_brp2``).
-
-  - State S_k       = yard configuration after k blocks have been
-                       retrieved.
-  - Action a_k       = relocate every blocker above the k-th target
-                       (one at a time, LIFO order, to some *other* stack
-                       -- Assumption 3 of the paper), then retrieve the
-                       target (and auto-retrieve any further already
-                       accessible targets).
-  - F(S_k)           = minimum number of additional relocations needed
-                       to clear the remaining N-k blocks;
-                       F(S_0) = min_{a1} { h(a1|S0) + F(S1) }.
-  - Node selection   = depth-first + backtracking.  Among the children
-                       generated at a node, the paper explores the
-                       unexplored node with the *minimum lower bound*
-                       first (Section 2.1).
-  - Lower bound      = (relocations already realised, root -> node)
-                       + "confirmed relocations" of the node, where a
-                       confirmed relocation is a container sitting above
-                       another container of *smaller* priority number in
-                       the same stack -- it is certain to require at
-                       least one relocation eventually, no matter what
-                       is decided from here on.
-  - Dominance rules  = explicitly *not* used (the paper found the extra
-                       bookkeeping not worth the small amount of
-                       pruning it bought -- see Section 2.1).
-
-Independence
-------------
-This module only depends on the shared platform infrastructure
-(``core.base_algorithm``, ``core.yard``) and defines all of its own
-helper functions privately (leading underscore).  It does not import
-anything from any other algorithm package (``heuristic.kim_hong``,
-``exact.search.exposito_2015``, ``exact.solver.*``, ...), so it can be
-added, changed or removed without ever touching -- or being coupled
-to -- any other algorithm already registered in the platform.
+------------------------------- Reference --------------------------------
+K.H. Kim, G.P. Hong,
+"A heuristic rule for relocating blocks",
+Computers & Operations Research 33 (2006) 940–954.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -306,36 +270,10 @@ def _run_bb(
 # ================================================================ #
 
 class KimHong2006BB(BaseAlgorithm):
-    """
-    Exact branch-and-bound for the Restricted BRP / CRP-R.
-
-    Reference: Kim & Hong (2006), Computers & Operations Research 33,
-    Section 2 (individual-precedence case, Section 2.1).
-
-    Unlike the exact/solver algorithms in this platform, this is *not*
-    an integer program: it is a hand-crafted combinatorial search
-    directly over bay-configuration states, using a problem-specific
-    lower bound ("confirmed relocations") and depth-first backtracking,
-    exactly as described in the original 1998-2006-era literature.
-
-    Parameters
-    ----------
-    time_limit_s : float
-        Per-seed wall-clock time limit in seconds (default 300).
-        If the search is stopped early, the best solution found so far
-        is reported and ``optimal_proven`` is set to 0.0.
-    """
 
     name                = "Kim & Hong (2006) B&B"
     category            = "Exact"
-    description         = (
-        "Depth-first branch-and-bound directly over bay-configuration "
-        "states (Kim & Hong, COR 2006, Section 2.1) -- no IP formulation. "
-        "Lower bound = realised relocations + 'confirmed relocations' "
-        "(containers stacked above a smaller-priority container). "
-        "Guarantees the optimal number of relocations if it completes "
-        "within the time limit."
-    )
+    description         = "Kim & Hong (COR 2006) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)

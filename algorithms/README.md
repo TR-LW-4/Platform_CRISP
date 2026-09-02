@@ -1,83 +1,89 @@
 # Algorithms
 
-Algorithms are organised **problem-family-first**, PlatEMO-style.  Open
-any problem directory and every algorithm applicable to that problem is
-listed directly inside it (as a real folder for the paper's native
-problem, or as a symlink for cross-problem support).
+Algorithms are organised **problem-family-first**, PlatEMO-style. Open
+any problem directory and the algorithms for that family live inside it.
+
+How the eight families relate (same axes as the root README):
+
+```
+任务 / 目标     Time | Prem | Stow | Stoch
+翻箱规则        R vs U                         (distinct CRP only)
+优先级          R/U = distinct；D = duplicate  (D: extra restricted_relocation)
+几何            num_bays                       (config, not a family)
+信息揭示        Online | batch-stochastic      (separate families when user-facing)
+```
+
+Per-paper lists are in each family's README. The live GUI / CLI catalog is
+`python main.py list`.
 
 ## Directory layout
 
 ```
 algorithms/
-├── _shared/                  # universal algorithms (physical home)
-│   ├── evolutionary/genetic/
+├── _shared/                     # helpers only — not registered solvers
+│   └── solver/                  # shared Gurobi utilities
 │
-├── CRP_D/                # duplicate-group stowage (CRP-D scaffold)
+├── CRP_R/                       # restricted + distinct
+│   ├── tree/                    # B&B, IDA*, abstraction, beam search, …
+│   ├── solver_ip/               # Gurobi IP/MIP (+ Tanaka–Voß native IP)
+│   └── heuristic/
+│
+├── CRP_U/                       # unrestricted + distinct
+│   ├── tree/
+│   ├── solver_ip/
+│   └── heuristic/
+│
+├── CRP_D/                       # duplicate priorities (Du default, Dr optional)
+│   ├── exact/search/
+│   ├── exact/solver/
+│   └── heuristic/
+│
+├── CRP_Time/                    # same rules as CRP-R; crane-time objective
 │   ├── heuristic/
-│   │   └── glah/             ← physical (Jin 2015 GLAH — CRP-D packaging)
+│   └── exact/                   # empty scaffold (search/ + solver/)
+│
+├── CRP_Online/                  # progressively revealed fixed-order CRP
+│   └── heuristic/
+│
+├── CRP_Prem/                    # pre-marshalling
+│   ├── heuristic/
+│   ├── exact/search/
+│   ├── exact/solver/
+│   └── evolutionary/
+│
+├── CRP_Stow/                    # BRLP / POCRP / POCRP-RC
+│   ├── heuristic/
 │   └── exact/
-│       ├── tanaka/            ← physical (Tanaka 2016 CRP-D adapter)
-│       └── tanaka_2018/       ← physical (Tanaka 2018 CRP-D adapter)
 │
-├── CRP_R/                # fixed-order yard retrieval (CRP-R problem family)
-│   ├── tree/                 # B&B, A*, IDA*, and abstraction searches
-│   │   ├── tanaka/            ← physical (Tanaka 2016 B&B + vendor C)
-│   │   ├── tanaka_2018/       ← physical (Tanaka 2018 B&B + vendor C)
-│   │   └── tanaka_voss_2022/  ← physical (Tanaka–Voß tree search)
-│   ├── solver_ip/            # solver-backed IP/MIP formulations
-│   ├── heuristic/
-│   │   ├── kim_hong/         ← physical (original paper = single-bay CRP-R)
-│   │   ├── caserta/          ← physical
-│   │   ├── lan/              ← physical
-│   │   ├── lin_2015/         → symlink
-│   │   └── durasevic_2024/   → symlink
-│   └── evolutionary/genetic/ → symlink
-│
-├── CRP_Time/                 # multi-bay CRP with crane-time objective
-│   ├── heuristic/
-│   │   ├── lee_lee/          ← physical (Lee & Lee 2010, COR)
-│   │   ├── lin_2015/         ← physical (Lin, Lee & Lee 2015, TRC)
-│   │   ├── cifuentes_riff_2020/  ← physical (Cifuentes & Riff 2020, ASOC)
-│   │   ├── durasevic_2024/   ← physical (Ðurasević & Ðumić 2024, ASOC)
-│   │   ├── durasevic_2025_mgp/   ← physical (Ðurasević et al. 2025, EAAI)
-│   │   ├── kim_hong/         → symlink to CRP_R
-│   │   ├── caserta/          → symlink
-│   │   ├── lan/              → symlink
-│   │   └── glah/             ← physical (CRP-Time packaging; sync with CRP_D / CRP_U)
-│   └── evolutionary/genetic/ → symlink
-│
-├── CRP_U/                # fixed-order, unrestricted-relocation BRP
-│   ├── tree/                 # exact and heuristic tree-search methods
-│   │   └── forster_bortfeldt_2012/  ← CRP-U-specific adaptation
-│   ├── solver_ip/            # solver-backed IP/MIP formulations
-│   └── heuristic/            # non-tree heuristic methods
-│       └── glah/             ← physical (Jin 2015 GLAH — CRP-U packaging)
-│
-├── brp_nonfixed/             # free-order BRP (GA only; see also CRP_U/)
-│   └── evolutionary/genetic/ → symlink
-│
-├── CRP_Prem/               # pre-marshalling (CRP-Prem)
-├── CRP_Stow/               # stowage (CRP-Stow)
+└── CRP_Stoch/                   # stochastic CRP
+    ├── heuristic/
+    └── exact/
 ```
+
+`tree/` (CRP-R / CRP-U) versus `exact/search` (CRP-D / Prem / …) are
+historical folder names for the same idea: search-based methods. Runtime
+behaviour comes from each class's `category`, not from the folder name.
+`tree/` also holds heuristic tree searches (beam search, compound-move
+search); those classes set `category = "Heuristic"`.
 
 ## Conventions
 
 * **One physical home per algorithm** — whichever problem the paper
-  originally targeted.  Edit-once, propagates everywhere.
-* **Symlinks** (`mode 120000` in git) for every other problem in the
-  algorithm's `compatible_problems`.  No file duplication, no sync
-  trouble.
-* **Problem-specific ports** may use independent copies when their adapter
-  metadata or environment integration intentionally differs.
-* **`_shared/`** holds algorithms that are not tied to any specific
-  problem (GA).  They appear under **every** problem dir via symlink.
+  originally targeted.
+* **Symlinks** (`mode 120000` in git) *may* be used when the same code
+  is registered under another family via `compatible_problems`. Many
+  cross-family listings skip the symlink and rely on
+  `compatible_problems` alone (registry still finds the class).
+* **Problem-specific ports** use independent copies when the adapter or
+  environment integration differs (for example Jin–Tanaka 2023 under
+  both CRP-U and CRP-D).
+* **`_shared/`** holds cross-algorithm helpers (currently Gurobi
+  utilities). It is not a home for registered algorithms.
 * **`core/gp/`** (not inside `algorithms/`) hosts the platform-level
-  GP engine (tree, operators, CRP terminals, restricted RS).  Any GP
-  paper imports from `core.gp.*`, never from another paper's folder.
+  GP engine. Any GP paper should import from `core.gp.*`.
 * **Registry** (`core.registry`) auto-discovers classes via
   `pkgutil.walk_packages`; the `name` class attribute deduplicates
-  imports that come in through both the physical path and a symlinked
-  path.
+  imports that come in through both a physical path and a symlink.
 
 ## Adding a new algorithm
 
@@ -85,7 +91,8 @@ algorithms/
 2. `mkdir algorithms/<primary_problem>/<category>/<paper_key>/` and
    drop `__init__.py` + the algorithm module(s) there.
 3. Declare `compatible_problems = [...]` on the algorithm class.
-4. For each additional problem in `compatible_problems`, add a symlink:
+4. Optionally, for each additional problem in `compatible_problems`,
+   add a symlink:
 
    ```bash
    ln -s ../../<primary_problem>/<category>/<paper_key> \

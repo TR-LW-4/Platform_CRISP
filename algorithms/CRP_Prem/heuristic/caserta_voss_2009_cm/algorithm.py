@@ -1,62 +1,21 @@
 """
-Caserta & Voß (2009) — Corridor Method (CM) for the Pre-marshalling Problem.
+CasertaVossCM
+<2009> <heuristic> <premarshalling> <single-bay> <CRP-Prem>
+Corridor Method with GRASP sampling and local search
+delta --- 6 --- Corridor width
+num_restarts --- 30 --- Randomized restarts
+time_limit --- 10 --- Wall-clock budget (s)
 
-Algorithm overview
--------------------
-A stochastic metaheuristic that reshuffles a bay so that every stack ends
-up internally sorted (no container sits above a more urgent one), using
-the minimum number of moves.  Each iteration is made up of four phases:
-
-  1. Corridor Definition/Selection — roulette-wheel pick of a source stack
-     (weighted by its forced-relocation count), classification of every
-     other stack into empty / no-deadlock / deadlock groups relative to
-     the block being relocated, and a stochastic draw of a "corridor" of
-     candidate destination stacks (parameter ``delta``).
-  2. Neighbourhood Search — the bay configurations reachable by placing
-     the block on each corridor stack.
-  3. Move Evaluation and Selection — GRASP-style: keep the best
-     ``elite_quantile`` fraction (fewest resulting forced relocations),
-     then roulette-select one.
-  4. Local Search Improvement — two fast operators that opportunistically
-     finish sorting stacks (``heuristic_swap``,
-     ``heuristic_subsequence_building``) without needing the corridor
-     machinery.
-
-Because every phase is randomized, the algorithm is run multiple times per
-instance (``num_restarts``, bounded by ``time_limit``) and the best
-fully-sorted solution is kept — mirroring the original C++ implementation,
-which restarts until its time budget is exhausted.
-
-This algorithm is self-contained (see ``scoring.py``): it only depends on
-the platform's generic ``core`` package and does not import from any other
-algorithm module, so it can be added, modified or removed independently.
-
-Config parameters
-------------------
-  delta          : int   — corridor width, i.e. number of candidate
-                           destination stacks considered per move (paper
-                           default: unrestricted / large)
-  w0, w1, w2     : float — attractiveness weights for empty / no-deadlock /
-                           deadlock destination stacks (Eq. 1)
-  elite_quantile : float — fraction of corridor destinations kept as elite
-                           candidates before the final roulette-wheel pick
-  num_restarts   : int   — independent randomized attempts per instance;
-                           the best fully-sorted solution is kept
-  time_limit     : float — wall-clock budget (seconds) per instance,
-                           shared across all restarts
-                           to evaluate
-
-Compatible problems
---------------------
-  CRP-Prem
-
-Reference
----------
+------------------------------- Reference --------------------------------
 M. Caserta, S. Voß,
 "A Corridor Method-Based Algorithm for the Pre-marshalling Problem",
-in: M. Giacobini et al. (Eds.), EvoWorkshops 2009, LNCS 5484, pp. 788-797,
-Springer, 2009.
-https://doi.org/10.1007/978-3-642-01129-0_89
+EvoWorkshops 2009, LNCS 5484, pp. 788–797, Springer, 2009.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

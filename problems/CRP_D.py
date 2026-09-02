@@ -1,44 +1,13 @@
 """
-CRP-D – Duplicate-priority Block Relocation Problem (restricted OR unrestricted).
+CRP-D
+<grouped> <duplicate> <CRP-D>
+Block Relocation Problem with duplicate / group priorities
 
-Semantics
----------
-Containers are assigned to **groups** (duplicate priorities).  All containers
-in group 1 must leave before group 2, etc. — within a group the retrieval
-order is free (any accessible container of the current group may be taken).
-Objective: minimise total relocations.
-
-Relocation mode — controlled by ``extra["restricted_relocation"]``:
-
-  False (default) — **Unrestricted** (CRP-Du):
-      The crane may move the top container of ANY non-empty stack to any
-      other non-full stack.  Same rule as CRP-U with duplicate priorities.
-
-  True            — **Restricted** (CRP-Dr):
-      Only the top container of the stack that is currently *blocking* the
-      most accessible target-group member may be relocated.  This mirrors
-      the restricted rule from Tanaka & Takii (2016): among all stacks that
-      contain a target-group block with a non-target blocker on top, the
-      one with the fewest blockers above its topmost target-group item is
-      selected as the unique relocatable stack.  After each relocation the
-      selection is recomputed.
-
-Action encoding (identical for both modes)
-------------------------------------------
-  action = src_idx * S + dst_idx   where S = num_bays * num_rows.
-
-  In restricted mode the action mask ensures src_idx is always the
-  currently relocatable stack, so the effective choice is dst_idx only.
-
-Benchmark files
----------------
-When ``extra["layout_file_path"]`` points to a ZhuDup ``.txt`` file the
-episode loads containers from that file.  Otherwise a random
-duplicate-priority layout is generated using ``config.num_groups`` distinct
-group IDs spread over ``config.num_containers`` containers.
-
-This class is completely standalone.  It imports nothing from CRP_U or
-CRP_Stow.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP".
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -72,14 +41,8 @@ class CRP_D(BaseProblem):
 
     name        = "CRP-D"
     description = (
-        "Duplicate-priority BRP (restricted OR unrestricted). "
-        "Groups of containers must be retrieved in group-ID order; within a "
-        "group any accessible container counts. "
-        "Set extra['restricted_relocation']=True for restricted mode "
-        "(only the blocker above the best target-group member may be moved); "
-        "default is unrestricted (any stack-top relocatable). "
-        "Loads ZhuDup benchmark files when ``layout_file_path`` is set; "
-        "otherwise uses random duplicate layout."
+        "Container relocation with duplicate priorities; "
+        "any container in the current priority group may be retrieved."
     )
     tags         = ["crp", "duplicate", "unrestricted", "restricted-optional",
                     "fixed-group-order", "yard-only"]
@@ -151,10 +114,12 @@ class CRP_D(BaseProblem):
 
     def _build_episode(self) -> None:
         path_str = layout_path_from_extra(self.config.extra)
-        if path_str:
-            self._load_zhu_dup_file(Path(path_str))
-        else:
-            self._build_random_episode()
+        if not path_str:
+            raise ValueError(
+                "CRP-D requires a ZhuDup layout file "
+                "(set extra['layout_file_path']). Random layouts are disabled."
+            )
+        self._load_zhu_dup_file(Path(path_str))
 
     def _load_zhu_dup_file(self, path: Path) -> None:
         from core.zhu_dup_benchmark import apply_dup_file_to_yard
@@ -163,6 +128,7 @@ class CRP_D(BaseProblem):
         self.containers = apply_dup_file_to_yard(self.yard, self.config, path)
 
     def _build_random_episode(self) -> None:
+        """Unused by the workbench; kept for local debugging of duplicate layouts."""
         cfg = self.config
         rng = np.random.RandomState(cfg.seed)
 

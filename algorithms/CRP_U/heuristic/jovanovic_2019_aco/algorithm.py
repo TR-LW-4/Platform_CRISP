@@ -1,43 +1,22 @@
 """
-Jovanović, Tuba, Voß (2019) — Ant Colony Optimization for uBRP (CRP-U).
+JovanovicACO_uBRP
+<2019> <heuristic> <unrestricted> <single-bay> <CRP-U>
+ACO-C with Gre-C extended candidate list
+n_iterations --- 1000 --- Colony iterations per layout
+n_ants --- 10 --- Ants per iteration
+q0 --- 0.9 --- Exploitation rate
 
-This implements the ACO-C variant (Section 4.2 Gre-C + Section 5 ACO):
-  • Gre-C extended candidate list (Eqs. 9–23):
-      T   — topmost blocker above the current target → any valid destination
-      Or  — any non-well-located stack-top → destinations where it becomes WL
-      Ow  — well-located stack-tops (look-ahead) when no Or moves exist
-  • Extended heuristic dife (Eq. 21): penalises relocating well-located
-    containers by N, offset by imp(c) (improvement in the source stack)
-  • Same 4-D pheromone matrix τ[c][d][m_c][t] as the rBRP version
-  • Same ACS update rules (local Eq. 36, global Eqs. 34–35) and stagnation
-    reinitialisation
-
-Performance optimisations
---------------------------
-1. loc[c]   = stack_key        O(1) lookup of any container's stack
-2. smin[key] = min priority    O(1) dd*(S) computation and dife evaluation,
-               updated incrementally on every push/pop
-3. Incremental lower-bound tracking:
-     − 1 when a non-WL container leaves its stack
-     + 1 when a container arrives at a stack where it is non-WL
-   Eliminates the O(W×H) compute_lb() call per relocation.
-
-Candidate-list cost
--------------------
-Building Ĉ requires O(W²) work at each step (scan all stacks for Tn, then
-scan all destinations for each Tn element).  This is larger than CRP-R (O(W))
-but bounded in practice since W ≤ 12 for standard benchmarks.
-
-Pheromone matrix size: N × (N+W) × (MaxMoves+1) × N  (float32)
-  For N=99, W=10, MaxMoves=10: ≈ 11.8 M entries ≈ 47 MB
-
-Reference
----------
+------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
 "An efficient ant colony optimization algorithm for the blocks relocation
  problem",
 European Journal of Operational Research 274 (2019) 78–90.
-https://doi.org/10.1016/j.ejor.2018.09.038
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

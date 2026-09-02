@@ -1,5 +1,20 @@
 """
-van Brink & van der Zwaan (2014) branch-and-price scaffold for pre-marshalling.
+VanBrinkVanDerZwaan2014BP
+<2014> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Branch-and-price restricted master for pre-marshalling
+bp_mip_time_limit_s --- 8 --- Restricted-master MIP limit (s)
+bp_global_time_limit_s --- 120 --- Overall time limit (s)
+
+------------------------------- Reference --------------------------------
+J. van Brink, R. van der Zwaan,
+"A branch and price approach for the container pre-marshalling problem",
+2014.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

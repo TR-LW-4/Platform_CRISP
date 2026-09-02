@@ -1,21 +1,12 @@
 """
-Shared state helpers for Parreno-Torres, Alvarez-Valdes & Ruiz (2019)
-"Integer programming models for the pre-marshalling problem",
-European Journal of Operational Research 274 (2019) 142-154.
+IPS6 shared helpers for ParrenoTorresAlvarezValdesRuiz2019IPS6.
 
-Self-contained on purpose (platform convention): this folder does not import
-from -- and is not imported by -- any other paper folder, including the
-already-embedded ``lee_hsu_2007_network_flow_ip/``, ``de_melo_silva_2018/``
-(a different paper: EJOR 271 (2018)) or
-``exact/search/parreno_torres_alvarez_valdes_ruiz_tierney_2020_cpmpct/`` (a different,
-later paper by an overlapping author list: Transp. Res. Part E 137 (2020),
-crane-time objective). A small amount of duplicated stack-helper boilerplate
-is the accepted trade-off.
-
-Convention (shared with this platform's other CRP-Prem embeddings): stacks
-are lists of priority values, bottom to top; smaller values are retrieved
-earlier and therefore belong closer to the top. A stack is well located iff
-its values are non-increasing from bottom to top.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

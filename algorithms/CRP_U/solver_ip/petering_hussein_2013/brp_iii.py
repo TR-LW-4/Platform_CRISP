@@ -1,13 +1,12 @@
 """
-Petering & Hussein (2013) BRP-III mixed-integer formulation.
+BRP-III Gurobi formulation for PeteringHussein2013BRPIII.
 
-The model follows Table 4 of:
-M.E.H. Petering, M.I. Hussein, "A new mixed integer program and
-extended look-ahead heuristic algorithm for the block relocation
-problem", EJOR 231 (2013) 120-130.
-
-Stacks and priorities are 1-indexed inside the model. Input stacks and
-returned source/destination stack indices are 0-indexed, bottom-to-top.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

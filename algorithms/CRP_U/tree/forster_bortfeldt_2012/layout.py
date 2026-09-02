@@ -1,23 +1,12 @@
 """
-Internal bay-state representation for Forster & Bortfeldt (2012).
+Bay layout helpers for ForsterBortfeldt2012.
 
-Completely self-contained: no imports from other platform algorithms.
-
-Reference
----------
-F. Forster and A. Bortfeldt,
-"A tree search procedure for the container relocation problem",
-Computers & Operations Research 39 (2012) 299–309.
-
-Convention
-----------
-stacks[s] : list of group integers, bottom→top (index 0 = bottom).
-Group index: 1 … G.  Lower value = higher retrieval priority (retrieved first).
-S          : number of stacks.
-H          : maximum stack height (hard cap).
-G          : maximum group index present in initial layout.
-n          : current total items in bay.
-next_group : current minimum group remaining (the "targets" to remove now).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

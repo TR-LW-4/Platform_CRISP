@@ -1,30 +1,12 @@
 """
-Cost estimation heuristics ``h(n)`` for A*/IDA* (Section 4.3 of the paper).
+EMO lower bound for TierneyPacinoVoss2017AStarIDAStar.
 
-Two lower bounds on the number of moves needed to reach a mis-overlay-free
-layout are provided:
-
-- ``lb_direct``: the "direct" lower bound used by the state-of-the-art A*
-  baseline of Expósito-Izquierdo et al. (2012) -- simply the number of
-  mis-overlaid containers currently in the bay.
-
-- ``lb_emo``: the "extended mis-overlay" (EMO) bound, a re-derivation of the
-  Bortfeldt & Forster (2012) supply/demand lower bound (their Proposition 1),
-  which the paper adopts as its main A*/IDA* heuristic since it dominates
-  ``lb_direct`` (Section 4.3). Priority values double as "container groups"
-  in the Bortfeldt & Forster sense: a smaller value must leave sooner and
-  therefore belongs closer to the top of a mis-overlay-free stack.
-
-Both bounds are *admissible* (never overestimate the true number of moves
-needed). The EMO bound is admissible but *not consistent* -- as noted in
-Section 4.3, applying a move can, in rare cases, cause it to increase. A*/IDA*
-require a consistent heuristic, so callers should clamp a child's bound to be
-no lower than its parent's (handled by :func:`emo_bound_consistent` /
-the search module, not here).
-
-This module is self-contained and does not import from any sibling
-algorithm package (e.g. ``heuristic/bortfeldt_forster_2012_tree_search``),
-even though it independently re-implements the same published formula.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

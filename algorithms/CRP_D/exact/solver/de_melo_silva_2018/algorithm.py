@@ -1,34 +1,21 @@
 """
-de Melo da Silva, Toulouse, Wolfler Calvo (2018)
+DeMeloSilva2018BRPGrouped
+<2018> <exact> <grouped> <single-bay> <CRP-D>
+Time-indexed MIP for grouped / duplicate-priority BRP
+variant --- m1 --- Formulation: m1 (T=UB+N) or m2 (T=UB)
+time_limit_s --- 3600 --- Gurobi time limit (s)
+
+------------------------------- Reference --------------------------------
+M. de Melo da Silva, S. Toulouse, R. Wolfler Calvo,
 "A new effective unified model for solving the Pre-marshalling and
-Block Relocation Problems"
-European Journal of Operational Research 271 (2018) 40-56.
-
-This module implements the **CRP-D (grouped / duplicate priorities)** formulations.
-For grouped instances G < N  (G = number of distinct priority classes,
-N = total number of containers).  Container .priority encodes the group ID (1..G).
-
-Four solver functions are provided:
-
-  _solve_brp_m1_grouped  — Unrestricted BRP m1: Eq. (23)-(38) with grouped Q_gn.
-                           T = T_ub + N (relocations + retrieval steps).
-  _solve_brp_m2_grouped  — Unrestricted BRP m2: Eq. (39)-(50), Constr (48) replaced
-                           by aggregated (49)+(50) for grouped precedence.
-                           T = T_ub (relocation steps only).
-  _solve_rbrp_m1_grouped — Restricted r-BRP m1: BRP m1 + Constraint (51) adapted
-                           for grouped priorities (uses w[t-1,g,cum[g]]).
-  _solve_rbrp_m2_grouped — Restricted r-BRP m2: BRP m2 + Constraint (52).
-
-Select variant with  extra["variant"] = "m1"  (default) or  "m2".
-
-Platform classes
-----------------
-DeMeloSilva2018BRPGrouped  — unrestricted CRP-D  (compatible_problems = ["CRP-D"])
-DeMeloSilva2018RBRPGrouped — restricted  CRP-D   (compatible_problems = ["CRP-D"])
-  set extra["restricted_relocation"] = true in CRP-D problem config to enable the
-  restricted relocation mode in the environment when evaluating this algorithm.
-
-Solver: Gurobi (gurobipy).  Academic Named-User License recommended.
+ Block Relocation Problems",
+European Journal of Operational Research 271 (2018) 40–56.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

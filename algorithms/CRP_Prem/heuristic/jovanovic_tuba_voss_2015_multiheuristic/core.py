@@ -1,35 +1,12 @@
 """
-State representation and stage 1-2 scoring functions for Jovanovic, Tuba,
-Voss (CEJOR 2015) "A multi-heuristic approach for solving the pre-marshalling
-problem".
+Shared stage helpers for JovanovicTubaVoss2015MultiHeuristic.
 
-Convention (shared with the Exposito-Izquierdo (2012) LPFH module this paper
-extends): stacks are lists of due-date/priority values, bottom to top. A
-container is *well located* if it is smaller than or equal to every
-container below it (so the smallest, most urgent values end up on top,
-retrievable first) and everything below it is itself well located. This is
-the same "non-increasing bottom-to-top" convention used throughout this
-platform's other pre-marshalling embeddings (TGH's "clean", FBH's
-"orderly").
-
-Implements:
-* well-located predicates and the well-located prefix height.
-* f(c, s*), g(c, s) (paper Eq. before (1), Fig. 1) and w(c, s*) (Eq. 1).
-* nw(c, s*) (number of well-located containers touched by f's clearing) and
-  the improved f-hat / w-hat (Eq. 2).
-* forced-relocation count fr(c, s*) (Sec. 3.2, using the paper's stated
-  "track only the top of each stack" approximation) and the next-block
-  heuristic h-hat(c) (Eq. 3-5).
-
-Documented approximation: the paper describes fr(c, s*) only informally,
-via a worked example (Fig. 3) and the sentence "a forced relocation occurs
-only if a block c is being relocated and all of the top stack due date
-values are larger than p(c)". We implement this literally: for every block
-that stage 3 would need to temporarily relocate to well-locate c at s*, it
-counts as one forced relocation iff its own due-date value is smaller than
-the *effective top* of every other stack (where a stack that is currently
-fully well located, or empty, counts as having effective top 0, per the
-paper's own "well located stacks cannot create forced relocations" rule).
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+corresponding original algorithm paper.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

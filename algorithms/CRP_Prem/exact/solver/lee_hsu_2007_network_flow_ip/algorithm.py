@@ -1,61 +1,21 @@
 """
-Lee & Hsu (2007) network-flow integer-programming model for the container
-pre-marshalling problem.
+LeeHsu2007NetworkFlowIP
+<2007> <exact> <premarshalling> <single-bay> <CRP-Prem>
+Time-expanded multi-commodity network-flow IP
+t_start --- 4 --- Initial time horizon
+t_max --- 12 --- Maximum time horizon
+per_solve_time_limit_s --- 30 --- Per-T Gurobi limit (s)
 
-Reference
----------
-Y. Lee, N.-Y. Hsu, "An optimization model for the container pre-marshalling
-problem", Computers & Operations Research 34 (2007) 3295-3313.
-
-Embedding scope ("main algorithm" focus)
------------------------------------------
-The paper's central contribution is an exact model on a time-expanded
-multi-commodity flow network: each stack/tier/time-point is a node, and
-five arc types (upward, downward, internal/stationary-in-slot, stationary
-across a segment, and crane movement) carry 0/1 flow of container "types".
-This embedding implements:
-
-* ``mip_model.py`` -- the basic model, constraints (1)-(26) and objective
-  (26), built directly as a Gurobi MIP (paper used CPLEX; this platform
-  standardizes exact/solver modules on Gurobi).
-* the paper's own practical relaxation (Sec. 5): replacing the "one
-  movement per time segment" constraint (4) with a cap K (constraints
-  (33)/(34) instead of (3)/(5)/(21)), plus the 2- and 3-stack
-  cycle-breaking constraints (31)/(32). Without this, T must equal the
-  number of moves and the model is -- as the paper itself reports --
-  impractically slow even on 12-30 container instances.
-* ``ordering.py`` -- Sec. 5's own procedure for turning the (possibly
-  simultaneous, possibly cyclic) per-segment movement arcs into an
-  executable move sequence, breaking any residual >= 4-length cycle by
-  rerouting one move through a spare stack.
-* ``extensions.py`` -- Eq. (27) exact final layout and Eq. (28)
-  one-type-per-stack, both optional config toggles.
-* ``solve.py`` -- since the model needs a fixed time horizon T chosen
-  up front, this drives a small ascending T search under a wall-clock
-  budget (the paper's own Table 3 experiments do the same by hand).
-
-Documented simplifications / out-of-scope for this embedding
---------------------------------------------------------------
-* Container "types" C default to the distinct priority values present in
-  the instance (matches CRP-Prem's actual well-located definition exactly
-  when types are unique); when an instance has more distinct values than
-  ``max_types``, they are bucketed into ``max_types`` contiguous groups
-  (paper explicitly treats C as a user-chosen size/fidelity trade-off).
-  Bucketing is a documented approximation: containers sharing a bucket
-  become interchangeable, so the final "solved" metric always re-checks
-  the *original* (non-bucketed) priorities, never the coarse ones.
-* The Eq. (29)-(30) "concurrent unloading" extension is not implemented:
-  it introduces a new arc/variable whose time index is stated
-  inconsistently between Eq. (29) (TIME\\{1}) and the pop-out conservation
-  constraint it is meant to replace, Eq. (19) (TIME\\{T}), and it models a
-  scenario (containers leaving the yard *during* premarshalling) that
-  CRP-Prem itself does not have.
-* The Sec. 6 two-phase matheuristic (heuristic construction + MIP repair)
-  is not implemented; this embedding is the exact model only.
-* Because binary-variable count grows as O(T x S x H x C), this is, as in
-  the paper's own experiments, only practical on small instances. A hard
-  ``max_binaries`` guard skips oversized (T, C) combinations rather than
-  hanging the solver.
+------------------------------- Reference --------------------------------
+Y. Lee, N.-Y. Hsu,
+"An optimization model for the container pre-marshalling problem",
+Computers & Operations Research 34 (2007) 3295–3313.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

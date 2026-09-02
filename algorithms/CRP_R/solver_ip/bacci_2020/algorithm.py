@@ -1,72 +1,19 @@
 """
-Bacci, Mattia, Ventura (2020)
-"A branch-and-cut algorithm for the restricted Block Relocation Problem"
+BacciBC2020
+<2020> <exact> <restricted> <single-bay> <CRP-R>
+BC-RBRP branch-and-cut IP wrapper
+bacci2020_binary ---  --- Path to BC_RBRP.exe (optional)
+
+------------------------------- Reference --------------------------------
+T. Bacci, S. Mattia, P. Ventura,
+"A branch-and-cut algorithm for the restricted Block Relocation Problem",
 European Journal of Operational Research 287 (2020) 452–459.
-
-Algorithm: BC-RBRP
--------------------
-Branch-and-cut exact algorithm based on a new time-period-indexed ILP
-formulation for the restricted BRP.
-
-Formulation overview
---------------------
-Variables (1-indexed, period t = retrieval of block t):
-  x[i,j,t]  = 1 if block i is in stack j at the start of period t
-  y[i,j,t]  = 1 if block i is reshuffled from stack j during period t
-
-Key constraints:
-  (2)  Each block is in exactly one stack per period.
-  (3)  Stack capacity limit.
-  (4–7) Define y from x transitions.
-  (8–9) Exponential ordering constraints (generated as cuts by callback).
-  (13–18) Pre-processing / valid inequalities from initial layout.
-
-Initial warm start: BBS heuristic (Bacci et al., 2019) run for 1 second.
-Cuts: violated (8)/(9) constraints are separated when integer solutions are
-found (see rBRP_MIP3.h callback).
-
-Performance vs. Caserta benchmark Set 1:
-  All instances with n ≤ 50 solved within seconds.
-  n = 60–100: solved within seconds to 1 min on average.
-  n = 100 (10×12): not solved within 1 hour.
-
-Vendor C++ source (vendor/BC_RBRP/)
--------------------------------------
-  BC_RBRP.cpp    : main entry point
-  rBRP_MIP3.cpp  : IP model + separation callback (Gurobi C++ API)
-  rBRP_MIP3.h    : callback class (cuts integer solutions violating (8)/(9))
-  rBRP_BSheu.cpp : BBS warm start heuristic
-
-Compilation
------------
-1. Edit vendor/BC_RBRP/Makefile:
-     LIBGUROBI = /path/to/gurobi/linux64/lib -lgurobi_c++ -lgurobi<ver>
-     INCGUROBI = /path/to/gurobi/linux64/include
-2. cd vendor/BC_RBRP && make
-3. Produces BC_RBRP.exe  (Linux: executable without extension needed)
-
-Binary interface
-----------------
-Usage: ./BC_RBRP.exe instanceFile <solS=N> <optS=N> <verbS=N>
-  solS=0   BC-RBRP exact (default)
-  solS=1   BBS heuristic only
-  optS=1   solve integer problem to optimality (default)
-  optS=0   solve LP relaxation only
-  verbS=1  print solution detail
-
-stdout:
-  "Heuristic solution value = N"        (BBS warm-start value)
-  "Optimal solution = M, found in T secs."  (BC-RBRP result)
-
-Note: the time limit is hardcoded in rBRP_MIP3.cpp to 3600 seconds.
-To change it, edit and recompile.
-
-Input format (BC_RBRP / BBS format)
--------------------------------------
-Line 1: w h n        (stacks, max_tiers, containers)
-Remaining w lines, one per stack left→right, bay-major order:
-  k p1 p2 ... pk     (height k; priorities bottom→top, 1=first retrieved)
-Empty stacks: "0"
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -84,41 +31,27 @@ import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
+from algorithms.CRP_R.solver_ip.common import (
+    merge_solver_and_plan_metrics,
+    occupancy_from_yard,
+    occupancy_stages_to_plan,
+    plan_to_moves_extra,
+    priority_to_container_id,
+    sequential_retrieval_plan,
+    stack_keys,
+)
 
 from .bbs_export import yard_to_bbs_instance
+from .model import parse_bacci_period_layouts
 
 
 class BacciBC2020(BaseAlgorithm):
-    """
-    Bacci, Mattia & Ventura (2020) — BC-RBRP branch-and-cut exact solver.
-
-    Wraps ``vendor/BC_RBRP/BC_RBRP.exe`` (``solS=0``).  The binary uses
-    Gurobi internally; compile with Gurobi headers/libraries before use.
-
-    Compilation:
-        cd vendor/BC_RBRP
-        # edit Makefile: set LIBGUROBI and INCGUROBI to your Gurobi paths
-        make
-        # produces BC_RBRP.exe
-
-    Note: the time limit is hardcoded to 3600 s in ``rBRP_MIP3.cpp``.
-
-    Config parameters (``AlgorithmConfig.extra``)
-    ---------------------------------------------
-    bacci2020_binary  : str   override path to compiled binary (optional)
-    """
 
     name                = "Bacci (2020) BC-RBRP [Gurobi]"
     category            = "Exact"
     requires_solver     = True
     solver_backend      = "gurobi"
-    description         = (
-        "Branch-and-cut exact algorithm for restricted BRP. "
-        "Bacci, Mattia & Ventura — EJOR 287 (2020). "
-        "New time-period-indexed ILP + exponential cuts via Gurobi callback. "
-        "Outperforms CRP-I and Tanaka B&B on Caserta benchmarks. "
-        "[Requires Gurobi: compile vendor/BC_RBRP/BC_RBRP.exe first]"
-    )
+    description         = "Bacci et al. (EJOR 2020) BC-RBRP branch-and-cut IP."
     compatible_problems = ["CRP-R"]
     # Parse BBS warm-start value and BC-RBRP result from stdout
     _BBS_RE = re.compile(r"Heuristic solution value\s*=\s*(\d+)")
@@ -155,14 +88,10 @@ class BacciBC2020(BaseAlgorithm):
         self,
         instance_text: str,
         timeout_s: float = 4200.0,   # 3600 s (hardcoded limit) + buffer
-    ) -> Tuple[Optional[int], Optional[int], float]:
+    ) -> Tuple[Optional[int], Optional[int], float, str]:
         """
-        Write instance to temp file, run BC_RBRP.exe (solS=0, optS=1),
-        parse and return (bc_reloc, bbs_reloc, solve_time_s).
-
-        bc_reloc  : int   BC-RBRP result (None if binary not found or failed)
-        bbs_reloc : int   BBS warm-start value (None if not printed)
-        solve_time: float seconds reported by the binary
+        Write instance to temp file, run BC_RBRP.exe (solS=0, optS=1, verbS=1),
+        parse and return (bc_reloc, bbs_reloc, solve_time_s, stdout).
         """
         binary = self._resolve_binary()
         if not binary.is_file():
@@ -183,7 +112,7 @@ class BacciBC2020(BaseAlgorithm):
 
         try:
             proc = subprocess.run(
-                [str(binary), tmp_path, "solS=0", "optS=1", "verbS=0"],
+                [str(binary), tmp_path, "solS=0", "optS=1", "verbS=1"],
                 capture_output=True,
                 text=True,
                 timeout=float(timeout_s),
@@ -210,7 +139,7 @@ class BacciBC2020(BaseAlgorithm):
             bc_val  = int(round(float(m_opt.group(1))))
             solve_t = float(m_opt.group(2))
 
-        return bc_val, bbs_val, solve_t
+        return bc_val, bbs_val, solve_t, stdout
 
     # ---------------------------------------------------------------- #
     # BaseAlgorithm interface                                            #
@@ -240,7 +169,7 @@ class BacciBC2020(BaseAlgorithm):
             instance_text = yard_to_bbs_instance(env.config, env.yard)
 
             try:
-                bc_reloc, bbs_reloc, solve_t = self._run_bc(instance_text)
+                bc_reloc, bbs_reloc, solve_t, stdout = self._run_bc(instance_text)
             except FileNotFoundError as exc:
                 print(f"[BacciBC2020] {exc}", file=sys.stderr, flush=True)
                 self._push(
@@ -252,25 +181,62 @@ class BacciBC2020(BaseAlgorithm):
                 )
                 continue
 
-            primary = float(bc_reloc) if bc_reloc is not None else float("inf")
+            n_cont = len(env.containers)
+            w = env.config.num_bays * env.config.num_rows
+            h = env.config.max_tiers
+            keys = stack_keys(env.yard)
+            pri = priority_to_container_id(env.yard)
+            layouts = parse_bacci_period_layouts(stdout, w, h)
+            plan = None
+            if bc_reloc == 0:
+                plan = sequential_retrieval_plan(env.yard)
+            elif bc_reloc is not None:
+                occupancy = layouts if layouts else {1: occupancy_from_yard(env.yard)}
+                plan = occupancy_stages_to_plan(
+                    occupancy, {}, n_cont, keys, pri, max_tiers=h,
+                )
+
+            solver = {
+                "obj": bc_reloc,
+                "optimal": bool(bc_reloc is not None and solve_t < 3590),
+                "time_out": bool(bc_reloc is not None and solve_t >= 3590),
+                "n_vars": 0,
+                "n_constrs": 0,
+                "solve_time": solve_t,
+            }
+            if plan is not None:
+                metrics = merge_solver_and_plan_metrics(
+                    solver, env.validate_plan(plan),
+                )
+            else:
+                metrics = merge_solver_and_plan_metrics(
+                    solver,
+                    {
+                        "relocations": float(bc_reloc) if bc_reloc is not None else float("inf"),
+                        "crane_time": float("inf"),
+                        "time": float("inf") if bc_reloc is None else 0.0,
+                        "feasible": 0.0 if bc_reloc is None else 1.0,
+                        "completed": 0.0 if bc_reloc is None else 1.0,
+                        "validated": 0.0,
+                    },
+                )
+            metrics["bbs_warm_start"] = (
+                float(bbs_reloc) if bbs_reloc is not None else float("inf")
+            )
+            metrics["optimal_likely"] = (
+                1.0 if bc_reloc is not None and solve_t < 3590 else 0.0
+            )
+            metrics["solve_time_s"] = round(solve_t, 3)
+            all_metrics.append(metrics)
+            primary = float(metrics.get("relocations", float("inf")))
 
             if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []
-
-            metrics: Dict = {
-                "relocations":    primary,
-                "steps":          primary,
-                "time":           primary,
-                "bbs_warm_start": float(bbs_reloc) if bbs_reloc is not None else float("inf"),
-                "solve_time_s":   round(solve_t, 3),
-                "feasible":       0.0 if bc_reloc is None else 1.0,
-                # BC-RBRP's own output says "Optimal solution" but we cannot
-                # distinguish proven-optimal from time-limit here (status not printed).
-                # Mark as likely optimal (the paper solves n≤50 trivially).
-                "optimal_likely": 1.0 if bc_reloc is not None and solve_t < 3590 else 0.0,
-            }
-            all_metrics.append(metrics)
+                self._best_metric = primary
+                self._best_solution = [
+                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                    for m in (plan.movements if plan is not None else [])
+                    if m.to_pos is not None
+                ]
 
             self._push(
                 result_queue,
@@ -278,10 +244,15 @@ class BacciBC2020(BaseAlgorithm):
                 metric   = primary,
                 metrics  = metrics,
                 progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
+                extra    = {
+                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                    "validation_errors": env.get_last_validation_errors(),
+                },
             )
             print(
                 f"[BacciBC2020] seed={seed}  N={len(env.containers)}  "
+                f"reloc={metrics.get('relocations')}  "
+                f"crane={metrics.get('crane_time')}  "
                 f"bc={bc_reloc}  bbs={bbs_reloc}  t={solve_t:.1f}s",
                 file=sys.stderr, flush=True,
             )

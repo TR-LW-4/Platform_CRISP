@@ -1,31 +1,20 @@
 """
-Jin & Tanaka (2023) UCRP-IDBB exact solver — CRP-D adapter.
+JinTanaka2023ForCRPD
+<2023> <exact> <grouped> <single-bay> <CRP-D>
+Iterative-deepening branch-and-bound for grouped BRP
+jin_time_limit_sec --- 600 --- Per-instance wall-clock limit (s)
 
-Paper
------
-Bo Jin, Shunji Tanaka (2023). "An iterative deepening branch-and-bound
-algorithm for the unrestricted container relocation problem."
-European Journal of Operational Research.
-
-Vendor binary
--------------
-Compiled from ``vendor/`` source (``make`` produces ``vendor/main-solve``).
-Override via ``extra["jin_binary"]`` or env var ``JIN_UCRP_BINARY``.
-
-CLI interface (from solve.c)
-----------------------------
-    main-solve --input/-i <file> --time_limit/-t <seconds>
-
-stdout output lines (from algorithm.c)
----------------------------------------
-    [status] best_lb = X @ t / best_ub = Y @ t / time = Z / nodes = N / probe = P
-    [(p: src -> dst), ...]           # final move sequence (or '?')
-
-CRP-D specifics
----------------
-- Container priorities are **group IDs** (may repeat).
-- ``compatible_problems = ["CRP-D"]``.
-- Primary metric = ``relocations`` (= ``best_ub`` from the solver).
+------------------------------- Reference --------------------------------
+B. Jin, S. Tanaka,
+"An iterative deepening branch-and-bound algorithm for the unrestricted
+ container relocation problem",
+European Journal of Operational Research, 2023.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations

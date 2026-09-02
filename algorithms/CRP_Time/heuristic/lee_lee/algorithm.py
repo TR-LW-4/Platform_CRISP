@@ -1,13 +1,20 @@
 """
-Lee & Lee (2010) three-phase retrieval heuristic – algorithm class.
+LeeLeeRetrievalHeuristic
+<2010> <heuristic> <time> <multi-bay> <CRP-Time>
+Three-phase retrieval heuristic for crane working time
+max_no_improve_p2 --- 200 --- Phase-2 stagnation cutoff
+max_no_improve_p3 --- 500 --- Phase-3 stagnation cutoff
 
-Orchestrates Phase 1 → 2 → 3 and integrates with the platform's
-BaseAlgorithm interface (subprocess training, progress queue, GUI config).
-
-Reference
----------
-Y. Lee, Y.-J. Lee, "A heuristic for retrieving containers from a yard",
+------------------------------- Reference --------------------------------
+Y. Lee, Y.-J. Lee,
+"A heuristic for retrieving containers from a yard",
 Computers & Operations Research 37 (2010) 1139–1147.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
