@@ -49,6 +49,9 @@ class TanakaTierney2018IDBB(BaseAlgorithm):
         "upper-bound seeding); no MIP solver required."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

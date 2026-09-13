@@ -44,6 +44,9 @@ class JovanovicACO_uBRP(BaseAlgorithm):
         "Outperforms EXP and FB on large instances; ~20–30× faster than FB."
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

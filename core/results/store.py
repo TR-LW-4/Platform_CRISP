@@ -33,6 +33,7 @@ File format
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -51,10 +52,51 @@ _CASERTA_RE = re.compile(
     re.IGNORECASE,
 )
 _ZHU_FOLDER_RE = re.compile(r"^(?P<h>\d+)-(?P<s>\d+)-(?P<n>\d+)$")
+_STOW_RE = re.compile(
+    r"^Bay-(?P<a>\d+)-(?P<vs>\d+)-(?P<ys>\d+)-(?P<yt>\d+)"
+    r"_(?P<seed>\d+)\.pro$",
+    re.IGNORECASE,
+)
 
 
 def _safe_token(name: str) -> str:
     return name.replace(" ", "_").replace("/", "-")
+
+
+def _objective_result_suffix(
+    prob_config: Optional[Mapping[str, Any]],
+) -> str:
+    """Stable CRP-Time objective identity; empty for legacy configurations."""
+    if not isinstance(prob_config, Mapping):
+        return ""
+    raw_extra = prob_config.get("extra")
+    values = raw_extra if isinstance(raw_extra, Mapping) else prob_config
+    mode = values.get("objective_mode")
+    if mode is None:
+        return ""
+
+    keys = ["objective_mode"]
+    if mode != "relocations":
+        keys.extend([
+            "time_model",
+            "stack_s_per_stack",
+            "pickup_place_s",
+            "empty_vertical_s_per_tier",
+            "loaded_vertical_s_per_tier",
+            "outside_height",
+            "gantry_s_per_bay",
+            "trolley_s_per_row",
+            "gantry_accel_s",
+            "spreader_s",
+        ])
+    if mode == "weighted":
+        keys.extend(["relocation_weight", "time_weight"])
+    identity = {key: values.get(key) for key in keys if key in values}
+    digest = hashlib.sha1(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:8]
+    model = values.get("time_model", "none") if mode != "relocations" else "none"
+    return f"_obj-{_safe_token(str(mode))}-{_safe_token(str(model))}-{digest}"
 
 
 def stable_result_stem(
@@ -86,7 +128,20 @@ def stable_result_stem(
             h = int(m.group("h"))
             w = int(m.group("w"))
             iid = int(m.group("iid"))
-            return f"caserta_{h}x{w}_{iid:02d}"
+            return (
+                f"caserta_{h}x{w}_{iid:02d}"
+                f"{_objective_result_suffix(prob_config)}"
+            )
+        stow_match = _STOW_RE.match(path.name)
+        if stow_match:
+            return (
+                "stow_"
+                f"{stow_match.group('a')}-"
+                f"{stow_match.group('vs')}-"
+                f"{stow_match.group('ys')}-"
+                f"{stow_match.group('yt')}_"
+                f"{int(stow_match.group('seed')):02d}"
+            )
 
         folder_m = _ZHU_FOLDER_RE.match(path.parent.name)
         if folder_m:
@@ -95,13 +150,16 @@ def stable_result_stem(
             n = int(folder_m.group("n"))
             stem = path.stem
             safe_stem = re.sub(r"[^\w.\-]+", "_", stem)
-            return f"zhu_{h}-{s}-{n}_{safe_stem}"
+            return (
+                f"zhu_{h}-{s}-{n}_{safe_stem}"
+                f"{_objective_result_suffix(prob_config)}"
+            )
 
         # Unknown layout filename: still stable per path basename.
         safe = re.sub(r"[^\w.\-]+", "_", path.stem)
-        return f"layout_{safe}"
+        return f"layout_{safe}{_objective_result_suffix(prob_config)}"
 
-    return f"random_seed{int(seed)}"
+    return f"random_seed{int(seed)}{_objective_result_suffix(prob_config)}"
 
 
 def _result_path(
@@ -128,6 +186,7 @@ def result_path_for(
     layout_path: str | Path,
     *,
     seed: int = 0,
+    prob_config: Optional[Mapping[str, Any]] = None,
     base_dir: Path = _DEFAULT_DIR,
     mkdir: bool = False,
 ) -> Path:
@@ -136,11 +195,19 @@ def result_path_for(
     Lookup-only by default (``mkdir=False``) so Continue can scan without
     creating empty algorithm folders.
     """
+    lookup_config = dict(prob_config or {})
+    raw_extra = lookup_config.get("extra")
+    if isinstance(raw_extra, Mapping):
+        extra = dict(raw_extra)
+        extra[LAYOUT_FILE_EXTRA_KEY] = str(layout_path)
+        lookup_config["extra"] = extra
+    else:
+        lookup_config[LAYOUT_FILE_EXTRA_KEY] = str(layout_path)
     return _result_path(
         problem,
         algorithm,
         seed,
-        {LAYOUT_FILE_EXTRA_KEY: str(layout_path)},
+        lookup_config,
         base_dir,
         mkdir=mkdir,
     )
@@ -151,13 +218,19 @@ def completed_layout_paths(
     algorithm: str,
     layout_paths: Sequence[str | Path],
     base_dir: Path = _DEFAULT_DIR,
+    prob_config: Optional[Mapping[str, Any]] = None,
 ) -> List[str]:
     """Layout paths that already have a result file, in the given order."""
     done: List[str] = []
     for raw in layout_paths:
         path = Path(raw)
         result = result_path_for(
-            problem, algorithm, path, base_dir=base_dir, mkdir=False,
+            problem,
+            algorithm,
+            path,
+            prob_config=prob_config,
+            base_dir=base_dir,
+            mkdir=False,
         )
         if result.exists():
             done.append(str(path))

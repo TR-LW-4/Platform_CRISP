@@ -81,6 +81,9 @@ class Zhu2012IDAStarU(BaseAlgorithm):
         "narrow the search window; optional transposition table (IDA*-UM)."
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _LB_MODES    = (LB1, LB3)
     _PROBE_MODES = (PU1, PU2)
 

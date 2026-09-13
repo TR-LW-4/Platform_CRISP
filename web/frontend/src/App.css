@@ -249,6 +249,33 @@ input:disabled {
   font-weight: 650;
 }
 
+.comparison-notes {
+  margin: 0;
+  padding: 8px 10px 8px 24px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  list-style: disc;
+}
+
+.comparison-notes.ok {
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  color: #667085;
+}
+
+.comparison-notes.degraded {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.comparison-notes.incompatible {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;

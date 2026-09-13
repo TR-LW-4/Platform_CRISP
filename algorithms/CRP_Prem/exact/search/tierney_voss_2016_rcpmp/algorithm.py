@@ -79,6 +79,9 @@ class TierneyVoss2016RCPMP(BaseAlgorithm):
         "Uses relaxation-guided IDA* search inspired by Tierney & Voss (2016)."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     # No external MILP/CP backend is required for this embedding.
     requires_solver = False
     solver_backend = None

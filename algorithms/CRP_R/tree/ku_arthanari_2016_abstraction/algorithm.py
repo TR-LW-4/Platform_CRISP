@@ -52,6 +52,9 @@ class KuArthanari2016Abstraction(BaseAlgorithm):
     category = "Exact"
     description = "Ku & Arthanari (COR 2016) abstraction + pattern-database search."
     compatible_problems = ["CRP-R"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

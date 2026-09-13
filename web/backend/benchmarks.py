@@ -27,9 +27,16 @@ from core.zhu_dup_benchmark import (
     index_sn_pairs_by_height_dup,
     problem_config_for_zhu_dup_txt,
 )
+from core.benchmarks.stow import (
+    DEFAULT_STOW_DIR,
+    collect_paths_from_stow_queue,
+    index_classes_by_min_vessel_height,
+    problem_config_for_stow_pro,
+)
 
 BENCH_PROBLEMS = frozenset({"CRP-R", "CRP-U"})
 BENCH_DUP_PROBLEMS = frozenset({"CRP-D"})
+BENCH_STOW_PROBLEMS = frozenset({"CRP-Stow"})
 # These problems only accept Caserta / Zhu / ZhuDup files — no random layouts.
 NO_RANDOM_PROBLEMS = BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
 
@@ -37,6 +44,7 @@ SOURCE_RANDOM = "random"
 SOURCE_CASERTA = "caserta"
 SOURCE_ZHU = "zhu"
 SOURCE_ZHU_DUP = "zhu_dup"
+SOURCE_STOW = "crp_stow"
 
 
 def _project_root() -> Path:
@@ -53,6 +61,14 @@ def zhu_root() -> Path:
 
 def dup_root() -> Path:
     return DEFAULT_ZHU_DUP_DIR if DEFAULT_ZHU_DUP_DIR.is_dir() else _project_root() / "benchmark" / "dup_dataset"
+
+
+def stow_root() -> Path:
+    return (
+        DEFAULT_STOW_DIR
+        if DEFAULT_STOW_DIR.is_dir()
+        else _project_root() / "benchmark" / "crp_stow" / "Data" / "Gen"
+    )
 
 
 def available_for_problem(problem_name: str) -> Dict[str, Any]:
@@ -122,11 +138,34 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
             ),
         })
 
+    if problem_name in BENCH_STOW_PROBLEMS:
+        classes_by_a = index_classes_by_min_vessel_height(stow_root())
+        heights = sorted(classes_by_a)
+        sources.append({
+            "id": SOURCE_STOW,
+            "label": "CRP-Stow BRLP Benchmark",
+            "available": bool(heights),
+            "heights": heights,
+            "stow_classes_by_height": {
+                str(a): [
+                    {"vs": vs, "ys": ys, "yt": yt}
+                    for vs, ys, yt in classes_by_a[a]
+                ]
+                for a in heights
+            },
+            "caption": (
+                "Official Jovanović BRLP .pro files. Select minimum vessel "
+                "height A and one or more (VS, YS, YT) classes; each class "
+                "contains 40 instances."
+            ),
+        })
+
     return {
         "problem_name": problem_name,
         "sources": sources,
         "notes": (
-            "Caserta/Zhu support CRP-R and CRP-U; ZhuDup supports CRP-D."
+            "Caserta/Zhu support CRP-R and CRP-U; ZhuDup supports CRP-D; "
+            "the official BRLP .pro set supports CRP-Stow."
             if problem_name not in BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
             else None
         ),
@@ -158,6 +197,31 @@ def _normalize_sn_queue(queue: Sequence[Mapping[str, Any]]) -> List[Dict[str, An
     return out
 
 
+def _normalize_stow_queue(
+    queue: Sequence[Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for block in queue:
+        a = int(block["h"])
+        classes = {
+            (
+                int(item["vs"]),
+                int(item["ys"]),
+                int(item["yt"]),
+            )
+            for item in block.get("stow_classes", [])
+        }
+        if classes:
+            out.append({
+                "h": a,
+                "stow_classes": [
+                    {"vs": vs, "ys": ys, "yt": yt}
+                    for vs, ys, yt in sorted(classes)
+                ],
+            })
+    return out
+
+
 def resolve_paths(
     source: str,
     queue: Sequence[Mapping[str, Any]],
@@ -175,6 +239,11 @@ def resolve_paths(
             dup_root(),
             _normalize_sn_queue(queue),
             chosen,
+        )
+    elif source == SOURCE_STOW:
+        paths = collect_paths_from_stow_queue(
+            stow_root(),
+            _normalize_stow_queue(queue),
         )
     else:
         return []
@@ -194,6 +263,8 @@ def problem_config_for_layout(
         return problem_config_for_zhu_dup_txt(layout_path, params)
     if source == SOURCE_ZHU:
         return problem_config_for_zhu_txt(layout_path, params)
+    if source == SOURCE_STOW:
+        return problem_config_for_stow_pro(layout_path, params)
     return problem_config_for_caserta_dat(layout_path, params)
 
 
@@ -202,6 +273,7 @@ def source_tag(source: str) -> str:
         SOURCE_CASERTA: "caserta_batch",
         SOURCE_ZHU: "zhu_batch",
         SOURCE_ZHU_DUP: "zhu_dup_batch",
+        SOURCE_STOW: "crp_stow_batch",
     }.get(source, source)
 
 
@@ -217,7 +289,13 @@ def validate_source_for_problem(problem_name: str, source: str) -> None:
         raise ValueError(f"{source} benchmark requires CRP-R or CRP-U")
     if source == SOURCE_ZHU_DUP and problem_name not in BENCH_DUP_PROBLEMS:
         raise ValueError("zhu_dup benchmark requires CRP-D")
+    if source == SOURCE_STOW and problem_name not in BENCH_STOW_PROBLEMS:
+        raise ValueError("crp_stow benchmark requires CRP-Stow")
     if source not in {
-        SOURCE_RANDOM, SOURCE_CASERTA, SOURCE_ZHU, SOURCE_ZHU_DUP,
+        SOURCE_RANDOM,
+        SOURCE_CASERTA,
+        SOURCE_ZHU,
+        SOURCE_ZHU_DUP,
+        SOURCE_STOW,
     }:
         raise ValueError(f"Unknown instance source: {source}")

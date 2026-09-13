@@ -29,8 +29,13 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.objectives import KinematicsModel
-from core.plan import Movement
+from core.objectives import (
+    KinematicsModel,
+    ObjectiveSpec,
+    evaluate_plan_objectives,
+    movement_objective_cost,
+)
+from core.plan import Movement, RelocationPlan
 
 
 _EPS = 1e-9
@@ -39,7 +44,7 @@ _EPS = 1e-9
 @dataclass
 class _SearchResult:
     moves: List[Movement]
-    crane_time: float
+    objective_value: float
     total_moves: int
     relocations: int
 
@@ -53,6 +58,7 @@ class _CSUMSolver:
         positions: Sequence[Tuple[int, int]],
         max_tiers: int,
         kinematics: KinematicsModel,
+        objective_spec: ObjectiveSpec,
         time_limit_s: float,
         max_branches_b: int,
     ) -> None:
@@ -60,6 +66,7 @@ class _CSUMSolver:
         self.positions: List[Tuple[int, int]] = list(positions)
         self.max_tiers = int(max_tiers)
         self.kin = kinematics
+        self.objective_spec = objective_spec
 
         self.time_limit_s = float(max(0.1, time_limit_s))
         self.max_branches_b = int(max(1, max_branches_b))
@@ -103,7 +110,7 @@ class _CSUMSolver:
         relocs = sum(1 for m in self.best_moves if not m.is_retrieval)
         return _SearchResult(
             moves=self.best_moves[:],
-            crane_time=float(self.best_time),
+            objective_value=float(self.best_time),
             total_moves=int(self.best_total_moves),
             relocations=int(relocs),
         )
@@ -278,8 +285,10 @@ class _CSUMSolver:
         tcw = 0.0
         crane_pos = (1, 1)
         for mv in moves:
-            tcw += self.kin.move_time(crane_pos, mv)
-            crane_pos = self.kin.end_pos(mv)
+            dt, _time_cost, crane_pos = movement_objective_cost(
+                mv, self.objective_spec, self.kin, crane_pos
+            )
+            tcw += dt
         n_total = len(moves)
         better = (tcw + _EPS < self.best_time) or (
             abs(tcw - self.best_time) <= _EPS and n_total < self.best_total_moves
@@ -301,7 +310,12 @@ class _CSUMSolver:
                 return moves, False
 
             if stacks[src] and stacks[src][-1] == target:
-                mv = Movement(target, self.positions[src], None)
+                mv = Movement(
+                    target,
+                    self.positions[src],
+                    None,
+                    from_tier=len(stacks[src]),
+                )
                 moves.append(mv)
                 self._apply_retrieval(stacks, src, target)
                 target_idx += 1
@@ -316,8 +330,14 @@ class _CSUMSolver:
                 return moves, False
 
             dst = cand[0]
+            mv = Movement(
+                q,
+                self.positions[src],
+                self.positions[dst],
+                from_tier=len(stacks[src]),
+                to_tier=len(stacks[dst]) + 1,
+            )
             self._apply_relocation(stacks, src, dst)
-            mv = Movement(q, self.positions[src], self.positions[dst])
             moves.append(mv)
 
         return moves, True
@@ -348,7 +368,10 @@ class _CSUMSolver:
             return
 
         lb = self._lower_bound_moves_2x_plus_y(stacks)
-        if nmov + lb > self.best_total_moves:
+        if (
+            self.objective_spec.mode == "relocations"
+            and nmov + lb > self.best_total_moves
+        ):
             return
 
         target = self.targets[target_idx]
@@ -357,8 +380,15 @@ class _CSUMSolver:
             return
 
         if stacks[src] and stacks[src][-1] == target:
-            mv = Movement(target, self.positions[src], None)
-            dt = self.kin.move_time(crane_pos, mv)
+            mv = Movement(
+                target,
+                self.positions[src],
+                None,
+                from_tier=len(stacks[src]),
+            )
+            dt, _time_cost, next_pos = movement_objective_cost(
+                mv, self.objective_spec, self.kin, crane_pos
+            )
             new_t = tcw + dt
             if new_t >= self.best_time - _EPS:
                 return
@@ -368,7 +398,7 @@ class _CSUMSolver:
             self._dfs(
                 stacks=stacks,
                 target_idx=target_idx + 1,
-                crane_pos=self.kin.end_pos(mv),
+                crane_pos=next_pos,
                 nmov=nmov + 1,
                 tcw=new_t,
                 path=path,
@@ -391,16 +421,24 @@ class _CSUMSolver:
         for dst in candidates:
             if self._timed_out():
                 return
+            mv = Movement(
+                stacks[src][-1],
+                self.positions[src],
+                self.positions[dst],
+                from_tier=len(stacks[src]),
+                to_tier=len(stacks[dst]) + 1,
+            )
             moved_q = self._apply_relocation(stacks, src, dst)
-            mv = Movement(moved_q, self.positions[src], self.positions[dst])
-            dt = self.kin.move_time(crane_pos, mv)
+            dt, _time_cost, next_pos = movement_objective_cost(
+                mv, self.objective_spec, self.kin, crane_pos
+            )
             new_t = tcw + dt
             if new_t < self.best_time - _EPS:
                 path.append(mv)
                 self._dfs(
                     stacks=stacks,
                     target_idx=target_idx,
-                    crane_pos=self.kin.end_pos(mv),
+                    crane_pos=next_pos,
                     nmov=nmov + 1,
                     tcw=new_t,
                     path=path,
@@ -422,6 +460,9 @@ class Azari2017CSUM(BaseAlgorithm):
         "Implementation is self-contained and does not depend on other algorithms."
     )
     compatible_problems = ["CRP-Time"]
+    geometry = "single-bay"
+    objectives = ["crane_time"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -442,6 +483,7 @@ class Azari2017CSUM(BaseAlgorithm):
             env = problem_factory()
             env.config.seed = int(cfg.seed) + seed_idx
             env.reset()
+            initial_yard = copy.deepcopy(env.yard)
 
             positions = sorted(env.yard.stacks.keys())
             stacks = [
@@ -450,26 +492,29 @@ class Azari2017CSUM(BaseAlgorithm):
             ]
 
             kin = KinematicsModel.from_config_extra(env.config.extra)
+            objective_spec = ObjectiveSpec.from_config(env.config)
             solver = _CSUMSolver(
                 stacks=stacks,
                 positions=positions,
                 max_tiers=int(env.config.max_tiers),
                 kinematics=kin,
+                objective_spec=objective_spec,
                 time_limit_s=float(cfg.extra.get("time_limit_s", 5.0)),
                 max_branches_b=int(cfg.extra.get("max_branches_b", 6)),
             )
             result = solver.solve()
 
             actions = _moves_to_actions(result.moves, int(env.config.num_rows))
-            metrics = {
-                "time": float(result.crane_time),
-                "crane_time": float(result.crane_time),
-                "relocations": float(result.relocations),
-                "steps": float(result.total_moves),
-            }
+            metrics = evaluate_plan_objectives(
+                RelocationPlan(list(result.moves)),
+                objective_spec,
+                kinematics=kin,
+                initial_yard=initial_yard,
+            )
+            metrics["steps"] = float(result.total_moves)
             all_metrics.append(metrics)
 
-            primary = float(metrics["crane_time"])
+            primary = float(metrics["objective_value"])
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = actions

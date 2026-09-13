@@ -42,6 +42,9 @@ class TanakaBB2022(BaseAlgorithm):
     category = "Exact"
     description = "Tanaka & Voß (EJOR 2022) improved branch-and-bound."
     compatible_problems = ["CRP-R"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     # Parse opt=N (proven optimal) and best=N (best found, optimality not proven)
     # from rbrp_bb stderr output.
     _OPT_RE  = re.compile(r"opt=(\d+)")

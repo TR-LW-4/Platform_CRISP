@@ -54,6 +54,9 @@ class DeMeloSilva2018RBRP(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "de Melo da Silva et al. (EJOR 2018) r-BRP m1/m2 integer program."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

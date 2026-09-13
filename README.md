@@ -88,7 +88,8 @@ Information          Online | batch-stochastic      ← separate families
 | **CRP-R** | restricted + distinct | Retrieve in order 1…N; only blockers above the current target may move | relocations |
 | **CRP-U** | unrestricted + distinct | Retrieve in order 1…N; any stack top may move to any non-full stack | relocations |
 | **CRP-D** | duplicate (Du by default) | Groups are ordered; order inside a group is free. `extra["restricted_relocation"]`: `False` (default) = unrestricted Du, `True` = restricted Dr. Not a stowage problem; unrelated to CRP-Stow | relocations |
-| **CRP-Time** | same rules as CRP-R, different objective | Restricted + distinct; minimise total yard-crane working time | crane_time (also report relocations) |
+| **CRP-Time** | same rules as CRP-R, crane-time objective | Restricted + distinct; minimise selected crane time. Relocations are reported only | crane_time (also reports every time model) |
+| **CRP-MO** | same rules as CRP-Time, two objectives | Restricted + distinct; minimise (relocations, crane time) as a vector. No algorithm registered yet | relocations and crane_time |
 | **CRP-Online** | OCRP / limited look-ahead | Same dynamics as CRP-R, but future retrievals are revealed with `lookahead_h`. `lookahead_h=0` matches Zehendner 2017 | relocations |
 | **CRP-Prem** | pre-marshalling | No retrievals; reshuffle the bay until every stack is internally sorted | moves |
 | **CRP-Stow** | BRLP / POCRP | Retrieve according to a vessel stowage plan. `rc_ratio>0` enables **POCRP-RC** (rolled containers) | relocations |
@@ -106,11 +107,16 @@ The live catalog is the registry, not a static table on this page:
 python main.py list
 ```
 
-Family directories and paper lists live in `algorithms/<family>/README.md` (`CRP_R`, `CRP_U`, `CRP_D`, `CRP_Time`, `CRP_Online`, `CRP_Prem`, `CRP_Stow`, `CRP_Stoch`).
+Family directories and paper lists live in `algorithms/<family>/README.md` (`CRP_R`, `CRP_U`, `CRP_D`, `CRP_Time`, `CRP_MO`, `CRP_Online`, `CRP_Prem`, `CRP_Stow`, `CRP_Stoch`).
 
 > **Placement.** One family shares one `ProblemConfig` (`num_bays`, `num_rows`, `max_tiers`, `num_containers`, …). Put a new method in `algorithms/<primary_problem>/<category>/<paper_key>/` and list runnable families in `compatible_problems`. Keep the problem definition and objective unchanged; only the method changes.
 >
 > **Single-bay vs multi-bay is not two problems.** It is only `num_bays`. CRP-R and CRP-Time differ by objective (relocations vs crane time); the geometry is shared.
+
+> **CRP-Time is single-objective.** The search minimises crane time under
+> the paper `f2` / `f2_vertical` / `rmgc_current` models. Relocations stay
+> a reported metric. Bi-objective (R, T) search is the separate **CRP-MO**
+> family; do not register Pareto methods under CRP-Time.
 >
 > Some CRP-R heuristics (Kim–Hong 2006 ENAR, Caserta 2012 HEUR, LA-N) also appear in the CRP-Time menu via `compatible_problems`. Their code stays in `algorithms/CRP_R/heuristic/`; there is no symlink under Time. Jin (2015) GLAH currently lives only in `algorithms/CRP_U/heuristic/glah/`.
 
@@ -224,6 +230,7 @@ Platform_CRISP/
 │   ├── CRP_U/
 │   ├── CRP_D/
 │   ├── CRP_Time/
+│   ├── CRP_MO/
 │   ├── CRP_Online/
 │   ├── CRP_Prem/
 │   ├── CRP_Stow/

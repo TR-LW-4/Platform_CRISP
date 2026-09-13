@@ -50,6 +50,9 @@ class BortfeldtForster2012TreeSearch(BaseAlgorithm):
         "ablation switches V1-V4 exposed via config.extra."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

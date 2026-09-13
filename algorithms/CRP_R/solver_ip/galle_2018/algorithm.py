@@ -53,6 +53,9 @@ class GalleCRPI2018(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Galle et al. (EJOR 2018) CRP-I binary integer program."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

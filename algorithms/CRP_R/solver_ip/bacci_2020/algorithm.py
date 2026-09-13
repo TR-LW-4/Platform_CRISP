@@ -53,6 +53,9 @@ class BacciBC2020(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Bacci et al. (EJOR 2020) BC-RBRP branch-and-cut IP."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     # Parse BBS warm-start value and BC-RBRP result from stdout
     _BBS_RE = re.compile(r"Heuristic solution value\s*=\s*(\d+)")
     _OPT_RE = re.compile(r"Optimal solution\s*=\s*([\d.]+),\s*found in\s*([\d.]+)\s*secs")

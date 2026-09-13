@@ -44,6 +44,29 @@ def abstract_bay(bay: np.ndarray) -> np.ndarray:
     return arr.copy()
 
 
+def remap_batch_ids_to_start_labels(bay: np.ndarray) -> np.ndarray:
+    """
+    Convert consecutive batch IDs (Ku / Arthanari files: 1, 2, 3, ...)
+    into the start-index encoding that ``PBFSA.m`` applies before search.
+
+    A batch whose original ID is ``k`` is rewritten to
+    ``1 + |B_1| + ... + |B_{k-1}|``.  The map is idempotent on bays that
+    already use this encoding (``env_to_source_bay``).
+    """
+    positives = sorted({int(v) for v in bay.flatten().tolist() if int(v) > 0})
+    if not positives:
+        return bay.copy()
+    start = 1
+    mapping: Dict[int, int] = {}
+    for lab in positives:
+        mapping[lab] = start
+        start += int(np.sum(bay == lab))
+    out = bay.copy()
+    for lab, new in mapping.items():
+        out[bay == lab] = new
+    return out
+
+
 def batch_start_labels(batches: Sequence[Sequence[int]]) -> Dict[int, int]:
     """
     Return the source-style label for each priority.
@@ -112,14 +135,21 @@ def read_input_file(
     text = filename.read_text().strip().splitlines()
     rows = []
     for ln in text[1:]:
-        toks = [int(x) for x in ln.split()]
-        rows.append(toks)
-    raw = np.array(rows, dtype=int)
-    height = raw[:, 2]
+        toks = [int(x) for x in ln.split() if x]
+        if toks:
+            rows.append(toks)
+    if len(rows) != stacks:
+        raise ValueError(
+            f"{filename} has {len(rows)} stack lines, expected {stacks}"
+        )
     bay = np.zeros((tiers, stacks), dtype=int)
-    for s in range(stacks):
-        for t in range(int(height[s])):
-            bay[tiers - t - 1, s] = raw[s, 2 * (t + 2) - 1]
+    for s, toks in enumerate(rows):
+        height = int(toks[2])
+        for t in range(height):
+            # MATLAB dlmread is 1-based: RawConfiguration(s, 2*(t+1))
+            # after (bay, stack, height) is the first id of each pair.
+            col = 2 * (t + 2) - 1
+            bay[tiers - t - 1, s] = int(toks[col])
     return bay
 
 

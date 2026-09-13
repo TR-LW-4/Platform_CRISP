@@ -361,6 +361,9 @@ class _ZengBase(BaseAlgorithm):
     """Base class for Zeng et al. (2019) heuristics (CRP-D)."""
 
     compatible_problems = ["CRP-D"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

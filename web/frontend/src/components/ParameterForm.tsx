@@ -27,7 +27,19 @@ export function ParameterForm({
   return (
     <div className="parameter-grid">
       {Object.entries(schema)
-        .filter(([name]) => !hidden.has(name))
+        .filter(([name, field]) => {
+          if (hidden.has(name)) return false
+          if (!field.visibleWhen) return true
+          const conditions = Array.isArray(field.visibleWhen)
+            ? field.visibleWhen
+            : [field.visibleWhen]
+          return conditions.every((condition) => {
+            const controllingValue = values[condition.key]
+            return condition.values.some(
+              (candidate) => String(candidate) === String(controllingValue),
+            )
+          })
+        })
         .map(([name, field]) => {
         const label = field.label ?? name.replaceAll('_', ' ')
         const options = field.options ?? field.choices

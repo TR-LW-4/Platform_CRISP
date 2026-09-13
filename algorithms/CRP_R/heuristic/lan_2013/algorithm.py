@@ -34,6 +34,9 @@ class LANHeuristic(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Petering & Hussein (EJOR 2013) restricted LA-1 heuristic."
     compatible_problems = ["CRP-R", "CRP-Time"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None
@@ -68,7 +71,9 @@ class LANHeuristic(BaseAlgorithm):
         env._finish_reset_after_layout_loaded()
         plan    = build_lan_plan(initial_yard, containers, N, max_tiers)
         metrics = env.validate_plan(plan)
-        primary = float(metrics["relocations"])
+        primary = float(
+            metrics.get("objective_value", metrics["relocations"])
+        )
         self._best_plan     = plan
         self._best_solution = _plan_to_action_list(plan, env)
 

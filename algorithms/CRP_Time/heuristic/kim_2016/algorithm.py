@@ -191,6 +191,7 @@ class Kim2016Heuristic(BaseAlgorithm):
     name                = "Kim (2016) Multi-Case Heuristic"
     category            = "Heuristic"
     description         = (
+        "[fixed rule; selected objective is posterior-only] "
         "Kim, Kim & Lee (C&IE 2016) 4-case heuristic for CRP-Time. "
         "Case 1: retrieve when cmin on top. "
         "Case 2: no ideal stack → dest with max min_priority. "
@@ -203,6 +204,9 @@ class Kim2016Heuristic(BaseAlgorithm):
         "executable here but the destination-selection logic follows the paper."
     )
     compatible_problems = ["CRP-Time"]
+    geometry            = "multi-bay"
+    objectives          = ["fixed-rule"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -249,7 +253,10 @@ class Kim2016Heuristic(BaseAlgorithm):
             all_metrics.append(metrics)
 
             primary = float(
-                metrics.get("crane_time", metrics.get("relocations", 0.0))
+                metrics.get(
+                    "objective_value",
+                    metrics.get("crane_time", metrics.get("relocations", 0.0)),
+                )
             )
             if primary < self._best_metric:
                 self._best_metric   = primary

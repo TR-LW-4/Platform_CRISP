@@ -50,6 +50,9 @@ class WangJinLim2015TGH(BaseAlgorithm):
         "``has_dummy_stack``."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

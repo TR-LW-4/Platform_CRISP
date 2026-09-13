@@ -52,6 +52,9 @@ class JovanovicTubaVoss2015MultiHeuristic(BaseAlgorithm):
         "move-sequence correction pass."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

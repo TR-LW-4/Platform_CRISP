@@ -54,6 +54,9 @@ class GLAHHeuristic(BaseAlgorithm):
         "procedure — baseline only on free-order problems."
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan = None

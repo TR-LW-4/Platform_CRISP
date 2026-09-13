@@ -5,6 +5,8 @@ import { InstanceSourcePanel } from '../components/InstanceSourcePanel'
 import { MetricChart } from '../components/MetricChart'
 import { ParameterForm } from '../components/ParameterForm'
 import type {
+  AlgorithmFidelity,
+  AlgorithmGeometry,
   AlgorithmInfo,
   BatchClassSummary,
   BenchmarkQueueBlock,
@@ -39,6 +41,99 @@ function compatible(algorithm: AlgorithmInfo, problemName: string) {
   )
 }
 
+const GEOMETRY_LABELS: Record<AlgorithmGeometry, string> = {
+  'single-bay': 'Single-bay (2D)',
+  'multi-bay': 'Multi-bay (3D)',
+}
+
+const FIDELITY_LABELS: Record<AlgorithmFidelity, string> = {
+  faithful: 'Faithful reproduction',
+  adapted: 'Platform adaptation',
+  degenerate: 'Degenerate baseline',
+}
+
+// Objective modes under which crane time is part of what is minimised.
+const TIME_AWARE_MODES = new Set(['crane_time', 'weighted'])
+
+interface Assessment {
+  status: 'ok' | 'degraded' | 'incompatible'
+  notes: string[]
+}
+
+function objectiveLabel(algorithm: AlgorithmInfo) {
+  if (algorithm.objectives.includes('fixed-rule')) return 'Fixed rule'
+  return algorithm.objectives
+    .map((item) => (item === 'crane_time' ? 'Crane time' : 'Relocations'))
+    .join(' → ')
+}
+
+/**
+ * Mirror of core.algorithm_meta.assess_compatibility. A yard only counts as
+ * multi-bay when both horizontal axes exceed one: the single-bay benchmarks
+ * store their S stacks as S bays with one row each.
+ */
+function assess(
+  algorithm: AlgorithmInfo,
+  problemName: string,
+  objectiveMode: string,
+  numBays: number,
+  numRows: number,
+): Assessment {
+  if (!compatible(algorithm, problemName)) {
+    return {
+      status: 'incompatible',
+      notes: [`Not registered for ${problemName}.`],
+    }
+  }
+
+  const notes: string[] = []
+  let status: Assessment['status'] = 'ok'
+  const timeAware = TIME_AWARE_MODES.has(objectiveMode)
+  const fixedRule = algorithm.objectives.includes('fixed-rule')
+  const optimises =
+    !fixedRule &&
+    algorithm.objectives.includes(timeAware ? 'crane_time' : 'relocations')
+
+  if (!optimises) {
+    status = 'degraded'
+    if (fixedRule) {
+      notes.push(
+        'Deterministic rule: the selected objective is measured afterwards, ' +
+          'never optimised. Use as a baseline only.',
+      )
+    } else if (timeAware) {
+      notes.push(
+        'Minimises relocation count only; crane time is reported but not optimised.',
+      )
+    } else {
+      notes.push(
+        'Does not minimise relocation count; the reported value is a ' +
+          'by-product of a different objective.',
+      )
+    }
+  }
+
+  if (timeAware && numBays > 1 && numRows > 1 && algorithm.geometry === 'single-bay') {
+    status = 'degraded'
+    notes.push(
+      `Single-bay method on a ${numBays}×${numRows} yard: stacks are flattened, ` +
+        'so gantry travel between bays is not part of its decisions.',
+    )
+  }
+
+  if (algorithm.fidelity === 'adapted') {
+    notes.push(
+      'Platform adaptation rather than a line-by-line reproduction; ' +
+        'published numbers are not expected to match.',
+    )
+  } else if (algorithm.fidelity === 'degenerate') {
+    status = 'degraded'
+    notes.push('Degenerate baseline: does not represent the published method.')
+  }
+
+  return { status, notes }
+}
+
 function displayNumber(value: number | null | undefined) {
   return value === null || value === undefined ? '—' : value.toFixed(3)
 }
@@ -59,7 +154,17 @@ function summaryMetricKeys(classes: BatchClassSummary[]): string[] {
     })
   }
   // Prefer literature-facing metrics first when present.
-  const preferred = ['relocations', 'crane_time', 'time', 'moves', 'shifters']
+  const preferred = [
+    'objective_value',
+    'relocations',
+    'crane_time',
+    'crane_time_f2',
+    'crane_time_vertical',
+    'crane_time_rmgc',
+    'time',
+    'moves',
+    'shifters',
+  ]
   const ordered = preferred.filter((key) => keys.has(key))
   for (const key of [...keys].sort()) {
     if (!ordered.includes(key)) ordered.push(key)
@@ -115,6 +220,19 @@ export function Workbench({
   const jobId = job?.id
   const jobStatus = job?.status
   const usingLayout = instanceSource !== 'random'
+
+  // Comparison axes the fairness check depends on. Benchmark layouts always
+  // land on a single row, so their geometry is fixed regardless of the form.
+  const objectiveMode = String(problemValues.objective_mode ?? 'relocations')
+  const numBays = Number(problemValues.num_bays ?? 1)
+  const numRows = usingLayout ? 1 : Number(problemValues.num_rows ?? 1)
+  const assessment = useMemo(
+    () =>
+      algorithm
+        ? assess(algorithm, problemName, objectiveMode, numBays, numRows)
+        : null,
+    [algorithm, problemName, objectiveMode, numBays, numRows],
+  )
   const batchMetricKeys = useMemo(
     () => summaryMetricKeys(job?.batch_summary?.classes ?? []),
     [job?.batch_summary],
@@ -256,6 +374,15 @@ export function Workbench({
 
   const start = async () => {
     if (!problem || !algorithm) return
+    if (
+      problem.name === 'CRP-Time' &&
+      problemValues.objective_mode === 'weighted' &&
+      Number(problemValues.relocation_weight ?? 0) === 0 &&
+      Number(problemValues.time_weight ?? 0) === 0
+    ) {
+      setError('Relocation weight and time weight cannot both be zero.')
+      return
+    }
     if (usingLayout && resolvedCount <= 0) {
       setError('Add at least one instance block before starting a benchmark run.')
       return
@@ -403,9 +530,20 @@ export function Workbench({
               disabled={running}
               onChange={(event) => setAlgorithmName(event.target.value)}
             >
-              {groupAlgorithms.map((item) => (
-                <option key={item.name}>{item.name}</option>
-              ))}
+              {groupAlgorithms.map((item) => {
+                const itemStatus = assess(
+                  item,
+                  problemName,
+                  objectiveMode,
+                  numBays,
+                  numRows,
+                ).status
+                return (
+                  <option key={item.name} value={item.name}>
+                    {itemStatus === 'degraded' ? `⚠ ${item.name}` : item.name}
+                  </option>
+                )
+              })}
             </select>
           </label>
           {algorithm && (
@@ -415,7 +553,19 @@ export function Workbench({
                 {algorithm.category !== algorithm.method_group && (
                   <span>{algorithm.category}</span>
                 )}
+                <span>{GEOMETRY_LABELS[algorithm.geometry]}</span>
+                <span>{objectiveLabel(algorithm)}</span>
+                {algorithm.fidelity !== 'faithful' && (
+                  <span>{FIDELITY_LABELS[algorithm.fidelity]}</span>
+                )}
               </div>
+              {assessment && assessment.notes.length > 0 && (
+                <ul className={`comparison-notes ${assessment.status}`}>
+                  {assessment.notes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              )}
               <p className="description">
                 {algorithm.requires_solver && (
                   <strong>Requires {algorithm.solver_backend ?? 'external solver'}. </strong>

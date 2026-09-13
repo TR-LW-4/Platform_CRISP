@@ -57,6 +57,9 @@ class Tanaka2016BBDuplicate(BaseAlgorithm):
         "Primary metric = relocations; ``optimal_proven=1`` when opt= is reported."
     )
     compatible_problems = ["CRP-D"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _OPT_RE  = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")
 

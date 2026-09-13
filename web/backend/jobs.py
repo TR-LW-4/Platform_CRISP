@@ -324,6 +324,7 @@ class Job:
                     self.problem_name,
                     self.algorithm_name,
                     self.layout_paths,
+                    prob_config=self.problem_config,
                 ))
             else:
                 completed_count = len(self.result_files)
@@ -480,6 +481,7 @@ class JobManager:
                 job.problem_name,
                 job.algorithm_name,
                 job.layout_paths,
+                prob_config=job.problem_config,
             )
             if len(done) >= len(job.layout_paths):
                 raise ValueError("All instances already have saved results")
@@ -535,7 +537,12 @@ class JobManager:
         existing: List[str] = []
         seen = set()
         for layout in job.layout_paths:
-            path = result_path_for(job.problem_name, job.algorithm_name, layout)
+            path = result_path_for(
+                job.problem_name,
+                job.algorithm_name,
+                layout,
+                prob_config=job.problem_config,
+            )
             if not path.exists():
                 continue
             text = str(path)

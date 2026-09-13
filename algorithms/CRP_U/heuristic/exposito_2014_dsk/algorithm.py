@@ -54,6 +54,9 @@ class ExpositoDSK(BaseAlgorithm):
         "DOI: 10.1016/j.asoc.2014.04.007"
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

@@ -36,6 +36,9 @@ class TingWuBS(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Ting & Wu (TRE 2017) beam search with VRH."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

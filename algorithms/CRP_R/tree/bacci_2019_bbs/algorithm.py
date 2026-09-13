@@ -38,6 +38,9 @@ class BacciBBS(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Bacci et al. (C&OR 2019) bounded beam search."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _RESHUFFLES_RE = re.compile(r"reshuffles=(\d+)")
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

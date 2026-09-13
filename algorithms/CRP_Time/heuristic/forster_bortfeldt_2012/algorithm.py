@@ -190,12 +190,16 @@ class ForsterBortfeldt2012Retrieval(BaseAlgorithm):
     name = "Forster–Bortfeldt (2012) Retrieval Tree Search"
     category = "Heuristic"
     description = (
-        "[native multi-bay] OR Proceedings 2012 adaptation: "
+        "[native multi-bay; fixed policy, selected objective is posterior-only] "
+        "OR Proceedings 2012 adaptation: "
         "solve bays independently with single-bay tree search, then merge bay "
         "solutions by repeatedly executing moves until the block's global lowest "
-        "group is removed. Objective: crane working time."
+        "group is removed."
     )
     compatible_problems = ["CRP-Time"]
+    geometry = "multi-bay"
+    objectives = ["fixed-rule"]
+    fidelity = "adapted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -234,15 +238,14 @@ class ForsterBortfeldt2012Retrieval(BaseAlgorithm):
 
             actions = _moves_to_actions(merged.plan, int(env.config.num_rows))
             replay_metrics = env.evaluate(actions)
-            metrics = {
-                "time": float(replay_metrics.get("time", crane_time)),
-                "crane_time": float(replay_metrics.get("crane_time", crane_time)),
-                "relocations": float(replay_metrics.get("relocations", merged.relocations)),
-                "steps": float(replay_metrics.get("steps", merged.total_moves)),
-            }
+            metrics = dict(replay_metrics)
+            metrics.setdefault("time", crane_time)
+            metrics.setdefault("crane_time", crane_time)
+            metrics.setdefault("relocations", float(merged.relocations))
+            metrics.setdefault("steps", float(merged.total_moves))
             all_metrics.append(metrics)
 
-            primary = float(metrics["crane_time"])
+            primary = float(metrics.get("objective_value", metrics["crane_time"]))
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = actions

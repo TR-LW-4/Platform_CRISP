@@ -44,6 +44,9 @@ class ExpositoMelianMoreno2012LPFH(BaseAlgorithm):
         "for the pre-marshalling problem."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

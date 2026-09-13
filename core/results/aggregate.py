@@ -7,6 +7,7 @@ Caserta files use ``data{H}-{w}-{id}.dat``; Zhu uses parent folder ``H-S-N``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from collections import defaultdict
@@ -60,6 +61,24 @@ def _parse_zhu_folder_name(dirname: str) -> Optional[Tuple[int, int, int]]:
         return None
 
 
+def _parse_stow_filename(
+    path: Path,
+) -> Optional[Tuple[int, int, int, int, int]]:
+    """Parse ``Bay-A-VS-YS-YT_seed.pro``."""
+    name = path.name
+    if not name.lower().endswith(".pro") or not name.startswith("Bay-"):
+        return None
+    stem = name[4:-4]
+    class_part, separator, seed_raw = stem.rpartition("_")
+    parts = class_part.split("-")
+    if not separator or len(parts) != 4:
+        return None
+    try:
+        return (*(int(value) for value in parts), int(seed_raw))
+    except ValueError:
+        return None
+
+
 def _class_from_layout_path(path: Path) -> Optional[Tuple[str, str, Dict[str, int]]]:
     """
     Return ``(source, label, dims)`` or ``None``.
@@ -71,6 +90,20 @@ def _class_from_layout_path(path: Path) -> Optional[Tuple[str, str, Dict[str, in
     if parsed is not None:
         h, w, _inst = parsed
         return "caserta", f"{h}×{w}", {"h": h, "w": w}
+
+    stow = _parse_stow_filename(path)
+    if stow is not None:
+        a, vs, ys, yt, _seed = stow
+        return (
+            "crp_stow",
+            f"A={a} · VS={vs} · YS={ys} · YT={yt}",
+            {
+                "vessel_height_min": a,
+                "vessel_stacks": vs,
+                "yard_stacks": ys,
+                "yard_tiers": yt,
+            },
+        )
 
     folder = _parse_zhu_folder_name(path.parent.name)
     if folder is not None:
@@ -103,10 +136,25 @@ def class_sort_key(meta: Mapping[str, Any]) -> Tuple:
     w = _int_dim(meta, "w")
     s = _int_dim(meta, "s")
     n_dim = _int_dim(meta, "n_dim")
+    vessel_height_min = _int_dim(meta, "vessel_height_min")
+    vessel_stacks = _int_dim(meta, "vessel_stacks")
+    yard_stacks = _int_dim(meta, "yard_stacks")
+    yard_tiers = _int_dim(meta, "yard_tiers")
     if n_dim == 0 and meta.get("s") is not None and meta.get("w") is None:
         n_dim = _int_dim(meta, "n")
     label = str(meta.get("label") or "")
-    return (source, h, w, s, n_dim, label)
+    return (
+        source,
+        h,
+        w,
+        s,
+        n_dim,
+        vessel_height_min,
+        vessel_stacks,
+        yard_stacks,
+        yard_tiers,
+        label,
+    )
 
 
 def _layout_path_from_run(data: Mapping[str, Any]) -> Optional[Path]:
@@ -139,6 +187,51 @@ def _mean_std(values: Sequence[float]) -> Tuple[float, float]:
         return mean, 0.0
     var = sum((v - mean) ** 2 for v in values) / (n - 1)  # sample std
     return mean, math.sqrt(var)
+
+
+def _objective_group_label(data: Mapping[str, Any]) -> str:
+    """Readable CRP-Time objective identity for safe result aggregation."""
+    config = data.get("prob_config") or data.get("problem_config") or {}
+    if not isinstance(config, Mapping):
+        return ""
+    raw_extra = config.get("extra")
+    values = raw_extra if isinstance(raw_extra, Mapping) else config
+    mode = values.get("objective_mode")
+    if mode is None:
+        return ""
+    if mode == "relocations":
+        return "relocations"
+    model = str(values.get("time_model", "f2"))
+    identity_keys = [
+        "objective_mode",
+        "time_model",
+        "relocation_weight",
+        "time_weight",
+        "stack_s_per_stack",
+        "pickup_place_s",
+        "empty_vertical_s_per_tier",
+        "loaded_vertical_s_per_tier",
+        "outside_height",
+        "gantry_s_per_bay",
+        "trolley_s_per_row",
+        "gantry_accel_s",
+        "spreader_s",
+    ]
+    identity = {
+        key: values.get(key)
+        for key in identity_keys
+        if key in values
+    }
+    digest = hashlib.sha1(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:6]
+    if mode == "crane_time":
+        return f"{model}#{digest}"
+    return (
+        f"weighted:{model},"
+        f"wr={values.get('relocation_weight', 1.0)},"
+        f"wt={values.get('time_weight', 1.0)}#{digest}"
+    )
 
 
 def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -183,11 +276,15 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
             ungrouped += 1
             continue
         source, label, dims = classified
-        key = (source, label)
+        objective_group = _objective_group_label(data)
+        display_label = (
+            f"{label} [{objective_group}]" if objective_group else label
+        )
+        key = (source, display_label)
         if key not in buckets:
             buckets[key] = {
                 "source": source,
-                "label": label,
+                "label": display_label,
                 **dims,
             }
         metrics = data.get("metrics") or {}

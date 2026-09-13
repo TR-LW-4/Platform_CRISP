@@ -4,15 +4,13 @@ CRP-Stow (BRLP) 启发式算法逐步测试脚本
 Jovanović 2019 BRLP 问题接口对应版本。
 
 用法（在 Platform_CRISP 根目录下执行）：
-    python -m algorithms.CRP_Stow.heuristic.test_heuristic --algo JiNearest --pause
+    python -m algorithms.CRP_Stow.heuristic.test_heuristic --algo JovanovicGreedy --pause
 
 支持的算法 (--algo)：
-    JiNearest           Ji (2015) 最近栈策略
-    JiOptimization      Ji (2015) 优化策略（避免二次搬箱）
     JovanovicGreedy     Jovanović (2019) 贪心 MinW4CB+MinMax4CB（步进模式）
 
 常用选项：
-    --algo        JiNearest  算法名称（见上方列表）
+    --algo        JovanovicGreedy  算法名称（见上方列表）
     --seed        42         随机 seed
     --pause                  每步按 Enter 继续（交互模式）
     --bays        4          堆场 yard stack 数（YS）
@@ -22,12 +20,12 @@ Jovanović 2019 BRLP 问题接口对应版本。
     --pro                    可选：Jovanović .pro 文件路径
 
 示例：
-    # 交互式逐步看 JiNearest
-    python -m algorithms.CRP_Stow.heuristic.test_heuristic --algo JiNearest --pause
+    # 交互式逐步看 JovanovicGreedy
+    python -m algorithms.CRP_Stow.heuristic.test_heuristic --algo JovanovicGreedy --pause
 
     # 用 .pro 文件
     python -m algorithms.CRP_Stow.heuristic.test_heuristic \\
-        --algo JiOptimization \\
+        --algo JovanovicGreedy \\
         --pro /data/liuw2/Platform_CRISP/benchmark/crp_stow/Data/Gen/Bay-3-3-3-6_0.pro \\
         --pause
 """
@@ -44,21 +42,12 @@ if _ROOT not in sys.path:
 
 
 _ALGO_NAMES = [
-    "JiNearest", "JiOptimization",
     "JovanovicGreedy",
 ]
 
 
 def _make_selector(algo_name: str):
     """Return selector_fn(env) -> int."""
-    if algo_name == "JiNearest":
-        from algorithms.CRP_Stow.heuristic.ji_2015.algorithm import JiNearest
-        return JiNearest()._select
-
-    if algo_name == "JiOptimization":
-        from algorithms.CRP_Stow.heuristic.ji_2015.algorithm import JiOptimization
-        return JiOptimization()._select
-
     if algo_name == "JovanovicGreedy":
         from algorithms.CRP_Stow.heuristic.jovanovic_2019.algorithm import (
             _select_high_MinW4CB, _select_low_MinMax4CB, _compute_well_located,
@@ -297,7 +286,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--algo",       default="JovanovicGreedy",
                         choices=_ALGO_NAMES,
-                        help=f"算法名称（默认: JiNearest）")
+                        help="算法名称（默认: JovanovicGreedy）")
     parser.add_argument("--seed",       type=int,  default=42,
                         help="随机 seed（默认: 42）")
     parser.add_argument("--pause",      action="store_true",

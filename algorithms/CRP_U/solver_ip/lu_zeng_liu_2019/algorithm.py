@@ -60,6 +60,9 @@ class LuZengLiu2019BRP(BaseAlgorithm):
         "arXiv:1904.03347"
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

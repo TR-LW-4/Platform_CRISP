@@ -134,6 +134,8 @@ def list_algorithms() -> List[str]:
 
 def get_algorithm_info() -> List[Dict]:
     """Return list of dicts for GUI display."""
+    from core.algorithm_meta import algorithm_meta
+
     _ensure_loaded()
     out = []
     for name, cls in _ALGORITHM_REGISTRY.items():
@@ -144,6 +146,7 @@ def get_algorithm_info() -> List[Dict]:
             "compatible_problems":  getattr(cls, "compatible_problems", []),
             "requires_solver":      getattr(cls, "requires_solver", False),
             "solver_backend":       getattr(cls, "solver_backend", None),
+            **algorithm_meta(cls),
         })
     return sorted(out, key=lambda d: (d["category"], d["name"]))
 

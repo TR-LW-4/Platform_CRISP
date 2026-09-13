@@ -508,6 +508,9 @@ class ExposioBB2015(BaseAlgorithm):
     category            = "Exact"
     description         = "Expósito-Izquierdo et al. (ESWA 2015) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

@@ -33,7 +33,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
 
 from .astar import astar
-from .bay_utils import abstract_bay
+from .bay_utils import abstract_bay, remap_batch_ids_to_start_labels
 from .bounds import blocking_lower_bound, bounds_difference, rolling_lower_bound
 
 
@@ -254,9 +254,14 @@ def pbfsa(
 
     Setting `error_gap=0` reproduces the exact batch-model solver used as
     the "optimal algorithm" in the original experiments.
+
+    Ku / Arthanari files store consecutive batch IDs (1, 2, 3, ...).
+    ``PBFSA.m`` remaps those to start-index labels before search; this
+    port does the same so chance-node unveiling does not collide with
+    later batches.
     """
     rng = rng if rng is not None else np.random.RandomState()
-    bay = abstract_bay(bay.copy())
+    bay = abstract_bay(remap_batch_ids_to_start_labels(bay.copy()))
     start = time.perf_counter()
     stats = SearchStats()
     counts = _counts_by_positive_label(bay)

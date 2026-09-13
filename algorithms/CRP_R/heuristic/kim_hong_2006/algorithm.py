@@ -33,6 +33,9 @@ class KimHong2006ENARHeuristic(BaseAlgorithm):
     category    = "Heuristic"
     description = "Kim & Hong (COR 2006) ENAR-inspired destination heuristic."
     compatible_problems = ["CRP-R", "CRP-Time"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -92,7 +95,9 @@ class KimHong2006ENARHeuristic(BaseAlgorithm):
                 metrics.get("relocations", 0.0)
             )
             metrics["relocations"] = float("inf")
-        primary = float(metrics.get("relocations", 0.0))
+        primary = float(
+            metrics.get("objective_value", metrics.get("relocations", 0.0))
+        )
         self._best_solution = solution[:]
 
         self._push(

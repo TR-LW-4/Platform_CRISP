@@ -78,6 +78,9 @@ class TanakaBB2019Stow(BaseAlgorithm):
         "Primary metric: relocations (optimal count when solver proves optimality)."
     )
     compatible_problems = ["CRP-Stow"]
+    geometry            = "multi-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     step_label          = "Instance"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

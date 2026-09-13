@@ -34,7 +34,7 @@ class Lin2015Heuristic(BaseAlgorithm):
     name                = "Lin–Lee–Lee (2015) Rule"
     category            = "Heuristic"
     description         = (
-        "[native multi-bay]  "
+        "[native multi-bay; fixed rule, selected objective is posterior-only]  "
         "Lin, Lee & Lee (TRC 2015) SSI heuristic for CRP-Time. "
         "Rule 1: ideal stacks scored by SSI = min_prio + P_r·row + P_b·bay_dist. "
         "Rule 2 (unrestricted): pre-moves into dest before main relocation. "
@@ -42,6 +42,9 @@ class Lin2015Heuristic(BaseAlgorithm):
         "Defaults P_r=30, P_b=300 follow Shin et al. (TRC 2026)."
     )
     compatible_problems = ["CRP-Time", "CRP-R"]
+    geometry            = "multi-bay"
+    objectives          = ["fixed-rule"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -97,7 +100,10 @@ class Lin2015Heuristic(BaseAlgorithm):
             all_metrics.append(metrics)
 
             primary = float(
-                metrics.get("crane_time", metrics.get("relocations", 0.0))
+                metrics.get(
+                    "objective_value",
+                    metrics.get("crane_time", metrics.get("relocations", 0.0)),
+                )
             )
 
             if primary < self._best_metric:

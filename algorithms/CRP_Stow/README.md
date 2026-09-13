@@ -5,7 +5,6 @@ family.
 
 | Category | Paper key                | Algorithm | RC-aware |
 |----------|--------------------------|-----------|:--------:|
-| Heuristic | `ji_2015/`              | Ji et al. (2015) Nearest / Optimization | no |
 | Heuristic | `jovanovic_2019/`       | Jovanović (2019) GR-C + GRASP           | no |
 | Heuristic | `wang_2026_grasp/`      | **Wang, Ma, Yang & Hu (2026) GRASP for POCRP-RC** | **yes** |
 | Exact     | `exact/tanaka_voss_2019/` | Tanaka & Voß (2019) B&B for BRPSP     | no |
@@ -23,3 +22,8 @@ and is fully backward-compatible with all other baselines above.
 
 See `algorithms/README.md` for the overall layout convention and
 `problems/CRP_Stow.py` for the RC extension details.
+
+The Web Workbench exposes both random layouts and the official Jovanović
+BRLP benchmark under **CRP-Stow BRLP Benchmark**.  Benchmark classes follow
+`Bay-A-VS-YS-YT_seed.pro`; selecting one class queues its 40 seeded
+instances, while **First instance only** is available for smoke testing.

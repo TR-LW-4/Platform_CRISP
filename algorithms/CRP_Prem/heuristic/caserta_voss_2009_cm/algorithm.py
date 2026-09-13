@@ -45,6 +45,9 @@ class CasertaVossCM(BaseAlgorithm):
         "fully-sorted solution found within the time budget."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

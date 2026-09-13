@@ -7,6 +7,7 @@ from typing import Any, Mapping, TypeVar
 
 from core.base_algorithm import AlgorithmConfig
 from core.base_problem import ProblemConfig
+from core.objectives import ObjectiveSpec
 
 
 ConfigT = TypeVar("ConfigT", AlgorithmConfig, ProblemConfig)
@@ -30,7 +31,10 @@ def _from_values(config_type: type[ConfigT], values: Mapping[str, Any]) -> Confi
 
 
 def problem_config(values: Mapping[str, Any]) -> ProblemConfig:
-    return _from_values(ProblemConfig, values)
+    config = _from_values(ProblemConfig, values)
+    if "objective_mode" in values:
+        ObjectiveSpec.from_config(config)
+    return config
 
 
 def algorithm_config(values: Mapping[str, Any]) -> AlgorithmConfig:

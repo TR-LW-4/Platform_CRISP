@@ -275,6 +275,9 @@ class KimHong2006BB(BaseAlgorithm):
     category            = "Exact"
     description         = "Kim & Hong (COR 2006) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

@@ -45,6 +45,9 @@ class BogeGoerigkKnust2020RobustPMP(BaseAlgorithm):
         "order using adjacent-swap uncertainty (EJOR 2020)."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = True
     solver_backend = "gurobi"
 

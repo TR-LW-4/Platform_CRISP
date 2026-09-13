@@ -30,7 +30,8 @@ from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.plan import RelocationPlan
 from core.objectives import (
     KinematicsModel,
-    compute_crane_time,
+    ObjectiveSpec,
+    evaluate_plan_objectives,
     lower_bound_relocations,
 )
 from .phase1 import phase1_greedy
@@ -60,6 +61,9 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
         "numerics cannot be reproduced with this implementation."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
+    geometry            = "multi-bay"
+    objectives          = ["relocations", "crane_time"]
+    fidelity            = "adapted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None
@@ -94,6 +98,7 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
             env.reset(options={"skip_auto_retrieve": True})
 
             kin          = KinematicsModel.from_config_extra(env.config.extra)
+            objective_spec = ObjectiveSpec.from_config(env.config)
             initial_yard = copy.deepcopy(env.yard)
             containers   = list(env.containers)
             max_tiers    = env.config.max_tiers
@@ -107,8 +112,12 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
             self._push(
                 result_queue,
                 step     = seed_idx * 3 + 1,
-                metric   = float(plan.num_relocations()),
-                metrics  = _plan_metrics(plan, kin, lb),
+                metric   = _plan_metrics(
+                    plan, kin, lb, initial_yard, objective_spec
+                )["objective_value"],
+                metrics  = _plan_metrics(
+                    plan, kin, lb, initial_yard, objective_spec
+                ),
                 progress = (seed_idx * 3 + 1) / total_steps,
                 snapshot = env.get_state_snapshot(),
                 extra    = {"phase": 1, "seed": seed_idx},
@@ -127,8 +136,12 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
             self._push(
                 result_queue,
                 step     = seed_idx * 3 + 2,
-                metric   = float(plan.num_relocations()),
-                metrics  = _plan_metrics(plan, kin, lb),
+                metric   = _plan_metrics(
+                    plan, kin, lb, initial_yard, objective_spec
+                )["objective_value"],
+                metrics  = _plan_metrics(
+                    plan, kin, lb, initial_yard, objective_spec
+                ),
                 progress = (seed_idx * 3 + 2) / total_steps,
                 snapshot = env.get_state_snapshot(),
                 extra    = {"phase": 2, "seed": seed_idx},
@@ -142,11 +155,19 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
                 plan, initial_yard, max_tiers, kin,
                 max_no_improve=max_p3,
                 stop_event=stop_event,
+                score_fn=lambda candidate: evaluate_plan_objectives(
+                    candidate,
+                    objective_spec,
+                    kinematics=kin,
+                    initial_yard=initial_yard,
+                )["objective_value"],
             )
 
-            metrics = _plan_metrics(plan, kin, lb)
+            metrics = _plan_metrics(
+                plan, kin, lb, initial_yard, objective_spec
+            )
             all_metrics.append(metrics)
-            primary = float(plan.num_relocations())
+            primary = float(metrics["objective_value"])
 
             if primary <= self._best_metric:
                 self._best_metric   = primary
@@ -217,18 +238,21 @@ def _plan_metrics(
     plan:      RelocationPlan,
     kin:       KinematicsModel,
     lb_relocs: int,
+    initial_yard,
+    objective_spec: ObjectiveSpec,
 ) -> Dict:
-    n_relocs   = plan.num_relocations()
-    crane_time = compute_crane_time(plan, kin)
-    return {
-        "relocations": float(n_relocs),
-        "crane_time":  crane_time,
-        "total_moves": float(plan.num_moves()),
+    metrics = evaluate_plan_objectives(
+        plan,
+        objective_spec,
+        kinematics=kin,
+        initial_yard=initial_yard,
+    )
+    metrics.update({
         "lower_bound": float(lb_relocs),
-        "lb_ratio":    float(n_relocs / max(lb_relocs, 1)),
-        "time":        crane_time,
-        "steps":       float(plan.num_moves()),
-    }
+        "lb_ratio": float(metrics["relocations"] / max(lb_relocs, 1)),
+        "steps": float(plan.num_moves()),
+    })
+    return metrics
 
 
 def _plan_to_action_list(plan: RelocationPlan, env) -> List[int]:

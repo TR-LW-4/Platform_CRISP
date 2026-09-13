@@ -21,6 +21,7 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
+import copy
 import multiprocessing as mp
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -28,7 +29,66 @@ import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
-from .scoring import compute_lb, compute_lb_time, move_time_inline, retrieval_time_inline, run_greedy_rbrp_time
+from core.objectives import (
+    KinematicsModel,
+    ObjectiveSpec,
+    evaluate_plan_objectives,
+    movement_objective_cost,
+)
+from core.plan import Movement, RelocationPlan
+from .scoring import compute_lb, run_greedy_rbrp_time
+
+
+def _solution_to_plan(
+    solution: List[Tuple[int, int, int, int]],
+    stacks_init: Dict[Any, List[int]],
+    all_keys: List[Any],
+    n_total: int,
+) -> RelocationPlan:
+    """Rebuild an explicit tier-annotated plan from the ACO encoding."""
+    stacks = {key: list(values) for key, values in stacks_init.items()}
+    loc = {
+        container: key
+        for key, values in stacks.items()
+        for container in values
+    }
+    plan = RelocationPlan()
+    by_target: Dict[int, List[Tuple[int, int, int, int]]] = {}
+    for record in solution:
+        by_target.setdefault(record[3], []).append(record)
+
+    for target in range(1, n_total + 1):
+        for c, d_val, _mc, _t in by_target.get(target, []):
+            src = loc[c]
+            if d_val <= n_total:
+                dst = loc[d_val]
+            else:
+                dst = all_keys[d_val - n_total - 1]
+            plan.add(
+                Movement(
+                    c,
+                    src,
+                    dst,
+                    from_tier=len(stacks[src]),
+                    to_tier=len(stacks[dst]) + 1,
+                )
+            )
+            stacks[src].pop()
+            stacks[dst].append(c)
+            loc[c] = dst
+
+        src = loc[target]
+        plan.add(
+            Movement(
+                target,
+                src,
+                None,
+                from_tier=len(stacks[src]),
+            )
+        )
+        stacks[src].pop()
+        loc[target] = None
+    return plan
 
 
 class JovanovicACO_CRPTime(BaseAlgorithm):
@@ -44,6 +104,9 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
         "termination use seconds instead of relocation counts."
     )
     compatible_problems = ["CRP-Time"]
+    geometry            = "single-bay"
+    objectives          = ["crane_time"]
+    fidelity            = "adapted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -84,6 +147,9 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
             env.reset(options={"skip_auto_retrieve": True})
+            initial_yard = copy.deepcopy(env.yard)
+            objective_spec = ObjectiveSpec.from_config(env.config)
+            kinematics = KinematicsModel.from_config_extra(env.config.extra)
 
             n_total   = int(env.config.num_containers)
             max_tiers = int(env.config.max_tiers)
@@ -109,26 +175,15 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                     [int(c.priority) for c in stk.containers] if stk else []
                 )
 
-            # ── Greedy warm-start (returns crane time) ────────────────── #
-            S_best, best_cost = run_greedy_rbrp_time(
+            # ── Greedy warm-start ────────────────────────────────────── #
+            S_best, _legacy_greedy_cost = run_greedy_rbrp_time(
                 stacks_init, all_keys, n_total, max_tiers, key_to_1based_idx,
                 gantry_s, trolley_s, accel_s, spreader_s,
             )
-            # best_cost is float (seconds) from this point forward
 
-            # ── Initial lower bound (crane-time) ─────────────────────── #
+            # ── Initial lower bound ──────────────────────────────────── #
             lb_init_nwl  = compute_lb(stacks_init)          # integer NWL count
-            lb_init_time = compute_lb_time(lb_init_nwl, spreader_s)  # float seconds
-
-            # ── Pheromone initialisation (Eq. 37, crane-time val) ────── #
-            val_greedy = 1.0 / max(best_cost - lb_init_time + 1.0, 1.0)
-            tau_0      = val_greedy / n_stacks
-            tau_min    = tau_0 / n_stacks
-
-            pheromone = np.full(
-                (n_total, n_total + n_stacks, max_moves + 1, n_total),
-                tau_0, dtype=np.float32,
-            )
+            lb_init_time = 0.0  # safe for every selectable objective
 
             # ── Opt-1: precompute location + stack-min arrays ─────────── #
             loc_init:       List[Any]      = [None] * (n_total + 1)
@@ -140,6 +195,26 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 empty_d[key]        = n_total + key_to_1based_idx[key]
                 for p in prios:
                     loc_init[p] = key
+
+            best_plan = _solution_to_plan(
+                S_best, stacks_init, all_keys, n_total
+            )
+            best_metrics = evaluate_plan_objectives(
+                best_plan,
+                objective_spec,
+                kinematics=kinematics,
+                initial_yard=initial_yard,
+            )
+            best_cost = float(best_metrics["objective_value"])
+
+            # ── Pheromone initialisation (Eq. 37) ────────────────────── #
+            val_greedy = 1.0 / max(best_cost - lb_init_time + 1.0, 1.0)
+            tau_0      = val_greedy / n_stacks
+            tau_min    = tau_0 / n_stacks
+            pheromone = np.full(
+                (n_total, n_total + n_stacks, max_moves + 1, n_total),
+                tau_0, dtype=np.float32,
+            )
 
             iters_no_improve = 0
 
@@ -162,9 +237,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                     valid        = True
                     loc          = list(loc_init)
                     smin         = dict(stack_min_init)
-                    lb_curr      = lb_init_nwl      # incremental NWL count
                     crane_pos    = (1, 1)            # crane starts at (bay=1, row=1)
-                    time_so_far  = 0.0               # accumulated crane time
+                    time_so_far  = 0.0               # accumulated selected objective
 
                     for target in range(1, n_total + 1):
                         if not valid:
@@ -238,13 +312,16 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                                 dst_key = cands_k[idx]
                                 d_val   = cands_d[idx]
 
-                            # Incremental NWL tracking (Opt-2, same as CRP-R)
-                            was_non_wl  = smin[src_key] < c
-                            will_non_wl = smin[dst_key] < c
-
                             # Record 4-tuple and apply relocation
                             mc_rec = mc_cl
                             S.append((c, d_val, mc_rec, target))
+                            movement = Movement(
+                                c,
+                                src_key,
+                                dst_key,
+                                from_tier=len(stacks[src_key]),
+                                to_tier=len(stacks[dst_key]) + 1,
+                            )
 
                             stacks[src_key].pop()
                             if smin[src_key] == c:
@@ -261,23 +338,17 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                             loc[c]  = dst_key
                             M[c]   += 1
 
-                            # Accumulate crane time for this relocation
-                            # src_key and dst_key are (bay, row) tuples = positions
-                            cost, crane_pos = move_time_inline(
-                                crane_pos, src_key, dst_key,
-                                gantry_s, trolley_s, accel_s, spreader_s,
+                            # Accumulate the user-selected additive objective.
+                            cost, _selected_time, crane_pos = movement_objective_cost(
+                                movement,
+                                objective_spec,
+                                kinematics,
+                                crane_pos,
                             )
                             time_so_far += cost
 
-                            # Update NWL count
-                            if was_non_wl:
-                                lb_curr -= 1
-                            if will_non_wl:
-                                lb_curr += 1
-
-                            # Early termination (crane-time)
-                            lb_remaining = lb_curr * spreader_s
-                            if time_so_far + lb_remaining >= best_cost:
+                            # All supported objective components are non-negative.
+                            if time_so_far >= best_cost:
                                 valid = False
 
                         # Retrieve target (also incurs crane time)
@@ -286,9 +357,17 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                             and stacks[src_key]
                             and stacks[src_key][-1] == target
                         ):
-                            cost, crane_pos = retrieval_time_inline(
-                                crane_pos, src_key,
-                                gantry_s, trolley_s, accel_s, spreader_s,
+                            movement = Movement(
+                                target,
+                                src_key,
+                                None,
+                                from_tier=len(stacks[src_key]),
+                            )
+                            cost, _selected_time, crane_pos = movement_objective_cost(
+                                movement,
+                                objective_spec,
+                                kinematics,
+                                crane_pos,
                             )
                             time_so_far += cost
 
@@ -316,7 +395,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                                 np.float32(pheromone[c_i, d_i, mc_rec, t_i] * phi),
                             )
 
-                    # ── Update best (crane time) ───────────────────────── #
+                    # ── Update best selected objective ─────────────────── #
                     if valid and time_so_far < best_cost:
                         best_cost        = time_so_far
                         S_best           = S.copy()
@@ -355,33 +434,49 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 # ── Periodic GUI push ─────────────────────────────────── #
                 if (iteration + 1) % report_every == 0:
                     frac = (seed * n_iters + iteration + 1) / (n_seeds * n_iters)
+                    report_plan = _solution_to_plan(
+                        S_best, stacks_init, all_keys, n_total
+                    )
+                    report_metrics = evaluate_plan_objectives(
+                        report_plan,
+                        objective_spec,
+                        kinematics=kinematics,
+                        initial_yard=initial_yard,
+                    )
+                    report_metrics.update({
+                        "lower_bound": float(lb_init_time),
+                        "iteration": float(iteration + 1),
+                    })
                     self._push(
                         result_queue,
                         step     = seed + 1,
                         metric   = float(best_cost),
-                        metrics  = {
-                            "crane_time":  float(best_cost),
-                            "time":        float(best_cost),
-                            "relocations": float(len(S_best)),
-                            "lower_bound": float(lb_init_time),
-                            "iteration":   float(iteration + 1),
-                        },
+                        metrics  = report_metrics,
                         progress = min(frac, (seed + 1) / n_seeds),
                     )
 
             # ── End of seed ───────────────────────────────────────────── #
-            metrics = {
-                "crane_time":  float(best_cost),
-                "time":        float(best_cost),
-                "relocations": float(len(S_best)),
-                "steps":       float(len(S_best)),
-                "progress":    1.0,
-            }
+            best_plan = _solution_to_plan(
+                S_best, stacks_init, all_keys, n_total
+            )
+            metrics = evaluate_plan_objectives(
+                best_plan,
+                objective_spec,
+                kinematics=kinematics,
+                initial_yard=initial_yard,
+            )
+            metrics["steps"] = float(best_plan.num_moves())
+            metrics["progress"] = 1.0
             all_metrics.append(metrics)
 
             if float(best_cost) < self._best_metric:
                 self._best_metric   = float(best_cost)
-                self._best_solution = []
+                self._best_solution = [
+                    (move.to_pos[0] - 1) * env.config.num_rows
+                    + (move.to_pos[1] - 1)
+                    for move in best_plan.movements
+                    if not move.is_retrieval
+                ]
 
             self._push(
                 result_queue,

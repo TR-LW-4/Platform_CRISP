@@ -438,6 +438,9 @@ class DeMeloSilva2018BRP(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

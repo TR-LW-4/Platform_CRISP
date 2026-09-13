@@ -37,6 +37,9 @@ class CasertaLAH(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Caserta et al. (EvoCOP 2009) look-ahead heuristic."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     step_label          = "Restart"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

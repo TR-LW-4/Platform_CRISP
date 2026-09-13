@@ -58,6 +58,9 @@ class TanakaVossIP2022(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Tanaka & Voß (EJOR 2022) IP-based exact algorithm."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     # Output patterns from solve.cpp (written to stderr)
     _OPT_RE   = re.compile(r"optimal_value=(\d+)")
     _UB_RE    = re.compile(r"upper_bound=(\d+)")

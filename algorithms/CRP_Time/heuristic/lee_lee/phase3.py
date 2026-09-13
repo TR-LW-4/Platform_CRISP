@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import random
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from core.plan import RelocationPlan, simulate_plan
 from core.objectives import KinematicsModel, compute_crane_time
@@ -27,6 +27,7 @@ def phase3_reduce_time(
     kinematics:     KinematicsModel,
     max_no_improve: int = 500,
     stop_event:     Optional[mp.Event] = None,
+    score_fn:       Optional[Callable[[RelocationPlan], float]] = None,
 ) -> Tuple[RelocationPlan, List[float]]:
     """
     Reduce crane working time by trying alternate waypoints for Type B
@@ -37,7 +38,8 @@ def phase3_reduce_time(
     (best_plan, crane_time_history)
     """
     best      = plan.clone()
-    best_time = compute_crane_time(best, kinematics)
+    scorer = score_fn or (lambda candidate: compute_crane_time(candidate, kinematics))
+    best_time = float(scorer(best))
 
     all_positions = list(initial_yard.stacks.keys())
     history       = [best_time]
@@ -86,7 +88,7 @@ def phase3_reduce_time(
             if not result.feasible:
                 continue
 
-            cand_time = compute_crane_time(candidate, kinematics)
+            cand_time = float(scorer(candidate))
             if cand_time < best_time:
                 best      = candidate
                 best_time = cand_time

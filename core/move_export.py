@@ -24,8 +24,17 @@ def plan_from_moves(moves: Iterable[Any]) -> RelocationPlan:
         cid = int(getattr(move, "container_id"))
         src = tuple(getattr(move, "src"))
         dst = getattr(move, "dst", None)
+        from_tier = getattr(move, "from_tier", None)
+        to_tier = getattr(move, "to_tier", None)
         if kind == "retrieve" or dst is None:
-            plan.add(Movement(cid, (int(src[0]), int(src[1])), None))
+            plan.add(
+                Movement(
+                    cid,
+                    (int(src[0]), int(src[1])),
+                    None,
+                    from_tier=from_tier,
+                )
+            )
         elif kind in ("relocate", "load"):
             dst_t = tuple(dst)
             plan.add(
@@ -33,6 +42,8 @@ def plan_from_moves(moves: Iterable[Any]) -> RelocationPlan:
                     cid,
                     (int(src[0]), int(src[1])),
                     (int(dst_t[0]), int(dst_t[1])),
+                    from_tier=from_tier,
+                    to_tier=to_tier,
                 )
             )
     return plan
@@ -60,6 +71,12 @@ def moves_to_json(moves: Iterable[Any]) -> List[Dict[str, Any]]:
         else:
             dst_t = tuple(dst)
             entry["to"] = [int(dst_t[0]), int(dst_t[1])]
+        from_tier = getattr(move, "from_tier", None)
+        to_tier = getattr(move, "to_tier", None)
+        if from_tier is not None:
+            entry["from_tier"] = int(from_tier)
+        if to_tier is not None:
+            entry["to_tier"] = int(to_tier)
         out.append(entry)
     return out
 
@@ -76,14 +93,29 @@ def plan_from_json(moves: Sequence[Dict[str, Any]]) -> RelocationPlan:
         frm = entry["from"]
         to = entry.get("to")
         src: Tuple[int, int] = (int(frm[0]), int(frm[1]))
+        from_tier = entry.get("from_tier")
+        to_tier = entry.get("to_tier")
         if entry.get("kind") == "retrieve" or to is None:
-            plan.add(Movement(int(entry["container_id"]), src, None))
+            plan.add(
+                Movement(
+                    int(entry["container_id"]),
+                    src,
+                    None,
+                    from_tier=(
+                        int(from_tier) if from_tier is not None else None
+                    ),
+                )
+            )
         else:
             plan.add(
                 Movement(
                     int(entry["container_id"]),
                     src,
                     (int(to[0]), int(to[1])),
+                    from_tier=(
+                        int(from_tier) if from_tier is not None else None
+                    ),
+                    to_tier=int(to_tier) if to_tier is not None else None,
                 )
             )
     return plan
@@ -109,7 +141,11 @@ def attach_crane_time(
 ) -> Dict[str, float]:
     """Copy *metrics* and add ``crane_time`` (seconds) from yard history."""
     out = dict(metrics)
-    out["crane_time"] = crane_time_for_yard(yard, config_extra)
+    legacy_time = crane_time_for_yard(yard, config_extra)
+    if "objective_value" in out:
+        out.setdefault("crane_time_rmgc", legacy_time)
+    else:
+        out["crane_time"] = legacy_time
     return out
 
 

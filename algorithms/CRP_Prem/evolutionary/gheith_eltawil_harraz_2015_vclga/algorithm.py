@@ -60,6 +60,9 @@ class GheithEltawilHarraz2015VCLGA(BaseAlgorithm):
         "chromosome feasibility repair."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     step_label = "Generation"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

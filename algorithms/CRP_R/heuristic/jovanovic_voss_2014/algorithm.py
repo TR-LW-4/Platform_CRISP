@@ -33,6 +33,9 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Jovanović & Voß (C&IE 2014) chain look-ahead heuristic."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

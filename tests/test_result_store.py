@@ -13,6 +13,7 @@ from core.result_store import (
     save_run,
     stable_result_stem,
 )
+from core.results.aggregate import summarize_run_dicts
 
 
 class StableStemTests(unittest.TestCase):
@@ -27,6 +28,15 @@ class StableStemTests(unittest.TestCase):
             "layout_file_path": "/data/bench/Zhu_dataset/5-8-39/06101.txt",
         })
         self.assertEqual(stem, "zhu_5-8-39_06101")
+
+    def test_stow_layout(self) -> None:
+        stem = stable_result_stem({
+            "layout_file_path": (
+                "/data/benchmark/crp_stow/Data/Gen/"
+                "Bay-3-20-38-6_23.pro"
+            ),
+        })
+        self.assertEqual(stem, "stow_3-20-38-6_23")
 
     def test_random_fallback(self) -> None:
         self.assertEqual(stable_result_stem({}, seed=42), "random_seed42")
@@ -148,6 +158,55 @@ class StableStemTests(unittest.TestCase):
             )
             self.assertFalse(path.parent.exists())
             self.assertFalse(path.exists())
+
+    def test_time_objectives_use_distinct_result_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            layout = base / "data3-4-1.dat"
+            f2_path = result_path_for(
+                "CRP-Time",
+                "Time Algo",
+                layout,
+                prob_config={
+                    "objective_mode": "crane_time",
+                    "time_model": "f2",
+                    "stack_s_per_stack": 1.2,
+                    "pickup_place_s": 30.0,
+                },
+                base_dir=base,
+                mkdir=False,
+            )
+            vertical_path = result_path_for(
+                "CRP-Time",
+                "Time Algo",
+                layout,
+                prob_config={
+                    "objective_mode": "crane_time",
+                    "time_model": "f2_vertical",
+                    "stack_s_per_stack": 1.2,
+                    "empty_vertical_s_per_tier": 2.59,
+                    "loaded_vertical_s_per_tier": 5.18,
+                },
+                base_dir=base,
+                mkdir=False,
+            )
+            self.assertNotEqual(f2_path, vertical_path)
+
+    def test_aggregation_does_not_mix_time_objectives(self) -> None:
+        layout = "/bench/Caserta_dataset/data3-4-1.dat"
+        runs = [
+            {
+                "prob_config": {
+                    "layout_file_path": layout,
+                    "objective_mode": "crane_time",
+                    "time_model": model,
+                },
+                "metrics": {"objective_value": value},
+            }
+            for model, value in (("f2", 10.0), ("f2_vertical", 20.0))
+        ]
+        summary = summarize_run_dicts(runs)
+        self.assertEqual(len(summary["classes"]), 2)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,9 @@ class CasertaCM(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Caserta et al. (OR Spectrum 2011) corridor method heuristic."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _MOVES_RE = re.compile(r"CM\s*:\s*Solution found with\s*(\d+)\s*moves")
     _MOVE_LINE_RE = re.compile(r"^CM_MOVE\s+(\d+)\s+(\d+)\s+(-?\d+)$")
 

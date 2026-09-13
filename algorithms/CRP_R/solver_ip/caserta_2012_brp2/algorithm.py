@@ -55,6 +55,9 @@ class Caserta2012BRPII(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Caserta et al. (EJOR 2012) BRP-II integer program."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

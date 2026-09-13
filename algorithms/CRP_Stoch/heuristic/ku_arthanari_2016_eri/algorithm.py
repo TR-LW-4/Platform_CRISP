@@ -45,6 +45,9 @@ class ExpectedReshufflingIndex(BaseAlgorithm):
         "with departure time windows (CRPTW)."
     )
     compatible_problems = ["CRP-Stoch"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

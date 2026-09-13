@@ -98,6 +98,9 @@ class _ZehendnerBase(BaseAlgorithm):
 
     category = "Heuristic"
     compatible_problems = ["CRP-Online"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     _rule_key: str = "L"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

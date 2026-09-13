@@ -39,6 +39,8 @@ class Movement:
     container_id: int
     from_pos:     Tuple[int, int]            # (bay, row)
     to_pos:       Optional[Tuple[int, int]]  # None = OUT (truck)
+    from_tier:    Optional[int] = None        # 1-indexed tier before pickup
+    to_tier:      Optional[int] = None        # 1-indexed tier after placement
 
     @property
     def is_retrieval(self) -> bool:

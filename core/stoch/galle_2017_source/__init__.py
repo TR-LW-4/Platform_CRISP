@@ -38,6 +38,7 @@ from .bay_utils import (
     generate_incomplete_config,
     preprocess_bay,
     read_input_file,
+    remap_batch_ids_to_start_labels,
     unveil_containers,
     unveil_containers_online,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "pbfsa",
     "preprocess_bay",
     "read_input_file",
+    "remap_batch_ids_to_start_labels",
     "rolling_lower_bound",
     "run_heuristic_batch",
     "run_heuristic_online",

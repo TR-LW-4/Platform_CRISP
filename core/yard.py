@@ -148,6 +148,8 @@ class Move:
     container_id: int
     src:          Tuple[int, int]           # (bay, row)
     dst:          Optional[Tuple[int, int]] = None  # None for retrieval
+    from_tier:    Optional[int] = None
+    to_tier:      Optional[int] = None
 
 
 # ================================================================ #
@@ -225,12 +227,21 @@ class Yard:
         if dst_stack.is_full:
             raise ValueError(f"Destination stack {dst} is full")
 
+        from_tier = src_stack.height
+        to_tier = dst_stack.height + 1
         container = src_stack.pop()
         dst_stack.push(container)
 
         self.total_relocations += 1
         self.move_history.append(
-            Move("relocate", container.id, src, dst)
+            Move(
+                "relocate",
+                container.id,
+                src,
+                dst,
+                from_tier=from_tier,
+                to_tier=to_tier,
+            )
         )
         return container
 
@@ -270,13 +281,19 @@ class Yard:
                     (stack.bay, stack.row)
                 )
             moved = self.relocate((stack.bay, stack.row), dst)
-            reloc_moves.append(Move("relocate", moved.id, (stack.bay, stack.row), dst))
+            reloc_moves.append(self.move_history[-1])
 
         # Now retrieve the target (it is on top)
+        from_tier = stack.height
         stack.pop()
         self.total_retrievals += 1
         self.move_history.append(
-            Move("retrieve", container.id, (stack.bay, stack.row))
+            Move(
+                "retrieve",
+                container.id,
+                (stack.bay, stack.row),
+                from_tier=from_tier,
+            )
         )
         return len(blockers), reloc_moves
 

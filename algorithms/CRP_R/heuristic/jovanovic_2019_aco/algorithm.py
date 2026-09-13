@@ -42,6 +42,9 @@ class JovanovicACO_rBRP(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Jovanović et al. (EJOR 2019) ant colony optimization heuristic."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

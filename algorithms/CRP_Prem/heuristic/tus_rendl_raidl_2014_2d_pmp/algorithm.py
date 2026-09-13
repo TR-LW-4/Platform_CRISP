@@ -328,6 +328,9 @@ def solve_mmas(
 
 class _Base2D(BaseAlgorithm):
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def _build_stacks(self, env) -> Tuple[Stacks, int]:
         keys = list(env.yard.stacks.keys())
         key_to_idx = {k: i for i, k in enumerate(keys)}

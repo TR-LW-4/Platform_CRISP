@@ -52,6 +52,9 @@ class LeeHsu2007NetworkFlowIP(BaseAlgorithm):
         "sequence from the solved flow."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = True
     solver_backend = "gurobi"
 

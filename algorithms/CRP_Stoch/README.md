@@ -47,7 +47,8 @@ algorithms/CRP_Stoch/
 │       └── algorithm.py          # ExpectedReshufflingIndex (ERI)
 └── exact/
     └── galle_2017_pbfs/          # Galle et al. SCRP repository (exact search)
-        └── algorithm.py          # PBFSBatchExact + PBFSAApprox + PBFSOnlineExact
+        ├── algorithm.py          # PBFSBatchExact + PBFSAApprox + PBFSOnlineExact
+        └── run_experiment1.py    # Ku/Arthanari files + PBFSA(error_gap=0) loop
 ```
 
 ## Registered algorithms
@@ -75,6 +76,33 @@ separate "[ported]" classes to avoid duplicate GUI entries; the shared
 ported `EM`/`L`/`Rand` retrieval functions for internal reuse (e.g. as
 upper-bound heuristics inside `astar.py` / `tree_search.py`), they are
 just not exposed as separate top-level algorithms.
+
+## Galle Experiment 1 (Ku / Arthanari files)
+
+`python main.py run` and `layout-run` do **not** scan the 1440
+`crptw_instance/T271014_*.txt` files.  To reproduce the MATLAB loop in
+`Experiments_1.m` (read each Ku file, then `PBFSA(..., errorGap=0)`):
+
+```bash
+cd /data/liuw2/Platform_CRISP
+# Use an env with numpy (e.g. tsp_ha). The login `python` may not have it.
+# Single instance: 5 stacks, 3 tiers, instance 1, 50% fill (gold opt=1.5)
+/data/liuw2/conda/envs/tsp_ha/bin/python \
+    algorithms/CRP_Stoch/exact/galle_2017_pbfs/run_experiment1.py --smoke
+
+# One bay size (30 instances), compare opt against the official CSV
+python algorithms/CRP_Stoch/exact/galle_2017_pbfs/run_experiment1.py \
+    --fill-rate 0.5 --stacks 5 --tiers 3
+
+# Full Experiment 1 at 50% fill (720 instances).  Use --fill-rates 0.5 0.67
+# for all 1440.  Large bays can hit the 1-hour cap per instance.
+python algorithms/CRP_Stoch/exact/galle_2017_pbfs/run_experiment1.py --fill-rate 0.5
+```
+
+Output CSVs go to `results/CRP-Stoch/galle_experiment1/` with the same
+names as `/data/liuw2/StochasticCRP-master/Results/Experiments_1/`.
+`--heuristics` also runs EG / EM / ERI / L / Rand (5000 samples, as in
+MATLAB).  Bounds and `opt` are always computed.
 
 ## Backward compatibility
 

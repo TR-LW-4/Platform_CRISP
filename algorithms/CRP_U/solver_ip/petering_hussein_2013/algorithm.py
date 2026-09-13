@@ -44,6 +44,9 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
         "LA-1 to set the move horizon. [Requires Gurobi license]"
     )
     compatible_problems = ["CRP-U"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

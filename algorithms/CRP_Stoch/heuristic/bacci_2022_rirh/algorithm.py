@@ -109,6 +109,9 @@ class RIRH(BaseAlgorithm):
         "being drastically smaller than EM."
     )
     compatible_problems = ["CRP-Stoch"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -200,6 +203,9 @@ class ExpectedMinMax(BaseAlgorithm):
         "Bacci 2022 Tables 1–4 and serves as the RIRH counterfactual."
     )
     compatible_problems = ["CRP-Stoch"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

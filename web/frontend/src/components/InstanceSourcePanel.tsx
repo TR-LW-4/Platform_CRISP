@@ -5,6 +5,7 @@ import type {
   BenchmarkSourceInfo,
   BenchmarkSourcesResponse,
   SNPair,
+  StowClass,
 } from '../types'
 
 interface InstanceSourcePanelProps {
@@ -25,6 +26,10 @@ function pairKey(pair: SNPair) {
   return `${pair.s}-${pair.n}`
 }
 
+function stowClassKey(item: StowClass) {
+  return `${item.vs}-${item.ys}-${item.yt}`
+}
+
 export function InstanceSourcePanel({
   problemName,
   disabled = false,
@@ -43,6 +48,7 @@ export function InstanceSourcePanel({
   const [height, setHeight] = useState<number | ''>('')
   const [selectedWs, setSelectedWs] = useState<number[]>([])
   const [selectedPairs, setSelectedPairs] = useState<string[]>([])
+  const [selectedStowClasses, setSelectedStowClasses] = useState<string[]>([])
   const [resolvedCount, setResolvedCount] = useState(0)
 
   useEffect(() => {
@@ -92,7 +98,9 @@ export function InstanceSourcePanel({
   }, [activeSource, alpha, source])
 
   const heights = useMemo(() => {
-    if (source === 'caserta') return activeSource?.heights ?? []
+    if (source === 'caserta' || source === 'crp_stow') {
+      return activeSource?.heights ?? []
+    }
     return snIndex?.heights ?? []
   }, [activeSource, snIndex, source])
 
@@ -105,6 +113,7 @@ export function InstanceSourcePanel({
       setHeight(heights[0])
       setSelectedWs([])
       setSelectedPairs([])
+      setSelectedStowClasses([])
     }
   }, [heights, height])
 
@@ -117,6 +126,15 @@ export function InstanceSourcePanel({
     if (!snIndex || height === '') return []
     return snIndex.sn_by_height[String(height)] ?? []
   }, [height, snIndex])
+
+  const stowClassOptions = useMemo(() => {
+    if (
+      source !== 'crp_stow' ||
+      height === '' ||
+      !activeSource?.stow_classes_by_height
+    ) return []
+    return activeSource.stow_classes_by_height[String(height)] ?? []
+  }, [activeSource, height, source])
 
   useEffect(() => {
     if (source === 'random') {
@@ -170,6 +188,36 @@ export function InstanceSourcePanel({
       setSelectedWs([])
       return
     }
+    if (source === 'crp_stow') {
+      const classes = stowClassOptions.filter((item) =>
+        selectedStowClasses.includes(stowClassKey(item)),
+      )
+      if (!classes.length) return
+      const next = queue.map((block) => ({
+        ...block,
+        stow_classes: [...(block.stow_classes ?? [])],
+      }))
+      const existing = next.find((block) => block.h === height)
+      if (existing) {
+        const merged = new Map(
+          (existing.stow_classes ?? []).map((item) => [stowClassKey(item), item]),
+        )
+        classes.forEach((item) => merged.set(stowClassKey(item), item))
+        existing.stow_classes = [...merged.values()].sort(
+          (a, b) => a.vs - b.vs || a.ys - b.ys || a.yt - b.yt,
+        )
+      } else {
+        next.push({
+          h: height,
+          stow_classes: [...classes].sort(
+            (a, b) => a.vs - b.vs || a.ys - b.ys || a.yt - b.yt,
+          ),
+        })
+      }
+      onQueueChange(next.sort((a, b) => a.h - b.h))
+      setSelectedStowClasses([])
+      return
+    }
     const pairs = pairOptions.filter((pair) => selectedPairs.includes(pairKey(pair)))
     if (!pairs.length) return
     const next = queue.map((block) => ({
@@ -211,6 +259,7 @@ export function InstanceSourcePanel({
             onQueueChange([])
             setSelectedWs([])
             setSelectedPairs([])
+            setSelectedStowClasses([])
           }}
         >
           {(catalog?.sources ?? []).map(
@@ -248,7 +297,9 @@ export function InstanceSourcePanel({
       {source !== 'random' && (
         <>
           <label className="field">
-            <span>Height H</span>
+            <span>
+              {source === 'crp_stow' ? 'Minimum vessel height A' : 'Height H'}
+            </span>
             <select
               value={height === '' ? '' : String(height)}
               disabled={disabled || !heights.length}
@@ -256,6 +307,7 @@ export function InstanceSourcePanel({
                 setHeight(Number(event.target.value))
                 setSelectedWs([])
                 setSelectedPairs([])
+                setSelectedStowClasses([])
               }}
             >
               {heights.map((item) => (
@@ -284,6 +336,32 @@ export function InstanceSourcePanel({
                         }}
                       />
                       w={w}
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          ) : source === 'crp_stow' ? (
+            <fieldset className="multi-select" disabled={disabled}>
+              <legend>BRLP classes (VS, YS, YT)</legend>
+              <div className="chip-grid">
+                {stowClassOptions.map((item) => {
+                  const key = stowClassKey(item)
+                  const checked = selectedStowClasses.includes(key)
+                  return (
+                    <label key={key} className={`chip ${checked ? 'active' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedStowClasses((current) =>
+                            checked
+                              ? current.filter((value) => value !== key)
+                              : [...current, key],
+                          )
+                        }}
+                      />
+                      VS={item.vs}, YS={item.ys}, YT={item.yt}
                     </label>
                   )
                 })}
@@ -340,9 +418,15 @@ export function InstanceSourcePanel({
               {queue.map((block, index) => (
                 <li key={`${block.h}-${index}`}>
                   <span>
-                    H={block.h}
+                    {source === 'crp_stow' ? 'A' : 'H'}={block.h}
                     {block.ws
                       ? ` · w=${block.ws.join(',')}`
+                      : block.stow_classes
+                        ? ` · ${block.stow_classes
+                            .map((item) => (
+                              `VS=${item.vs}/YS=${item.ys}/YT=${item.yt}`
+                            ))
+                            .join(', ')}`
                       : ` · ${(block.sn_pairs ?? [])
                           .map((pair) => `${pair.s}-${pair.n}`)
                           .join(', ')}`}

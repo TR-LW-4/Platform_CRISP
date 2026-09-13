@@ -45,6 +45,9 @@ class ParrenoTorresAlvarezValdesRuizTierney2020CPMPCT(BaseAlgorithm):
         "(CPMPCT), with acceleration-aware crane kinematics and exact B&B search."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

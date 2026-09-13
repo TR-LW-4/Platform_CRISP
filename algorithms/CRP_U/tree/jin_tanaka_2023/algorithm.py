@@ -47,6 +47,9 @@ class JinTanaka2023ForCRPU(BaseAlgorithm):
         "(``best_ub``).  ``optimal_proven=1`` when ``best_lb == best_ub``."
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _STAT_RE = re.compile(
         r"best_lb\s*=\s*(\d+).*?best_ub\s*=\s*(\d+)", re.DOTALL
     )

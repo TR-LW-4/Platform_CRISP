@@ -124,6 +124,9 @@ class ForsterBortfeldt2012(BaseAlgorithm):
         "with §5 lower-bound pruning and 6-type move classification (§4.2)."
     )
     compatible_problems = ["CRP-D"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

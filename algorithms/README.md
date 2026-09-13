@@ -3,10 +3,10 @@
 Algorithms are organised **problem-family-first**, PlatEMO-style. Open
 any problem directory and the algorithms for that family live inside it.
 
-How the eight families relate (same axes as the root README):
+How the problem families relate (same axes as the root README):
 
 ```
-任务 / 目标     Time | Prem | Stow | Stoch
+任务 / 目标     Time | MO | Prem | Stow | Stoch
 翻箱规则        R vs U                         (distinct CRP only)
 优先级          R/U = distinct；D = duplicate  (D: extra restricted_relocation)
 几何            num_bays                       (config, not a family)
@@ -41,6 +41,10 @@ algorithms/
 ├── CRP_Time/                    # same rules as CRP-R; crane-time objective
 │   ├── heuristic/
 │   └── exact/                   # empty scaffold (search/ + solver/)
+│
+├── CRP_MO/                      # same rules as CRP-Time; (R, T) vector
+│   ├── evolutionary/            # empty scaffold
+│   └── heuristic/               # empty scaffold
 │
 ├── CRP_Online/                  # progressively revealed fixed-order CRP
 │   └── heuristic/

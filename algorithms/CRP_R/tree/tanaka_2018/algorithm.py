@@ -39,6 +39,9 @@ class Tanaka2018BB(BaseAlgorithm):
     category            = "Exact"
     description         = "Tanaka (2018) exact branch-and-bound."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _OPT_RE = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")
 

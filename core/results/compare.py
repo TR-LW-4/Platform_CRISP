@@ -22,8 +22,12 @@ _DEFAULT_DIR = Path(__file__).resolve().parents[2] / "results"
 
 # Metrics where lower mean is better (highlight min).
 _LOWER_IS_BETTER = frozenset({
+    "objective_value",
     "relocations",
     "crane_time",
+    "crane_time_f2",
+    "crane_time_vertical",
+    "crane_time_rmgc",
     "time",
     "steps",
     "moves",
@@ -190,7 +194,15 @@ def compare_algorithms(
             metric_keys.update((row.get("metrics") or {}).keys())
 
     preferred = [
-        "relocations", "crane_time", "time", "moves", "shifters",
+        "objective_value",
+        "relocations",
+        "crane_time",
+        "crane_time_f2",
+        "crane_time_vertical",
+        "crane_time_rmgc",
+        "time",
+        "moves",
+        "shifters",
     ]
     metric_keys = {m for m in metric_keys if m not in SKIP_METRIC_KEYS}
     available_metrics = [m for m in preferred if m in metric_keys]

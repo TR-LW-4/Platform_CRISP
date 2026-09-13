@@ -53,6 +53,9 @@ class Zhu2012IDAStarR(BaseAlgorithm):
     category            = "Exact"
     description         = "Zhu et al. (IEEE T-ASE 2012) iterative deepening A*."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _LB_MODES    = (LB1, LB2, LB3)
     _PROBE_MODES = (PR1, PR2, PR3, PR4)
 

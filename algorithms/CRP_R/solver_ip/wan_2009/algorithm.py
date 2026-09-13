@@ -50,6 +50,9 @@ class Wan2009MRIP(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Wan et al. (NRL 2009) MRIP / MRIPK integer program."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

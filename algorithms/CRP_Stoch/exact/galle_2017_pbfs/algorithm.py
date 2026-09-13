@@ -36,6 +36,9 @@ from core.stoch.galle_2017_source import (
 class _PBFSBase(BaseAlgorithm):
     category = "Exact"
     compatible_problems = ["CRP-Stoch"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     _mode = "batch_exact"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

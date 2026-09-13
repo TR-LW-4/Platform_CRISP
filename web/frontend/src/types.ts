@@ -1,5 +1,10 @@
 export type ConfigValue = string | number | boolean
 
+export interface VisibilityCondition {
+  key: string
+  values: ConfigValue[]
+}
+
 export interface ConfigField {
   type: 'int' | 'float' | 'bool' | 'str'
   default?: ConfigValue
@@ -10,6 +15,7 @@ export interface ConfigField {
   help?: string
   options?: ConfigValue[]
   choices?: ConfigValue[]
+  visibleWhen?: VisibilityCondition | VisibilityCondition[]
 }
 
 export type ConfigSchema = Record<string, ConfigField>
@@ -23,6 +29,10 @@ export interface ProblemInfo {
   config_schema: ConfigSchema
 }
 
+export type AlgorithmGeometry = 'single-bay' | 'multi-bay'
+export type AlgorithmObjective = 'relocations' | 'crane_time' | 'fixed-rule'
+export type AlgorithmFidelity = 'faithful' | 'adapted' | 'degenerate'
+
 export interface AlgorithmInfo {
   name: string
   category: string
@@ -33,6 +43,9 @@ export interface AlgorithmInfo {
   solver_backend: string | null
   step_label: string
   config_schema: ConfigSchema
+  geometry: AlgorithmGeometry
+  objectives: AlgorithmObjective[]
+  fidelity: AlgorithmFidelity
 }
 
 export interface Catalog {
@@ -83,6 +96,10 @@ export interface BatchClassSummary {
   h?: number
   w?: number
   s?: number
+  vessel_height_min?: number
+  vessel_stacks?: number
+  yard_stacks?: number
+  yard_tiers?: number
   metrics: Record<string, MetricAgg>
 }
 
@@ -139,10 +156,17 @@ export interface SNPair {
   n: number
 }
 
+export interface StowClass {
+  vs: number
+  ys: number
+  yt: number
+}
+
 export interface BenchmarkQueueBlock {
   h: number
   ws?: number[]
   sn_pairs?: SNPair[]
+  stow_classes?: StowClass[]
 }
 
 export interface BenchmarkSourceInfo {
@@ -153,6 +177,7 @@ export interface BenchmarkSourceInfo {
   heights?: number[]
   ws_by_height?: Record<string, number[]>
   sn_by_height?: Record<string, SNPair[]>
+  stow_classes_by_height?: Record<string, StowClass[]>
   alphas?: string[]
   alpha_indexes?: Record<
     string,

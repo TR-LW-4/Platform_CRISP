@@ -50,6 +50,9 @@ class ParrenoTorresAlvarezValdesRuiz2019IPS6(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = True
     solver_backend = "gurobi"
 

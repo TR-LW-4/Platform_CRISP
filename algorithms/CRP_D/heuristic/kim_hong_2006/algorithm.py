@@ -342,6 +342,9 @@ class KimHong2006GroupENAR(BaseAlgorithm):
         "COR 33 (2006) 940–954."
     )
     compatible_problems = ["CRP-D"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

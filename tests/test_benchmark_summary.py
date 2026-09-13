@@ -100,6 +100,27 @@ class BenchmarkSummaryTests(unittest.TestCase):
         labels = [row["label"] for row in summarize_run_dicts(runs)["classes"]]
         self.assertEqual(labels, ["3×3", "5×4", "5×10", "10×10"])
 
+    def test_groups_stow_pro_files_by_brlp_class(self) -> None:
+        runs = [
+            {
+                "prob_config": {
+                    "layout_file_path": (
+                        f"/data/crp_stow/Data/Gen/Bay-3-20-38-6_{seed}.pro"
+                    ),
+                },
+                "metrics": {"relocations": value},
+            }
+            for seed, value in ((0, 10.0), (1, 14.0))
+        ]
+        summary = summarize_run_dicts(runs)
+        self.assertEqual(summary["ungrouped"], 0)
+        self.assertEqual(len(summary["classes"]), 1)
+        row = summary["classes"][0]
+        self.assertEqual(row["label"], "A=3 · VS=20 · YS=38 · YT=6")
+        self.assertEqual(row["n"], 2)
+        self.assertEqual(row["vessel_stacks"], 20)
+        self.assertAlmostEqual(row["metrics"]["relocations"]["mean"], 12.0)
+
     def test_summarize_result_files_reads_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

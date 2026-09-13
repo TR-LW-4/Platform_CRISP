@@ -754,6 +754,9 @@ class _JovanovicBase(BaseAlgorithm):
     """Shared train() scaffold for Jovanović (2019) algorithms."""
 
     compatible_problems = ["CRP-Stow"]
+    geometry = "multi-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -815,7 +818,6 @@ class JovanovicGRC(_JovanovicBase):
     Jovanović et al. (2019) Greedy with Correction (GR-C) for BRLP.
 
     Heuristic combination: MinMax4CB (HR) + MinW4CB (HL).
-    Paper's GR-C outperforms GA-ILSRS (Ji 2015) by >30% on average.
     """
 
     name        = "Jovanović (2019) GR-C"
@@ -824,8 +826,7 @@ class JovanovicGRC(_JovanovicBase):
         "Jovanović et al. (2019) Greedy with Correction for BRLP. "
         "Runs a greedy pass with MinMax4CB (relocation) and MinW4CB (retrieval), "
         "then applies a correction procedure (CMM/CMB/CMS criteria) to reduce "
-        "rehandles by trying alternatives at suspicious moves.  "
-        "Significantly outperforms Ji (2015) GA-ILSRS (>30% reduction on average)."
+        "rehandles by trying alternatives at suspicious moves."
     )
 
     def _run_one(self, env, seed=None):

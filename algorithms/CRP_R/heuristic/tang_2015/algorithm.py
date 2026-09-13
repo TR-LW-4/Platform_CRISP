@@ -35,6 +35,9 @@ class TangEtAl2015(BaseAlgorithm):
     category            = "Heuristic"
     description         = "Tang et al. (IIE Trans. 2015) H1/H2 reshuffling heuristic."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)

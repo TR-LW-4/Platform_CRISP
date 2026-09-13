@@ -127,7 +127,7 @@ class UnluyurtAydinDifference(BaseAlgorithm):
     name     = "Ünlüyurt–Aydın (2012) Difference1"
     category = "Heuristic"
     description = (
-        "[single-bay origin]  "
+        "[single-bay origin; fixed rule, selected objective is posterior-only]  "
         "Ünlüyurt & Aydın (J. Adv. Transp. 2012) Difference1 heuristic (§4.2). "
         "Relocates blockers using three priority-order rules to minimise future "
         "rehandles: (1) ideal stack — top_priority > X, pick closest from above; "
@@ -140,6 +140,9 @@ class UnluyurtAydinDifference(BaseAlgorithm):
         "use num_bays=1 for single-bay faithful comparison."
     )
     compatible_problems = ["CRP-R", "CRP-Time"]
+    geometry            = "single-bay"
+    objectives          = ["fixed-rule"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -167,7 +170,9 @@ class UnluyurtAydinDifference(BaseAlgorithm):
             solution, metrics = _run_one_episode(env)
             all_metrics.append(metrics)
 
-            primary = float(metrics.get("relocations", 0.0))
+            primary = float(
+                metrics.get("objective_value", metrics.get("relocations", 0.0))
+            )
 
             if primary < self._best_metric:
                 self._best_metric   = primary

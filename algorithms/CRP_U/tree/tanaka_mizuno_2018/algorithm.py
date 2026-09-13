@@ -44,6 +44,9 @@ class TanakaMizuno2018BB(BaseAlgorithm):
         "Primary metric: relocation count."
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     _OPT_RE  = re.compile(r"opt=(\d+)")
     _BEST_RE = re.compile(r"best=(\d+)")
 

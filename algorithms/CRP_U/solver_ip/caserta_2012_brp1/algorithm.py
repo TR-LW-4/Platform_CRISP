@@ -320,6 +320,9 @@ class Caserta2012BRPI(BaseAlgorithm):
         "practical for tiny instances. [Requires Gurobi license]"
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

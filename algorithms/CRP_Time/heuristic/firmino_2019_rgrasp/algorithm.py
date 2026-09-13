@@ -21,6 +21,7 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
+import copy
 import multiprocessing as mp
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -28,7 +29,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from core.objectives import KinematicsModel, compute_crane_time
+from core.objectives import (
+    KinematicsModel,
+    ObjectiveSpec,
+    evaluate_plan_objectives,
+)
 from core.plan import Movement, RelocationPlan
 
 
@@ -141,8 +146,21 @@ def _crane_time_from_moves(
     stacks_init: Stacks,
     n_total:     int,
     kin:         KinematicsModel,
+    objective_spec: Optional[ObjectiveSpec] = None,
+    initial_yard=None,
 ) -> float:
-    return float(compute_crane_time(_plan_from_moves(moves, stacks_init, n_total), kin))
+    plan = _plan_from_moves(moves, stacks_init, n_total)
+    if objective_spec is None or initial_yard is None:
+        from core.objectives import compute_crane_time
+        return float(compute_crane_time(plan, kin))
+    return float(
+        evaluate_plan_objectives(
+            plan,
+            objective_spec,
+            kinematics=kin,
+            initial_yard=initial_yard,
+        )["objective_value"]
+    )
 
 
 # ================================================================ #
@@ -258,6 +276,8 @@ def _local_search_phase(
     max_tiers:   int,
     kin:         KinematicsModel,
     current_ct:  float,
+    objective_spec: Optional[ObjectiveSpec] = None,
+    initial_yard=None,
 ) -> Tuple[List[Step], float]:
     """
     Reverse-scan local search (Algorithm 3 from Firmino et al. 2019).
@@ -356,7 +376,14 @@ def _local_search_phase(
             )
 
             candidate_moves = prefix + suffix
-            cand_ct = _crane_time_from_moves(candidate_moves, stacks_init, n_total, kin)
+            cand_ct = _crane_time_from_moves(
+                candidate_moves,
+                stacks_init,
+                n_total,
+                kin,
+                objective_spec,
+                initial_yard,
+            )
 
             if cand_ct < best_ct - 1e-6:
                 best_moves = candidate_moves
@@ -392,6 +419,9 @@ class FirminoRGRASP(BaseAlgorithm):
         "travel; use with num_bays=1 for faithful replication of paper results."
     )
     compatible_problems = ["CRP-Time"]
+    geometry            = "single-bay"
+    objectives          = ["crane_time"]
+    fidelity            = "faithful"
     step_label          = "Iteration"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
@@ -430,6 +460,8 @@ class FirminoRGRASP(BaseAlgorithm):
             max_tiers = int(env.config.max_tiers)
             n_stacks  = env.config.num_bays * env.config.num_rows
             kin       = KinematicsModel.from_config_extra(env.config.extra)
+            objective_spec = ObjectiveSpec.from_config(env.config)
+            initial_yard = copy.deepcopy(env.yard)
 
             all_keys:    List[Any] = []
             stacks_init: Stacks   = {}
@@ -461,12 +493,27 @@ class FirminoRGRASP(BaseAlgorithm):
                 moves = _construction_phase(
                     stacks_init, all_keys, n_total, max_tiers, alpha, rng
                 )
-                ct = _crane_time_from_moves(moves, stacks_init, n_total, kin)
+                ct = _crane_time_from_moves(
+                    moves,
+                    stacks_init,
+                    n_total,
+                    kin,
+                    objective_spec,
+                    initial_yard,
+                )
 
                 # ── Local search ──────────────────────────────────── #
                 if do_ls and moves:
                     moves, ct = _local_search_phase(
-                        moves, stacks_init, all_keys, n_total, max_tiers, kin, ct
+                        moves,
+                        stacks_init,
+                        all_keys,
+                        n_total,
+                        max_tiers,
+                        kin,
+                        ct,
+                        objective_spec,
+                        initial_yard,
                     )
 
                 # ── Update best ───────────────────────────────────── #
@@ -489,49 +536,57 @@ class FirminoRGRASP(BaseAlgorithm):
                 # ── Periodic report ───────────────────────────────── #
                 if it % report_every == 0:
                     frac = (seed_idx * max_iter + it) / (n_seeds * max_iter)
-                    relocs = len(best_moves)
+                    report_metrics = evaluate_plan_objectives(
+                        _plan_from_moves(best_moves, stacks_init, n_total),
+                        objective_spec,
+                        kinematics=kin,
+                        initial_yard=initial_yard,
+                    )
+                    report_metrics.update({
+                        "iteration": float(it),
+                        "alpha": float(alpha),
+                    })
                     self._push(
                         result_queue,
                         step     = seed_idx * max_iter + it,
                         metric   = float(best_ct),
-                        metrics  = {
-                            "crane_time":  float(best_ct),
-                            "relocations": float(relocs),
-                            "time":        float(best_ct),
-                            "alpha":       float(alpha),
-                            "iteration":   float(it),
-                        },
+                        metrics  = report_metrics,
                         progress = min(frac, (seed_idx + 1) / n_seeds),
                     )
 
             # ── Seed done: compile plan, get full metrics ─────────── #
             if best_moves:
                 plan     = _plan_from_moves(best_moves, stacks_init, n_total)
-                ct_final = float(compute_crane_time(plan, kin))
-                relocs_final = float(
-                    sum(1 for m in plan.movements if not m.is_retrieval)
+                metrics = evaluate_plan_objectives(
+                    plan,
+                    objective_spec,
+                    kinematics=kin,
+                    initial_yard=initial_yard,
                 )
             else:
-                ct_final     = 0.0
-                relocs_final = 0.0
-
-            metrics = {
-                "crane_time":  ct_final,
-                "relocations": relocs_final,
-                "time":        ct_final,
-                "steps":       relocs_final,
-                "progress":    1.0,
-            }
+                metrics = {
+                    "objective_value": 0.0,
+                    "crane_time": 0.0,
+                    "crane_time_f2": 0.0,
+                    "crane_time_vertical": 0.0,
+                    "crane_time_rmgc": 0.0,
+                    "relocations": 0.0,
+                    "total_moves": 0.0,
+                    "time": 0.0,
+                }
+            metrics["steps"] = float(metrics["relocations"])
+            metrics["progress"] = 1.0
             all_metrics.append(metrics)
 
-            if ct_final < self._best_metric:
-                self._best_metric   = ct_final
+            objective_final = float(metrics["objective_value"])
+            if objective_final < self._best_metric:
+                self._best_metric   = objective_final
                 self._best_solution = []
 
             self._push(
                 result_queue,
                 step     = seed_idx + 1,
-                metric   = ct_final,
+                metric   = objective_final,
                 metrics  = metrics,
                 progress = (seed_idx + 1) / n_seeds,
                 snapshot = env.get_state_snapshot(),

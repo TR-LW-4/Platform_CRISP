@@ -56,6 +56,9 @@ class Zehendner2015BRPIIA(BaseAlgorithm):
     solver_backend      = "gurobi"
     description         = "Zehendner et al. (EJOR 2015) BRP-II-A integer program."
     compatible_problems = ["CRP-R"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 

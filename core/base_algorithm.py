@@ -84,6 +84,9 @@ class BaseAlgorithm(ABC):
     category            : str  – "Exact" | "Evolutionary" | "Heuristic" | ...
     description         : str
     compatible_problems : list – problem class *names*; empty = all problems
+    geometry            : str  – "single-bay" | "multi-bay"
+    objectives          : list – what the search minimises; see algorithm_meta
+    fidelity            : str  – "faithful" | "adapted" | "degenerate"
     """
 
     # ── Metadata (override in subclasses) ─────────────────────────── #
@@ -91,6 +94,12 @@ class BaseAlgorithm(ABC):
     category:            str       = "Unknown"
     description:         str       = ""
     compatible_problems: List[str] = []   # empty → compatible with all
+
+    # ── Comparison metadata (vocabularies in core/algorithm_meta.py) ─ #
+    # Treat these as read-only class constants; never mutate in place.
+    geometry:            str       = "single-bay"
+    objectives:          List[str] = ["relocations"]
+    fidelity:            str       = "faithful"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         self.config = config if config is not None else AlgorithmConfig()

@@ -52,6 +52,9 @@ class WangJinZhangLim2017FBH(BaseAlgorithm):
         "avoided proactively rather than discovered by backtracking."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

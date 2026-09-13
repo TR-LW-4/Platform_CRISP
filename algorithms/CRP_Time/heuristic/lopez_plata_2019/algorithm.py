@@ -481,6 +481,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         "other CRP-Time heuristics or the Lee-Lee kinematics model for its decisions."
     )
     compatible_problems = ["CRP-Time"]
+    geometry = "single-bay"
+    objectives = ["crane_time"]
+    fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -640,9 +643,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             final_metrics["operating_cost"] = best_cost
             all_metrics.append(final_metrics)
 
-            # For this operating-cost algorithm, prefer our computed operating_cost
-            # as the primary metric used for "best" tracking.
-            primary = best_cost
+            # Keep the paper's operating cost as a reported diagnostic, while
+            # platform-wide ranking follows the user-selected CRP-Time objective.
+            primary = float(
+                final_metrics.get("objective_value", best_cost)
+            )
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = list(best_solution)

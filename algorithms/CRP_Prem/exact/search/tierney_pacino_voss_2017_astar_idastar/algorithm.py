@@ -44,6 +44,9 @@ class TierneyPacinoVoss2017AStarIDAStar(BaseAlgorithm):
         "move / transitive-move / empty-stack symmetry breaking rules."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = False
     solver_backend = None
 

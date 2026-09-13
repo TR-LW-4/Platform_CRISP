@@ -62,6 +62,9 @@ class FeillletLS(BaseAlgorithm):
         "DOI: 10.1016/j.cor.2019.04.005"
     )
     compatible_problems = ["CRP-U"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

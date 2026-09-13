@@ -5,7 +5,8 @@ match CRP-R: distinct priorities 1…N, restricted relocation. Lee–Lee
 (2010) RMGC kinematics (`γ_row = 1.2 s`, `γ_bay = 3.5 s`,
 `γ_acc = 40 s`, `γ_pd = 30 s`).
 
-**Objective:** minimise total crane working time.
+**Objective:** minimise total crane working time. Relocations are
+reported only. Bi-objective (R, T) methods belong in `algorithms/CRP_MO/`.
 
 `exact/search/` and `exact/solver/` exist as empty scaffolds; no exact
 Time solver is registered yet.

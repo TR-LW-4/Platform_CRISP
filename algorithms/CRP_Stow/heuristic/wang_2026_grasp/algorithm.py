@@ -110,6 +110,9 @@ class Wang2026GRASP(BaseAlgorithm):
         "exercise its RC-specific heuristics."
     )
     compatible_problems = ["CRP-Stow"]
+    geometry            = "multi-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

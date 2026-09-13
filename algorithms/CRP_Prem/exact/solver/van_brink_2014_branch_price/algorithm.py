@@ -49,6 +49,9 @@ class VanBrinkVanDerZwaan2014BP(BaseAlgorithm):
         "Uses a Gurobi-backed restricted master model with iterative time horizon."
     )
     compatible_problems = ["CRP-Prem"]
+    geometry = "single-bay"
+    objectives = ["relocations"]
+    fidelity = "faithful"
     requires_solver = True
     solver_backend = "gurobi"
 

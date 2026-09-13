@@ -895,6 +895,9 @@ class DeMeloSilva2018BRPGrouped(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-D"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 
@@ -1053,6 +1056,9 @@ class DeMeloSilva2018RBRPGrouped(BaseAlgorithm):
         "[Requires Gurobi license]"
     )
     compatible_problems = ["CRP-D"]
+    geometry            = "single-bay"
+    objectives          = ["relocations"]
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
         super().__init__(config)
 
