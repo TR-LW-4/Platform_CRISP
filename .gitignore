@@ -11,7 +11,9 @@ web/frontend/node_modules/
 *.pth
 
 # Local benchmark datasets (large; keep out of git — obtain separately)
-/benchmark/
+/benchmark/**
+!/benchmark/Caserta_dataset/
+!/benchmark/Caserta_dataset/**
 
 # macOS
 .DS_Store
