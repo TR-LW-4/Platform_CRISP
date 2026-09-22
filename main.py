@@ -36,6 +36,7 @@ python main.py bench-summary --problem "CRP-R" --algo "Caserta (2012) HEUR" --li
 
 import sys
 import os
+from functools import partial
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -106,8 +107,9 @@ def cmd_test():
         q = mp.Queue()
         ev = mp.Event()
 
-        def factory(_p=pcls, _c=cfg):
-            return _p(config=_c)
+        # partial() instead of a closure: Windows spawns workers and must
+        # pickle this factory, which cannot reach a function-local object.
+        factory = partial(pcls, config=cfg)
 
         proc = mp.Process(target=algo.train, args=(factory, q, ev), daemon=True)
         proc.start()
@@ -148,8 +150,7 @@ def cmd_run(problem: str, algo: str, iterations: int):
     q     = mp.Queue()
     ev    = mp.Event()
 
-    def factory(_p=pcls, _c=cfg_p):
-        return _p(config=_c)
+    factory = partial(pcls, config=cfg_p)
 
     print(f"\nRunning {algo} on {problem} for {iterations} iterations...")
     proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
@@ -264,8 +265,7 @@ def cmd_layout_run(
 
     import multiprocessing as mp
 
-    def factory():
-        return pcls(config=prob_cfg)
+    factory = partial(pcls, config=prob_cfg)
 
     q = mp.Queue()
     ev = mp.Event()
