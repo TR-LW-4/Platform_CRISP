@@ -22,7 +22,7 @@ from __future__ import annotations
 import copy
 import multiprocessing as mp
 import random
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -84,7 +84,8 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
         max_p3      = int(cfg.extra.get("max_no_improve_p3", 500))
         n_seeds = 1  # multi-seed eval removed; single run only
         total_steps = n_seeds * 3
-        all_metrics: List[Dict] = []
+        # (phase, plan, metrics) of every complete plan built during the run.
+        candidates: List[Tuple[int, RelocationPlan, Dict]] = []
 
         for seed_idx in range(n_seeds):
             if stop_event.is_set():
@@ -108,16 +109,15 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
 
             # ── Phase 1 ──────────────────────────────────────────── #
             plan = phase1_greedy(initial_yard, containers, n_containers)
+            metrics = _plan_metrics(plan, kin, lb, initial_yard, objective_spec)
+            candidates.append((1, plan, metrics))
+            self._keep_best(candidates, env)
 
             self._push(
                 result_queue,
                 step     = seed_idx * 3 + 1,
-                metric   = _plan_metrics(
-                    plan, kin, lb, initial_yard, objective_spec
-                )["objective_value"],
-                metrics  = _plan_metrics(
-                    plan, kin, lb, initial_yard, objective_spec
-                ),
+                metric   = metrics["objective_value"],
+                metrics  = metrics,
                 progress = (seed_idx * 3 + 1) / total_steps,
                 snapshot = env.get_state_snapshot(),
                 extra    = {"phase": 1, "seed": seed_idx},
@@ -132,16 +132,15 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
                 max_no_improve=max_p2,
                 stop_event=stop_event,
             )
+            metrics = _plan_metrics(plan, kin, lb, initial_yard, objective_spec)
+            candidates.append((2, plan, metrics))
+            self._keep_best(candidates, env)
 
             self._push(
                 result_queue,
                 step     = seed_idx * 3 + 2,
-                metric   = _plan_metrics(
-                    plan, kin, lb, initial_yard, objective_spec
-                )["objective_value"],
-                metrics  = _plan_metrics(
-                    plan, kin, lb, initial_yard, objective_spec
-                ),
+                metric   = metrics["objective_value"],
+                metrics  = metrics,
                 progress = (seed_idx * 3 + 2) / total_steps,
                 snapshot = env.get_state_snapshot(),
                 extra    = {"phase": 2, "seed": seed_idx},
@@ -166,13 +165,9 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
             metrics = _plan_metrics(
                 plan, kin, lb, initial_yard, objective_spec
             )
-            all_metrics.append(metrics)
+            candidates.append((3, plan, metrics))
+            self._keep_best(candidates, env)
             primary = float(metrics["objective_value"])
-
-            if primary <= self._best_metric:
-                self._best_metric   = primary
-                self._best_plan     = plan
-                self._best_solution = _plan_to_action_list(plan, env)
 
             self._push(
                 result_queue,
@@ -184,18 +179,22 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
                 extra    = {"phase": 3, "seed": seed_idx},
             )
 
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
+        if candidates:
+            best_phase, _, best_metrics = _best_candidate(candidates)
             self._push(
                 result_queue,
                 step     = total_steps,
-                metric   = self._best_metric,
-                metrics  = agg,
+                metric   = float(best_metrics["objective_value"]),
+                metrics  = best_metrics,
                 progress = 1.0,
+                extra    = {"best_phase": best_phase},
             )
+
+    def _keep_best(self, candidates, env) -> None:
+        """Paper p. 1141: the best sequence found in the process is the output."""
+        _, plan, _ = _best_candidate(candidates)
+        self._best_plan     = plan
+        self._best_solution = _plan_to_action_list(plan, env)
 
     # ---------------------------------------------------------------- #
     # Public accessors                                                   #
@@ -233,6 +232,11 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
 # ================================================================ #
 #  Private helpers (module-level, algorithm-specific)               #
 # ================================================================ #
+
+def _best_candidate(candidates):
+    # min() returns the first minimum, so a tie keeps the earlier phase.
+    return min(candidates, key=lambda c: float(c[2]["objective_value"]))
+
 
 def _plan_metrics(
     plan:      RelocationPlan,
