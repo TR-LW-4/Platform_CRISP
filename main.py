@@ -19,6 +19,10 @@ python main.py run --problem "CRP-R" --algo "Caserta (2012) HEUR"
 python main.py layout-run --problem "CRP-R" --algo "Caserta (2012) HEUR" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat
 
+# Optimise the tier-dependent crane-time model instead of f2 (CRP-Time only)
+python main.py layout-run --problem "CRP-Time" --algo "Lee–Lee (2010) Retrieval" \\
+    --layout benchmark/Caserta_dataset/data5-5-1.dat --time-model f2_vertical
+
 # Same, but print LA-N move-by-move trace on stderr (--trace-lan or export CRISP_TRACE_LAN=1)
 python main.py layout-run --problem "CRP-R" --algo "LA-N Look-Ahead" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat --trace-lan
@@ -37,6 +41,7 @@ python main.py bench-summary --problem "CRP-R" --algo "Caserta (2012) HEUR" --li
 import sys
 import os
 from functools import partial
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -213,6 +218,7 @@ def cmd_layout_run(
     save: bool,
     timeout: float,
     trace_lan: bool = False,
+    time_model: Optional[str] = None,
 ):
     """
     Run *one* registered algorithm on *one* Caserta (.dat) or Zhu (.txt) layout file.
@@ -249,12 +255,20 @@ def cmd_layout_run(
         print(f"Unknown algorithm: {algo!r}  (try: python main.py list)")
         return
 
+    # objective_mode travels with time_model because the saved-result identity
+    # is keyed off it; CRP-Time forces "crane_time" as its only mode anyway.
+    prob_params = (
+        {"time_model": time_model, "objective_mode": "crane_time"}
+        if time_model
+        else {}
+    )
+
     suffix = p.suffix.lower()
     if suffix == ".txt":
-        prob_cfg = problem_config_for_zhu_txt(p, {})
+        prob_cfg = problem_config_for_zhu_txt(p, prob_params)
         src_tag = "cli_zhu_txt"
     elif suffix == ".dat":
-        prob_cfg = problem_config_for_caserta_dat(p, {})
+        prob_cfg = problem_config_for_caserta_dat(p, prob_params)
         src_tag = "cli_caserta_dat"
     else:
         print("Expected a `.dat` (Caserta) or `.txt` (Zhu) layout file.")
@@ -277,6 +291,13 @@ def cmd_layout_run(
         proc.terminate()
         proc.join(timeout=5)
         print("ERROR: train subprocess timed out or did not exit cleanly.")
+        return
+    if proc.exitcode != 0:
+        print(
+            f"ERROR: train subprocess crashed (exit code {proc.exitcode}); "
+            "its traceback is on stderr. Any records it pushed describe an "
+            "incomplete run, so no metrics are reported."
+        )
         return
 
     records = []
@@ -310,6 +331,7 @@ def cmd_layout_run(
         ]
         algo_params = cfg_a.to_dict()
         prob_save = {
+            **prob_cfg.extra,
             LAYOUT_FILE_EXTRA_KEY: str(p),
             "source": src_tag,
         }
@@ -451,6 +473,15 @@ if __name__ == "__main__":
         help='Algorithm display name (see: python main.py list), e.g. "Caserta (2012) HEUR"',
     )
     layout_parser.add_argument(
+        "--time-model",
+        choices=["f2", "f2_vertical", "rmgc_current"],
+        help=(
+            "CRP-Time crane-time model the search minimises: Voß–Schwarze f2 "
+            "(default), f2vert with tier-dependent pickup/place-down, or the "
+            "legacy multi-bay RMGC model. Other problems ignore it."
+        ),
+    )
+    layout_parser.add_argument(
         "--save",
         action="store_true",
         help="Also write results/<problem>/<algo>/…json like the web workbench",
@@ -518,6 +549,7 @@ if __name__ == "__main__":
             args.save,
             args.timeout,
             trace_lan=args.trace_lan,
+            time_model=args.time_model,
         )
     elif args.command == "results":
         cmd_results(args.limit, args.verbose)
