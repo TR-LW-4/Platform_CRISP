@@ -177,8 +177,7 @@ def simulate_plan(
                     step, ConflictType.OVERHIGH,
                     f"Destination {move.to_pos} full ({dst_stack.height}/{max_tiers})",
                 ))
-                dst_stack.push(container)  # accept anyway to continue simulation
-                n_reloc += 1
+                src_stack.push(container)  # undo pop, keep simulating
             else:
                 dst_stack.push(container)
                 n_reloc += 1
