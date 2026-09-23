@@ -180,7 +180,9 @@ This also puts the earlier `data5-5-1` result in perspective: 43 relocations aga
 
 Example 1 is a coincidence: adjacent-only counting happens to give the right answer there, which is why the defect is easy to miss. The minimal counterexample is a single stack `[1, 3, 2]`, where both 3 and 2 must be relocated but only one adjacent inversion exists.
 
-### Check 4 — Caserta results compared with Voß & Schwarze (2019) optima — **not done**
+### Check 4 — Caserta results compared with Voß & Schwarze (2019) optima — **dropped**
+
+Dropped by Wei's decision (late Sept): Voß & Schwarze (2019) is the reference for problem setup and parameters only, not a benchmark for results. The original note is kept below.
 
 Requires their published optima; not yet available.
 
