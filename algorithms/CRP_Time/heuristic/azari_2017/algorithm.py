@@ -257,18 +257,21 @@ class _CSUMSolver:
             i for i in range(0, src)
             if len(stacks[i]) < self.max_tiers and self._is_bg(q, stacks[i])
         ]
+        bound = float("inf")
         if left:
             best_left = min(left, key=lambda i: (lows[i], i))
             out.append(best_left)
+            bound = lows[best_left]
 
-        for m in range(src + 1, n):
-            if len(stacks[m]) >= self.max_tiers:
+        # Fig. 3 reads "m := bound", with m the lowest number in the stack;
+        # "bound := m" is intended.
+        for j in range(src + 1, n):
+            if len(stacks[j]) >= self.max_tiers:
                 continue
-            if not self._is_bg(q, stacks[m]):
+            if not self._is_bg(q, stacks[j]) or lows[j] >= bound:
                 continue
-            prev = [i for i in range(0, m) if i != src]
-            if all(lows[m] < lows[i] for i in prev):
-                out.append(m)
+            out.append(j)
+            bound = lows[j]
 
         if not out:
             return []
