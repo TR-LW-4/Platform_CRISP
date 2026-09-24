@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import copy
 import multiprocessing as mp
+import sys
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -48,6 +49,7 @@ class _SearchResult:
     objective_value: float
     total_moves: int
     relocations: int
+    csum_solution_found: bool = True
 
 
 class _CSUMSolver:
@@ -81,8 +83,8 @@ class _CSUMSolver:
         self.empty_lowest = (max(self.targets) + 1) if self.targets else 1
 
         self.best_time = float("inf")
-        self.best_total_moves = float("inf")
         self.best_moves: List[Movement] = []
+        self._nmov = 0
 
         self._set_a: set[int] = set()
 
@@ -96,13 +98,16 @@ class _CSUMSolver:
                 "GBH found no complete solution within "
                 f"gbh_time_limit_s = {self.gbh_time_limit_s} s"
             )
-        self._accept_solution_if_better(initial_moves)
 
         reloc_count = Counter(
             m.container_id for m in initial_moves if not m.is_retrieval
         )
         self._set_a = {cid for cid, cnt in reloc_count.items() if cnt > 1}
 
+        # Fig. 3: NMOV starts at the movements of the GBH solution, Tbest at infinity.
+        self._nmov = len(initial_moves)
+        self.best_time = float("inf")
+        self.best_moves = []
         self._deadline = time.monotonic() + self.csum_time_limit_s
         stacks = copy.deepcopy(self.initial_stacks)
         path: List[Movement] = []
@@ -115,12 +120,19 @@ class _CSUMSolver:
             path=path,
         )
 
+        found = bool(self.best_moves)
+        if not found:
+            # Not covered by the paper: fall back to the GBH solution.
+            self.best_moves = list(initial_moves)
+            self.best_time = self._plan_time(initial_moves)
+
         relocs = sum(1 for m in self.best_moves if not m.is_retrieval)
         return _SearchResult(
             moves=self.best_moves[:],
             objective_value=float(self.best_time),
-            total_moves=int(self.best_total_moves),
+            total_moves=len(self.best_moves),
             relocations=int(relocs),
+            csum_solution_found=found,
         )
 
     def _timed_out(self) -> bool:
@@ -292,7 +304,7 @@ class _CSUMSolver:
                 dedup.append(i)
         return dedup[: self.max_branches_b]
 
-    def _accept_solution_if_better(self, moves: Sequence[Movement]) -> None:
+    def _plan_time(self, moves: Sequence[Movement]) -> float:
         tcw = 0.0
         crane_pos = (1, 1)
         for mv in moves:
@@ -300,14 +312,7 @@ class _CSUMSolver:
                 mv, self.objective_spec, self.kin, crane_pos
             )
             tcw += dt
-        n_total = len(moves)
-        better = (tcw + _EPS < self.best_time) or (
-            abs(tcw - self.best_time) <= _EPS and n_total < self.best_total_moves
-        )
-        if better:
-            self.best_time = float(tcw)
-            self.best_total_moves = int(n_total)
-            self.best_moves = list(moves)
+        return float(tcw)
 
     def _run_gbh(self) -> Optional[List[Movement]]:
         """GBH (Sec. 4.2, Fig. 2): the complete solution with the fewest
@@ -382,26 +387,6 @@ class _CSUMSolver:
         if self._timed_out():
             return
 
-        if tcw >= self.best_time - _EPS:
-            return
-
-        if target_idx >= len(self.targets):
-            better = (tcw + _EPS < self.best_time) or (
-                abs(tcw - self.best_time) <= _EPS and nmov < self.best_total_moves
-            )
-            if better:
-                self.best_time = float(tcw)
-                self.best_total_moves = int(nmov)
-                self.best_moves = path[:]
-            return
-
-        lb = self._lower_bound_moves_2x_plus_y(stacks)
-        if (
-            self.objective_spec.mode == "relocations"
-            and nmov + lb > self.best_total_moves
-        ):
-            return
-
         target = self.targets[target_idx]
         src = self._find_target_stack(stacks, target)
         if src < 0:
@@ -418,19 +403,23 @@ class _CSUMSolver:
                 mv, self.objective_spec, self.kin, crane_pos
             )
             new_t = tcw + dt
-            if new_t >= self.best_time - _EPS:
-                return
-
             self._apply_retrieval(stacks, src, target)
             path.append(mv)
-            self._dfs(
-                stacks=stacks,
-                target_idx=target_idx + 1,
-                crane_pos=next_pos,
-                nmov=nmov + 1,
-                tcw=new_t,
-                path=path,
-            )
+            if target_idx == len(self.targets) - 1:
+                # tcw <= Tbest: a later solution with equal time replaces the earlier one.
+                if new_t <= self.best_time + _EPS:
+                    self._nmov = nmov + 1
+                    self.best_time = float(new_t)
+                    self.best_moves = path[:]
+            else:
+                self._dfs(
+                    stacks=stacks,
+                    target_idx=target_idx + 1,
+                    crane_pos=next_pos,
+                    nmov=nmov + 1,
+                    tcw=new_t,
+                    path=path,
+                )
             path.pop()
             self._undo_retrieval(stacks, src, target)
             return
@@ -443,12 +432,13 @@ class _CSUMSolver:
             if not candidates:
                 candidates = self._gbh_candidates(q, src, stacks)
 
-        if not candidates:
+        if self._timed_out():
             return
 
         for dst in candidates:
-            if self._timed_out():
-                return
+            # Nm <= NMOV is checked only when a relocation is added (Fig. 3).
+            if nmov + 1 > self._nmov:
+                continue
             mv = Movement(
                 stacks[src][-1],
                 self.positions[src],
@@ -460,18 +450,16 @@ class _CSUMSolver:
             dt, _time_cost, next_pos = movement_objective_cost(
                 mv, self.objective_spec, self.kin, crane_pos
             )
-            new_t = tcw + dt
-            if new_t < self.best_time - _EPS:
-                path.append(mv)
-                self._dfs(
-                    stacks=stacks,
-                    target_idx=target_idx,
-                    crane_pos=next_pos,
-                    nmov=nmov + 1,
-                    tcw=new_t,
-                    path=path,
-                )
-                path.pop()
+            path.append(mv)
+            self._dfs(
+                stacks=stacks,
+                target_idx=target_idx,
+                crane_pos=next_pos,
+                nmov=nmov + 1,
+                tcw=tcw + dt,
+                path=path,
+            )
+            path.pop()
             self._undo_relocation(stacks, src, dst, moved_q)
 
 
@@ -532,6 +520,13 @@ class Azari2017CSUM(BaseAlgorithm):
                 max_branches_b=int(cfg.extra.get("max_branches_b", 6)),
             )
             result = solver.solve()
+            extra = {"csum_solution_found": result.csum_solution_found}
+            if not result.csum_solution_found:
+                print(
+                    "[Azari2017CSUM] CSUM found no complete solution within "
+                    "csum_time_limit_s; returning the GBH solution.",
+                    file=sys.stderr, flush=True,
+                )
 
             actions = _moves_to_actions(result.moves, int(env.config.num_rows))
             metrics = evaluate_plan_objectives(
@@ -555,6 +550,7 @@ class Azari2017CSUM(BaseAlgorithm):
                 metrics=metrics,
                 progress=(seed_idx + 1) / n_seeds,
                 snapshot=env.get_state_snapshot(),
+                extra=extra,
             )
 
         if all_metrics:
@@ -568,6 +564,7 @@ class Azari2017CSUM(BaseAlgorithm):
                 metric=self._best_metric,
                 metrics=agg,
                 progress=1.0,
+                extra=extra,
             )
 
     def get_best_solution(self) -> Optional[List[int]]:
