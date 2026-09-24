@@ -4,7 +4,6 @@ Azari2017CSUM
 CSUM tree search minimizing crane working time
 gbh_time_limit_s --- 3 --- GBH time limit T (s)
 csum_time_limit_s --- 5 --- CSUM time limit (s)
-max_branches_b --- 6 --- Constant-summation branch width
 
 ------------------------------- Reference --------------------------------
 E. Azari, H. Eskandari, A. Nourmohammadi,
@@ -64,7 +63,6 @@ class _CSUMSolver:
         objective_spec: ObjectiveSpec,
         gbh_time_limit_s: float,
         csum_time_limit_s: float,
-        max_branches_b: int,
     ) -> None:
         self.initial_stacks: List[List[int]] = [list(s) for s in stacks]
         self.positions: List[Tuple[int, int]] = list(positions)
@@ -74,7 +72,6 @@ class _CSUMSolver:
 
         self.gbh_time_limit_s = float(max(0.1, gbh_time_limit_s))
         self.csum_time_limit_s = float(max(0.1, csum_time_limit_s))
-        self.max_branches_b = int(max(1, max_branches_b))
         self._deadline = float("inf")
 
         self.targets: List[int] = sorted(
@@ -292,17 +289,7 @@ class _CSUMSolver:
                 continue
             out.append(j)
             bound = lows[j]
-
-        if not out:
-            return []
-
-        dedup: List[int] = []
-        seen = set()
-        for i in out:
-            if i not in seen:
-                seen.add(i)
-                dedup.append(i)
-        return dedup[: self.max_branches_b]
+        return out
 
     def _plan_time(self, moves: Sequence[Movement]) -> float:
         tcw = 0.0
@@ -517,7 +504,6 @@ class Azari2017CSUM(BaseAlgorithm):
                 objective_spec=objective_spec,
                 gbh_time_limit_s=float(cfg.extra.get("gbh_time_limit_s", 3.0)),
                 csum_time_limit_s=float(cfg.extra.get("csum_time_limit_s", 5.0)),
-                max_branches_b=int(cfg.extra.get("max_branches_b", 6)),
             )
             result = solver.solve()
             extra = {"csum_solution_found": result.csum_solution_found}
@@ -583,11 +569,6 @@ class Azari2017CSUM(BaseAlgorithm):
                 "type": "float", "default": 5.0, "min": 0.1, "max": 120.0,
                 "label": "CSUM time limit (s)",
                 "help": "Wall-clock limit for the CSUM search, starting after GBH (paper: 5 s).",
-            },
-            "max_branches_b": {
-                "type": "int", "default": 6, "min": 1, "max": 32,
-                "label": "Max B-set branches",
-                "help": "Maximum CSUM destination branches explored for B-set containers.",
             },
         })
         return base
