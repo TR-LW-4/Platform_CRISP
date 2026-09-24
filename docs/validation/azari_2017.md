@@ -68,7 +68,7 @@ Code: `algorithms/CRP_Time/heuristic/azari_2017/`
   - add t_rel (the time to relocate q to s) to tcw, and Nm + 1;
   - if Nm ≤ NMOV: move q to s, call CSUM recursively, and undo the move;
   - undo the bookkeeping: tcw − t_rel, Nm − 1.
-- Consequence: branches are pruned on the **number of movements**, not on time. NMOV is the move count of the best solution so far, so CSUM only looks for time improvements at an equal or smaller number of movements. A solution with more movements but a lower crane time is never explored.
+- Consequence: pruning uses the number of movements, not time. The check Nm ≤ NMOV is made only when a relocation is added (Fig. 3, p. 314; p. 315), and Nm counts the relocations and retrievals made so far. Retrievals after the last relocation are not checked, so a solution can have more movements than NMOV, and NMOV := Nm can then increase NMOV. The pruning therefore limits the number of movements but does not strictly cap it; the paper does not say which of the two is intended.
 - Worked example (Fig. 4, p. 315): q = 10, W = 8, w = 3; lowest numbers per stack: 14, 13, PS, 12, 9, 15, 11, N + 1 (stack 8 is empty). BG stacks for q: 1, 2, 4, 6, 7, 8 (stack 5 is BB). G1 = {1, 2}: s = 2, bound = 13, Q = [2]. G2: stack 4 (12 < 13) added, bound = 12; stack 5 skipped (BB); stack 6 (15) skipped; stack 7 (11 < 12) added, bound = 11; stack 8 (N + 1) skipped. Result: Q = [2, 4, 7], as stated in the paper.
 
 ### Parameters
