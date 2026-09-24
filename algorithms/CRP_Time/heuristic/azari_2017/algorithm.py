@@ -2,7 +2,8 @@
 Azari2017CSUM
 <2017> <heuristic> <time> <single-bay> <CRP-Time>
 CSUM tree search minimizing crane working time
-time_limit_s --- 5 --- Search time limit (s)
+gbh_time_limit_s --- 3 --- GBH time limit T (s)
+csum_time_limit_s --- 5 --- CSUM time limit (s)
 max_branches_b --- 6 --- Constant-summation branch width
 
 ------------------------------- Reference --------------------------------
@@ -59,7 +60,8 @@ class _CSUMSolver:
         max_tiers: int,
         kinematics: KinematicsModel,
         objective_spec: ObjectiveSpec,
-        time_limit_s: float,
+        gbh_time_limit_s: float,
+        csum_time_limit_s: float,
         max_branches_b: int,
     ) -> None:
         self.initial_stacks: List[List[int]] = [list(s) for s in stacks]
@@ -68,9 +70,10 @@ class _CSUMSolver:
         self.kin = kinematics
         self.objective_spec = objective_spec
 
-        self.time_limit_s = float(max(0.1, time_limit_s))
+        self.gbh_time_limit_s = float(max(0.1, gbh_time_limit_s))
+        self.csum_time_limit_s = float(max(0.1, csum_time_limit_s))
         self.max_branches_b = int(max(1, max_branches_b))
-        self.start_ts = time.monotonic()
+        self._deadline = float("inf")
 
         self.targets: List[int] = sorted(
             p for st in self.initial_stacks for p in st
@@ -87,15 +90,20 @@ class _CSUMSolver:
         if not self.targets:
             return _SearchResult([], 0.0, 0, 0)
 
-        initial_moves, complete = self._run_gbh_initial()
-        if complete:
-            self._accept_solution_if_better(initial_moves)
+        initial_moves = self._run_gbh()
+        if initial_moves is None:
+            raise RuntimeError(
+                "GBH found no complete solution within "
+                f"gbh_time_limit_s = {self.gbh_time_limit_s} s"
+            )
+        self._accept_solution_if_better(initial_moves)
 
         reloc_count = Counter(
             m.container_id for m in initial_moves if not m.is_retrieval
         )
         self._set_a = {cid for cid, cnt in reloc_count.items() if cnt > 1}
 
+        self._deadline = time.monotonic() + self.csum_time_limit_s
         stacks = copy.deepcopy(self.initial_stacks)
         path: List[Movement] = []
         self._dfs(
@@ -116,7 +124,7 @@ class _CSUMSolver:
         )
 
     def _timed_out(self) -> bool:
-        return (time.monotonic() - self.start_ts) >= self.time_limit_s
+        return time.monotonic() >= self._deadline
 
     def _lowest(self, stack: Sequence[int]) -> int:
         return min(stack) if stack else self.empty_lowest
@@ -301,38 +309,52 @@ class _CSUMSolver:
             self.best_total_moves = int(n_total)
             self.best_moves = list(moves)
 
-    def _run_gbh_initial(self) -> Tuple[List[Movement], bool]:
-        stacks = copy.deepcopy(self.initial_stacks)
-        target_idx = 0
-        moves: List[Movement] = []
+    def _run_gbh(self) -> Optional[List[Movement]]:
+        """GBH (Sec. 4.2, Fig. 2): the complete solution with the fewest
+        movements found within the GBH time limit, or None."""
+        self._deadline = time.monotonic() + self.gbh_time_limit_s
+        self._gbh_ub = self.max_tiers * len(self.targets)
+        self._gbh_best: Optional[List[Movement]] = None
+        self._gbh_dfs(copy.deepcopy(self.initial_stacks), 0, [])
+        return self._gbh_best
 
-        while target_idx < len(self.targets):
-            target = self.targets[target_idx]
-            src = self._find_target_stack(stacks, target)
-            if src < 0:
-                return moves, False
+    def _gbh_dfs(
+        self,
+        stacks: List[List[int]],
+        target_idx: int,
+        path: List[Movement],
+    ) -> None:
+        if self._timed_out():
+            return
 
-            if stacks[src] and stacks[src][-1] == target:
-                mv = Movement(
-                    target,
-                    self.positions[src],
-                    None,
-                    from_tier=len(stacks[src]),
-                )
-                moves.append(mv)
-                self._apply_retrieval(stacks, src, target)
-                target_idx += 1
-                continue
+        target = self.targets[target_idx]
+        src = self._find_target_stack(stacks, target)
+        if src < 0:
+            return
 
-            if not stacks[src]:
-                break
+        if stacks[src][-1] == target:
+            mv = Movement(
+                target,
+                self.positions[src],
+                None,
+                from_tier=len(stacks[src]),
+            )
+            self._apply_retrieval(stacks, src, target)
+            path.append(mv)
+            if target_idx == len(self.targets) - 1:
+                # Later solutions must use fewer movements than this one.
+                self._gbh_ub = len(path) - 1
+                self._gbh_best = path[:]
+            else:
+                self._gbh_dfs(stacks, target_idx + 1, path)
+            path.pop()
+            self._undo_retrieval(stacks, src, target)
+            return
 
-            q = stacks[src][-1]
-            cand = self._gbh_candidates(q, src, stacks)
-            if not cand:
-                return moves, False
-
-            dst = cand[0]
+        q = stacks[src][-1]
+        for dst in self._gbh_candidates(q, src, stacks):
+            if self._timed_out():
+                return
             mv = Movement(
                 q,
                 self.positions[src],
@@ -341,9 +363,12 @@ class _CSUMSolver:
                 to_tier=len(stacks[dst]) + 1,
             )
             self._apply_relocation(stacks, src, dst)
-            moves.append(mv)
-
-        return moves, True
+            path.append(mv)
+            # Prune unless Nm + LB <= UB, with Nm the movements so far.
+            if len(path) + self._lower_bound_moves_2x_plus_y(stacks) <= self._gbh_ub:
+                self._gbh_dfs(stacks, target_idx, path)
+            path.pop()
+            self._undo_relocation(stacks, src, dst, q)
 
     def _dfs(
         self,
@@ -502,7 +527,8 @@ class Azari2017CSUM(BaseAlgorithm):
                 max_tiers=int(env.config.max_tiers),
                 kinematics=kin,
                 objective_spec=objective_spec,
-                time_limit_s=float(cfg.extra.get("time_limit_s", 5.0)),
+                gbh_time_limit_s=float(cfg.extra.get("gbh_time_limit_s", 3.0)),
+                csum_time_limit_s=float(cfg.extra.get("csum_time_limit_s", 5.0)),
                 max_branches_b=int(cfg.extra.get("max_branches_b", 6)),
             )
             result = solver.solve()
@@ -551,10 +577,15 @@ class Azari2017CSUM(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "time_limit_s": {
+            "gbh_time_limit_s": {
+                "type": "float", "default": 3.0, "min": 0.1, "max": 120.0,
+                "label": "GBH time limit T (s)",
+                "help": "Wall-clock limit for the GBH search that yields the initial solution (paper: 3 s).",
+            },
+            "csum_time_limit_s": {
                 "type": "float", "default": 5.0, "min": 0.1, "max": 120.0,
-                "label": "Search time limit (s)",
-                "help": "Wall-clock limit for each seed's GBH+CSUM search.",
+                "label": "CSUM time limit (s)",
+                "help": "Wall-clock limit for the CSUM search, starting after GBH (paper: 5 s).",
             },
             "max_branches_b": {
                 "type": "int", "default": 6, "min": 1, "max": 32,
