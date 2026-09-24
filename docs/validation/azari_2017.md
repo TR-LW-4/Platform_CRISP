@@ -114,42 +114,43 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/azari_
 
 | Step | Paper (p.) | Code (file:line) | Verdict | Category |
 |---|---|---|---|---|
-| Single bay, W stacks, H tiers | 311 | Caserta loader: one stack per bay, `num_rows = 1` (`core/benchmarks/caserta.py:227-228`); stacks read bottom→top (`algorithm.py:491-495`) | equal | — |
-| Truck lane next to stack 1 | 311 | truck at stack index 0, retrieval travel grows with the stack index (`core/objectives.py:202-205`, `:261-265`); G1 = stacks with a lower index than the PS (`algorithm.py:256-259`) | equal | — |
-| Crane starts above the truck lane | 311 | `crane_pos = (1, 1)` (`algorithm.py:104`, `:289`); only `rmgc_current` reads it; f2/f2vert do not depend on the crane position (`core/objectives.py:303-316`) | deviation | unified 2D setting |
-| Priorities unique; lower number = earlier | 311 | `targets = sorted(...)` (`algorithm.py:75-77`); Caserta priorities are a permutation of 1..N (`core/benchmarks/caserta.py:164-180`) | equal | — |
-| Only top containers accessible; one move at a time; capacity H | 311 | moves pop/push the top (`algorithm.py:152-190`); destination must satisfy `len(st) < max_tiers` (`:192-196`, `:258`, `:269`) | equal | — |
-| Restricted: only q, the top of the PS, is relocated | 312–313 | q = top of the stack that holds the target (`algorithm.py:330`, `:413`) | equal | — |
-| Objective: minimise T_CW; NMOV secondary | 309–311 | search minimises f2 or f2vert through `movement_objective_cost` (`algorithm.py:392-394`, `:435-437`); movements reported as `steps` (`:517`) and `total_moves` by the shared evaluator | equal (time model adapted) | unified 2D setting |
-| Time model for t_rem and t_rel | 311 (no formulas) | f2: t_rem = 2·ts·s + tpp, t_rel = 2·ts·\|s1 − s2\| + tpp (`core/objectives.py:261-270`); f2vert (`:278-295`); tiers passed as in `annotate_plan_tiers` (`algorithm.py:320`, `:340-341`) | not specified in paper | unified 2D setting |
-| Def. 1: good / bad container | 311 | `_is_bg` / `_is_bb` compare q with the stack minimum (`algorithm.py:124-128`); the LB's bad test compares with every container below (`:140-145`) | equal | — |
-| Def. 2: BB / BG relocation | 312 | `algorithm.py:124-128` | equal | — |
-| Def. 3: best BB / best BG stack, compared only among BB resp. BG stacks | 312 (reading inferred from Fig. 1) | `_best_bb_stack` / `_best_bg_stack` filter on BB/BG first, then take the max/min stack minimum (`algorithm.py:198-218`) | equal | choice left open by paper |
-| Lowest number of an empty stack = N + 1 | 312 | `empty_lowest = max(targets) + 1` (`algorithm.py:78`, `:121-122`) | equal | — |
-| Several empty stacks: lowest stack number | 312 | BG key `(lowest, index)` (`algorithm.py:207`, `:262`) | equal | — |
-| Ties between non-empty stacks | not specified | cannot occur: priorities are unique, and a BB stack is never empty (`algorithm.py:218`, `:240`) | not specified in paper | choice left open by paper |
-| S = non-full stacks except the PS | 312 (Table 1) vs 313 | `_true_eligible_dsts` (`algorithm.py:192-196`) | equal (Table 1 reading) | choice left open by paper |
-| Lower bound 2x + y (Kim & Hong) | 312 | `_lower_bound_moves_2x_plus_y` (`algorithm.py:136-150`): a container is bad if any container below it has a lower number; this is not the shared B1 bound. Used only when `mode == "relocations"` (`:373-378`), which CRP-Time never allows (`problems/CRP_Time.py:144-154`) | equal (definition), unused | — |
-| GBH: recursive DFS with backtracking, UB = H × N, LB pruning, own time limit | 312–313, Fig. 2 | `_run_gbh_initial` is one greedy pass that always takes the FDS (`algorithm.py:304-346`): no backtracking, no UB, no LB, no time check | deviation | differs from paper |
-| GBH branching: FDS / SDS | 313 | `_gbh_candidates` (`algorithm.py:220-243`) | equal | — |
-| Neither FDS nor SDS exists: "the search stops" | 313 | GBH returns an incomplete solution (`algorithm.py:331-333`); in CSUM only that node returns and siblings are still explored (`:421-422`) | not specified in paper | choice left open by paper |
-| CSUM initial solution: GBH under time limit T | 313 | the greedy GBH pass (row above) | deviation | differs from paper |
-| Set A: at least one BB relocation / relocated more than once | 313, Fig. 3 | relocated more than once in the initial solution (`algorithm.py:94-97`) | equal | — |
-| Initialisation: NMOV = GBH moves, Tbest = ∞ | Fig. 3 | `best_time` starts at the crane time of the GBH solution, which becomes a candidate output (`algorithm.py:90-92`, `:287-302`); NMOV is not used | deviation | differs from paper |
-| Time limit checked on each call and before branching | Fig. 3 | `algorithm.py:357-358`, `:424-425` | equal | — |
-| PC not blocked: retrieve, tcw + t_rem, Nm + 1, recurse, undo | Fig. 3 | `algorithm.py:385-411` | equal | — |
-| New best when the last container is retrieved and tcw ≤ Tbest | Fig. 3 | only a strictly lower time reaches the leaf (`algorithm.py:360-361`, `:396-397`, `:439`); leaf acceptance `:363-371`. The equal-time, fewer-moves branch (`:364-366`) is unreachable | deviation | differs from paper |
-| Pruning on Nm ≤ NMOV; NMOV = Nm at each new best | Fig. 3 (p. 315 says UB) | no movement-count pruning in crane-time mode; a branch is cut once tcw + t ≥ best time (`algorithm.py:360-361`, `:396-397`, `:439`); `best_total_moves` is stored (`:369`) but never used for pruning | deviation | differs from paper |
-| q ∈ A: GBH branching | Fig. 3 | `algorithm.py:414-415` | equal | — |
-| q ∈ B, G1: best BG stack s, bound = its minimum | Fig. 3 | `algorithm.py:256-264` | equal | — |
-| q ∈ B, G2: which stacks are compared, update of bound | Fig. 3, Fig. 4 | in increasing order, stack j is added if it is non-full, the relocation is BG and its minimum is below bound; then bound := that minimum (`algorithm.py:266-274`). Before `ac344eb` every earlier stack was compared (A1, §3.4) | equal | choice left open by paper |
-| q ∈ B and Q empty | not specified | falls back to GBH branching (`algorithm.py:416-419`) | not specified in paper | choice left open by paper |
-| Cap on the number of set-B branches | not in the paper | `dedup[: max_branches_b]`, default 6, exposed in the UI (`algorithm.py:285`, `:506`, `:559-563`) | deviation | differs from paper |
-| For each s in Q, in order: t_rel, move, recurse, undo | Fig. 3 | `algorithm.py:424-450` | equal | — |
-| Time limits: 1 s (Table 2); 3 s GBH + 5 s CSUM (Lee & Lee instances) | 316 | one budget `time_limit_s` for GBH and CSUM together, default 5 s, clamped to ≥ 0.1 s (`algorithm.py:71`, `:73`, `:505`, `:554-558`) | not specified in paper (for Caserta) | choice left open by paper |
-| H | 313 (UB = H × N) | `max_tiers` = H′ + 2 for Caserta (`core/benchmarks/caserta.py:154-160`, `:229`); used for S and for h_max in f2vert (`core/objectives.py:280`). UB = H × N is not used | equal | unified 2D setting |
-| Deterministic | 316 | no random choices in the solver; the seed is set on the environment only (`algorithm.py:487`) | equal | — |
-| Output: best solution found | 313 | `best_moves`, re-evaluated with the shared evaluator (`algorithm.py:508-516`) | equal | — |
+| Single bay, W stacks, H tiers | 311 | Caserta loader: one stack per bay, `num_rows = 1` (`core/benchmarks/caserta.py:227-228`); stacks read bottom→top (`algorithm.py:516-520`) | equal | — |
+| Truck lane next to stack 1 | 311 | truck at stack index 0, retrieval travel grows with the stack index (`core/objectives.py:202-205`, `:261-265`); G1 = stacks with a lower index than the PS (`algorithm.py:264-267`) | equal | — |
+| Crane starts above the truck lane | 311 | `crane_pos = (1, 1)` (`algorithm.py:112`, `:297`); only `rmgc_current` reads it; f2/f2vert do not depend on the crane position (`core/objectives.py:303-316`) | deviation | unified 2D setting |
+| Priorities unique; lower number = earlier | 311 | `targets = sorted(...)` (`algorithm.py:78-80`); Caserta priorities are a permutation of 1..N (`core/benchmarks/caserta.py:164-180`) | equal | — |
+| Only top containers accessible; one move at a time; capacity H | 311 | moves pop/push the top (`algorithm.py:160-198`); destination must satisfy `len(st) < max_tiers` (`:200-204`, `:266`, `:277`) | equal | — |
+| Restricted: only q, the top of the PS, is relocated | 312–313 | q = top of the stack that holds the target (`algorithm.py:354`, `:438`) | equal | — |
+| Objective: minimise T_CW; NMOV secondary | 309–311 | search minimises f2 or f2vert through `movement_objective_cost` (`algorithm.py:417-419`, `:460-462`); movements reported as `steps` (`:543`) and `total_moves` by the shared evaluator | equal (time model adapted) | unified 2D setting |
+| Time model for t_rem and t_rel | 311 (no formulas) | f2: t_rem = 2·ts·s + tpp, t_rel = 2·ts·\|s1 − s2\| + tpp (`core/objectives.py:261-270`); f2vert (`:278-295`); tiers passed as in `annotate_plan_tiers` (`algorithm.py:340`, `:362-363`) | not specified in paper | unified 2D setting |
+| Def. 1: good / bad container | 311 | `_is_bg` / `_is_bb` compare q with the stack minimum (`algorithm.py:132-136`); the LB's bad test compares with every container below (`:148-153`) | equal | — |
+| Def. 2: BB / BG relocation | 312 | `algorithm.py:132-136` | equal | — |
+| Def. 3: best BB / best BG stack, compared only among BB resp. BG stacks | 312 (reading inferred from Fig. 1) | `_best_bb_stack` / `_best_bg_stack` filter on BB/BG first, then take the max/min stack minimum (`algorithm.py:206-226`) | equal | choice left open by paper |
+| Lowest number of an empty stack = N + 1 | 312 | `empty_lowest = max(targets) + 1` (`algorithm.py:81`, `:129-130`) | equal | — |
+| Several empty stacks: lowest stack number | 312 | BG key `(lowest, index)` (`algorithm.py:215`, `:270`) | equal | — |
+| Ties between non-empty stacks | not specified | cannot occur: priorities are unique, and a BB stack is never empty (`algorithm.py:226`, `:248`) | not specified in paper | choice left open by paper |
+| S = non-full stacks except the PS | 312 (Table 1) vs 313 | `_true_eligible_dsts` (`algorithm.py:200-204`) | equal (Table 1 reading) | choice left open by paper |
+| Lower bound 2x + y (Kim & Hong) | 312 | `_lower_bound_moves_2x_plus_y` (`algorithm.py:144-158`): a container is bad if any container below it has a lower number; this is not the shared B1 bound. Used for pruning in GBH (`:368`) since `6cf6b3c`; the CSUM branch that uses it when `mode == "relocations"` (`:398-403`) is never reached in CRP-Time (`problems/CRP_Time.py:144-154`) | equal | — |
+| GBH: recursive DFS with backtracking, UB = H × N, LB pruning, own time limit | 312–313, Fig. 2 | `_run_gbh` / `_gbh_dfs` (`algorithm.py:312-371`): UB starts at H × N (`:316`); each complete solution is stored and sets UB = \|solution\| − 1 (`:346-347`); a relocation is followed only if Nm + LB ≤ UB (`:368`); time checks `:327`, `:356`. Since `6cf6b3c`; before, a single greedy pass (§3.3) | equal | — |
+| GBH branching: FDS / SDS | 313 | `_gbh_candidates` (`algorithm.py:228-251`) | equal | — |
+| Neither FDS nor SDS exists: "the search stops" | 313 | GBH and CSUM: only that node returns and siblings are still explored (`algorithm.py:355`, `:446-447`) | not specified in paper | choice left open by paper |
+| No complete GBH solution within T | not specified | `solve()` raises a `RuntimeError` (`algorithm.py:93-98`) | not specified in paper | choice left open by paper |
+| CSUM initial solution: GBH under time limit T | 313 | the best GBH solution found within `gbh_time_limit_s` (`algorithm.py:93-99`) | equal | — |
+| Set A: at least one BB relocation / relocated more than once | 313, Fig. 3 | relocated more than once in the initial solution (`algorithm.py:101-104`) | equal | — |
+| Initialisation: NMOV = GBH moves, Tbest = ∞ | Fig. 3 | `best_time` starts at the crane time of the GBH solution, which becomes a candidate output (`algorithm.py:99`, `:295-310`); NMOV is not used | deviation | differs from paper |
+| Time limit checked on each call and before branching | Fig. 3 | `algorithm.py:382-383`, `:449-450` | equal | — |
+| PC not blocked: retrieve, tcw + t_rem, Nm + 1, recurse, undo | Fig. 3 | `algorithm.py:410-436` | equal | — |
+| New best when the last container is retrieved and tcw ≤ Tbest | Fig. 3 | only a strictly lower time reaches the leaf (`algorithm.py:385-386`, `:421-422`, `:464`); leaf acceptance `:388-396`. The equal-time, fewer-moves branch (`:389-391`) is unreachable | deviation | differs from paper |
+| Pruning on Nm ≤ NMOV; NMOV = Nm at each new best | Fig. 3 (p. 315 says UB) | no movement-count pruning in crane-time mode; a branch is cut once tcw + t ≥ best time (`algorithm.py:385-386`, `:421-422`, `:464`); `best_total_moves` is stored (`:394`) but never used for pruning | deviation | differs from paper |
+| q ∈ A: GBH branching | Fig. 3 | `algorithm.py:439-440` | equal | — |
+| q ∈ B, G1: best BG stack s, bound = its minimum | Fig. 3 | `algorithm.py:264-272` | equal | — |
+| q ∈ B, G2: which stacks are compared, update of bound | Fig. 3, Fig. 4 | in increasing order, stack j is added if it is non-full, the relocation is BG and its minimum is below bound; then bound := that minimum (`algorithm.py:274-282`). Before `ac344eb` every earlier stack was compared (A1, §3.4) | equal | choice left open by paper |
+| q ∈ B and Q empty | not specified | falls back to GBH branching (`algorithm.py:441-444`) | not specified in paper | choice left open by paper |
+| Cap on the number of set-B branches | not in the paper | `dedup[: max_branches_b]`, default 6, exposed in the UI (`algorithm.py:293`, `:532`, `:590-594`) | deviation | differs from paper |
+| For each s in Q, in order: t_rel, move, recurse, undo | Fig. 3 | `algorithm.py:449-475` | equal | — |
+| Time limits: 1 s (Table 2); 3 s GBH + 5 s CSUM (Lee & Lee instances) | 316 | since `6cf6b3c` two budgets, `gbh_time_limit_s` (default 3 s) and `csum_time_limit_s` (default 5 s), each clamped to ≥ 0.1 s; each phase sets its own deadline (`algorithm.py:73-74`, `:106`, `:315`, `:530-531`, `:580-589`) | not specified in paper (for Caserta) | choice left open by paper |
+| H | 313 (UB = H × N) | `max_tiers` = H′ + 2 for Caserta (`core/benchmarks/caserta.py:154-160`, `:229`); used for S, for h_max in f2vert (`core/objectives.py:280`) and for the initial GBH bound UB = H × N (`algorithm.py:316`) | equal | unified 2D setting |
+| Deterministic | 316 | no random choices in the solver; the seed is set on the environment only (`algorithm.py:512`) | equal | — |
+| Output: best solution found | 313 | `best_moves`, re-evaluated with the shared evaluator (`algorithm.py:534-542`) | equal | — |
 
 Verdict: equal / deviation / not specified in paper.
 Category: unified 2D setting / choice left open by paper / differs from paper (bug).
@@ -160,38 +161,41 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **Time model.** The paper gives no formulas and follows Lee & Lee (2010), whose procedure includes moving the trolley to the source stack of each movement. The code takes t_rem and t_rel from Voß & Schwarze f2 or f2vert (`core/objectives.py:261-295`). In f2, a retrieval from stack s costs 2·ts·s + tpp and a relocation from s1 to s2 costs 2·ts·|s1 − s2| + tpp. Each movement's cost is independent of the previous one: there is no repositioning term, as already noted in `lee_lee_2010.md` §3.1. The search logic is unchanged, but the times it compares differ from those in the paper's model.
 
-**Crane start position.** The paper starts the crane above the truck lane. The code starts it at `(1, 1)`, i.e. stack 1 (`algorithm.py:104`, `:289`), but only `rmgc_current` reads the position. Under f2 and f2vert the start position has no effect.
+**Crane start position.** The paper starts the crane above the truck lane. The code starts it at `(1, 1)`, i.e. stack 1 (`algorithm.py:112`, `:297`), but only `rmgc_current` reads the position. Under f2 and f2vert the start position has no effect.
 
 **Geometry.** Azari et al. already work in a single bay with the truck lane next to stack 1. That matches the CRISP convention (truck at stack index 0), so no 3D → 2D conversion is needed. For Caserta, H = H′ + 2 (`core/benchmarks/caserta.py:154-160`). H determines which stacks are full, and f2vert uses it for h_max.
 
 ### 3.2 Choices left open by the paper
 
-**Def. 3.** The code compares the best BB stack only with BB stacks and the best BG stack only with BG stacks (`algorithm.py:198-218`). This is the reading inferred from Fig. 1, and Check 1 (§4) passes.
+**Def. 3.** The code compares the best BB stack only with BB stacks and the best BG stack only with BG stacks (`algorithm.py:206-226`). This is the reading inferred from Fig. 1, and Check 1 (§4) passes.
 
-**S** is the Table 1 definition: non-full stacks except the PS (`algorithm.py:192-196`).
+**S** is the Table 1 definition: non-full stacks except the PS (`algorithm.py:200-204`).
 
-**Tie-breaking.** Only empty stacks can tie, since priorities are unique and a BB stack is never empty. Among empty stacks the lowest stack number wins, as the paper prescribes (`algorithm.py:207`, `:262`).
+**Tie-breaking.** Only empty stacks can tie, since priorities are unique and a BB stack is never empty. Among empty stacks the lowest stack number wins, as the paper prescribes (`algorithm.py:215`, `:270`).
 
-**Set-B container without any BG destination.** The code falls back to GBH branching (`algorithm.py:416-419`), so the container gets the best and second-best BB stacks. The paper does not mention this case. Without the fallback the branch would have no children.
+**Set-B container without any BG destination.** The code falls back to GBH branching (`algorithm.py:441-444`), so the container gets the best and second-best BB stacks. The paper does not mention this case. Without the fallback the branch would have no children.
 
-**"If neither FDS nor SDS exists, the search stops."** I am not sure whether the paper means the whole search or only the current branch. The code stops the current branch. On Caserta the case cannot occur: S is empty only if all W − 1 other stacks are full, which requires (W − 1)(H′ + 2) ≤ W·H′ − 1, i.e. H′ ≥ 2W − 1. The Caserta class closest to that is data10-6 (H′ = 10, W = 6), and it does not meet it.
+**"If neither FDS nor SDS exists, the search stops."** I am not sure whether the paper means the whole search or only the current branch. Both GBH and CSUM stop only the current branch. On Caserta the case cannot occur: S is empty only if all W − 1 other stacks are full, which requires (W − 1)(H′ + 2) ≤ W·H′ − 1, i.e. H′ ≥ 2W − 1. The Caserta class closest to that is data10-6 (H′ = 10, W = 6), and it does not meet it.
 
-**Time limit.** There is one budget, `time_limit_s` (default 5 s), for GBH and CSUM together. The paper uses 1 s for its Table 2 instances and 3 s + 5 s for the Lee & Lee instances. Because GBH is a single greedy pass here (§3.3), almost the whole budget goes to CSUM. As in the paper, results depend on machine speed.
+**Time limit.** Since `6cf6b3c`, GBH and CSUM have separate limits, `gbh_time_limit_s` (default 3 s) and `csum_time_limit_s` (default 5 s). These are the values the paper uses for the Lee & Lee instances (p. 316), and the only per-instance limits it states unambiguously; the 1 s for Table 2 may be per instance or per category (§1). Before, one 5 s budget covered both phases. The benchmark duration is decided later, with the design of the experiments. As in the paper, results depend on machine speed.
+
+**No complete GBH solution within T.** The paper does not say what happens then. CSUM needs the GBH solution for NMOV and set A, so `solve()` raises a `RuntimeError` with a clear message instead of continuing (`algorithm.py:93-98`). On Caserta this does not happen: S is never empty (above), and GBH found a complete solution on all 840 instances (§4, Check 5).
 
 ### 3.3 Differs from the paper
 
-**GBH is a single greedy pass.** The paper's GBH is a depth-first search with backtracking that minimises the number of movements within time limit T, pruning on Nm + LB ≤ UB. The code follows the FDS at every node until all containers are retrieved (`algorithm.py:304-346`). That is the first branch the paper's GBH explores (assuming UB = H × N does not prune it), but the search stops there. Consequences:
-- The initial solution can have more movements than the paper's.
-- Set A is derived from this solution (`algorithm.py:94-97`), so the A/B split can differ from the paper's.
-- The Kim & Hong lower bound is implemented correctly, but no CRP-Time code path uses it. It is only reached when `mode == "relocations"` (`algorithm.py:373-378`), and CRP-Time offers only `crane_time`. The shared B1 bound is not used here either, so B1 does not affect Azari.
+**GBH was a single greedy pass. Fixed in `6cf6b3c`.** The paper's GBH is a depth-first search with backtracking that minimises the number of movements within time limit T, pruning on Nm + LB ≤ UB. The code used to follow the FDS at every node until all containers were retrieved: the first branch of the paper's GBH, without backtracking. GBH now follows Sec. 4.2 and Fig. 2 (`algorithm.py:312-371`). UB starts at H × N (`:316`). Each complete solution is stored as the best so far and sets UB = |solution| − 1 (`:346-347`). After each relocation, the branch is continued only if Nm + LB ≤ UB, with the Kim & Hong bound (`:368`). The search stops at the GBH time limit. Relocations and movements are used internally here, as in the paper, which is allowed (Decisions from Wei).
+- Nm + LB never decreases along a path: every move adds 1 to Nm, while a BG relocation lowers LB by 1, a BB relocation leaves it unchanged, and a retrieval lowers it by 1. Pruning after relocations only, as the paper does, is therefore sufficient, and once a solution with LB₀ movements is found the rest of the tree is pruned at once.
+- The first complete solution is the old greedy pass, because UB = H × N never prunes it. GBH therefore never ends with more movements than before. Check 5 (§4) confirms this on all 840 Caserta instances, and confirms on the three smallest classes that the pruning loses nothing compared with the full FDS/SDS tree.
+- Set A is now derived from the best GBH solution (`algorithm.py:101-104`) instead of the greedy one.
+- The shared B1 bound is not used, so B1 does not affect Azari.
 
-**CSUM prunes on time instead of movement count.** The paper prunes a branch unless Nm ≤ NMOV, where NMOV is the movement count of the best solution so far. CSUM therefore only looks for faster solutions with at most that many movements. The code has no movement-count condition: it cuts a branch as soon as its accumulated time reaches the best time (`algorithm.py:360-361`, `:396-397`, `:439`). Because f2 and f2vert costs are non-negative, this time cut only removes branches that cannot give a strictly lower time. Dropping Nm ≤ NMOV, however, widens the search: the code can return a solution with more movements than the initial solution if it is faster, which the paper's CSUM never does. Within the same time budget, the two searches also spend their time in different parts of the tree. The code does not document whether this change was meant as an adaptation to the crane-time-only setting.
+**CSUM prunes on time instead of movement count.** The paper prunes a branch unless Nm ≤ NMOV, where NMOV is the movement count of the best solution so far. CSUM therefore only looks for faster solutions with at most that many movements. The code has no movement-count condition: it cuts a branch as soon as its accumulated time reaches the best time (`algorithm.py:385-386`, `:421-422`, `:464`). Because f2 and f2vert costs are non-negative, this time cut only removes branches that cannot give a strictly lower time. Dropping Nm ≤ NMOV, however, widens the search: the code can return a solution with more movements than the initial solution if it is faster, which the paper's CSUM never does. Within the same time budget, the two searches also spend their time in different parts of the tree. The code does not document whether this change was meant as an adaptation to the crane-time-only setting.
 
-**Tbest starts at the GBH solution, not at ∞.** The GBH solution's crane time becomes the initial best time (`algorithm.py:90-92`). The code's output is therefore never slower than the GBH solution, whereas in the paper the output is the best CSUM leaf.
+**Tbest starts at the GBH solution, not at ∞.** The GBH solution's crane time becomes the initial best time (`algorithm.py:99`). The code's output is therefore never slower than the GBH solution, whereas in the paper the output is the best CSUM leaf.
 
-**Ties.** Fig. 3 accepts a new best when tcw ≤ Tbest, so a later solution with the same time replaces the earlier one. In the code, a branch that reaches the best time exactly is cut before the leaf, so the first solution with a given time is kept. The code also contains an "equal time, fewer moves" rule (`algorithm.py:296-298`, `:364-366`). It is unreachable at present: `_dfs` never reaches a leaf with equal time, and `_accept_solution_if_better` is called only once, while the best time is still ∞. If it ever became reachable, it would break time ties on the movement count. An algorithm may use relocations or movements internally where its paper does so (Wei's decision, late Sept), but Fig. 3 does not break ties this way: it accepts any solution with tcw ≤ Tbest, so the later one wins. Movements enter CSUM only through the pruning Nm ≤ NMOV.
+**Ties.** Fig. 3 accepts a new best when tcw ≤ Tbest, so a later solution with the same time replaces the earlier one. In the code, a branch that reaches the best time exactly is cut before the leaf, so the first solution with a given time is kept. The code also contains an "equal time, fewer moves" rule (`algorithm.py:304-306`, `:389-391`). It is unreachable at present: `_dfs` never reaches a leaf with equal time, and `_accept_solution_if_better` is called only once, while the best time is still ∞. If it ever became reachable, it would break time ties on the movement count. An algorithm may use relocations or movements internally where its paper does so (Wei's decision, late Sept), but Fig. 3 does not break ties this way: it accepts any solution with tcw ≤ Tbest, so the later one wins. Movements enter CSUM only through the pruning Nm ≤ NMOV.
 
-**Cap on set-B branches.** `max_branches_b` (default 6, exposed in the UI) truncates Q (`algorithm.py:285`). The paper has no such cap. Q holds at most W − 1 stacks, so the cap can only bind for W ≥ 8 (Caserta classes data3-8, data5-8, data5-9, data5-10, data6-10, data10-10).
+**Cap on set-B branches.** `max_branches_b` (default 6, exposed in the UI) truncates Q (`algorithm.py:293`). The paper has no such cap. Q holds at most W − 1 stacks, so the cap can only bind for W ≥ 8 (Caserta classes data3-8, data5-8, data5-9, data5-10, data6-10, data10-10).
 
 ### 3.4 Suspected bugs
 
@@ -204,9 +208,9 @@ if all(lows[m] < lows[i] for i in prev):
 
 A G2 stack m was added only if its minimum was lower than the minimum of every earlier stack except the PS. That included BB stacks, full stacks and G1 stacks other than s. This is the literal reading of the text (p. 314–315). As §1 notes, Fig. 4 contradicts it: the example only compares BG stacks, via bound. On Fig. 4, BB stack 5 (minimum 9) blocked stack 7 (minimum 11), and the code returned Q = [2, 4] instead of [2, 4, 7]. In general, any BB or full stack with a low minimum hid every later G2 stack. Set-B containers then got fewer branches than in the paper, and possibly none, in which case the GBH fallback from §3.2 applied.
 
-The fix follows the pseudocode of Fig. 3 (`algorithm.py:256-274`). s is the best BG stack in G1, and bound starts at its minimum, or ∞ if there is none. Each G2 stack, in increasing order, is added to the bottom of Q if the relocation is BG and its minimum m is below bound; then bound := m. Fig. 3 literally reads `m := bound`. Following §1 ("Not specified"), `bound := m` is taken as intended, and a comment in the code says so. Fig. 4 does not distinguish `bound := m` from a bound that stays fixed at the minimum of s: both give Q = [2, 4, 7]. The fix therefore follows the pseudocode, and the example only confirms the outcome (§4, Check 2).
+The fix follows the pseudocode of Fig. 3 (`algorithm.py:264-282`). s is the best BG stack in G1, and bound starts at its minimum, or ∞ if there is none. Each G2 stack, in increasing order, is added to the bottom of Q if the relocation is BG and its minimum m is below bound; then bound := m. Fig. 3 literally reads `m := bound`. Following §1 ("Not specified"), `bound := m` is taken as intended, and a comment in the code says so. Fig. 4 does not distinguish `bound := m` from a bound that stays fixed at the minimum of s: both give Q = [2, 4, 7]. The fix therefore follows the pseudocode, and the example only confirms the outcome (§4, Check 2).
 
-**A2 — crash when no complete solution is found.** If neither GBH nor CSUM completes a solution, `best_total_moves` stays `inf` and `int(self.best_total_moves)` (`algorithm.py:114`) raises. Scratchpad check on stacks `[[1, 2], [3, 4]]` with H = 2 (PC 1 blocked, the only other stack full):
+**A2 — crash when no complete solution is found. Partly resolved in `6cf6b3c`.** Before, if neither GBH nor CSUM completed a solution, `best_total_moves` stayed `inf` and `int(self.best_total_moves)` (`algorithm.py:122`) raised. Scratchpad check on stacks `[[1, 2], [3, 4]]` with H = 2 (PC 1 blocked, the only other stack full):
 
 ```
 No complete solution (edge case, not from the paper)
@@ -215,13 +219,24 @@ No complete solution (edge case, not from the paper)
 
 This requires GBH to fail, which only happens when S is empty. §3.2 shows that this cannot occur on Caserta, so the bug is latent there.
 
+Since `6cf6b3c`, a GBH run without a complete solution raises a `RuntimeError` with a clear message (`algorithm.py:93-98`, §3.2). The same layout now gives:
+
+```
+No complete solution (edge case, not from the paper)
+  raised RuntimeError: GBH found no complete solution within gbh_time_limit_s = 1.0 s
+```
+
+`int(self.best_total_moves)` (`algorithm.py:122`) is still there. As long as Tbest starts at the GBH solution, CSUM always has a solution and the line is safe. If Tbest is changed to start at ∞ (§3.3), A2 has to be revisited in that step.
+
 ### 3.5 Notes for the standardisation (not deviations)
 
-- `fidelity = "faithful"` (`algorithm.py:468`) does not match §3.3 and §3.4.
-- The seed loop and the mean over seeds (`algorithm.py:479-545`) are left over from multi-seed evaluation. With `n_seeds = 1`, the final record's `metric` and `metrics` describe the same plan, so the `_push` issue from `lee_lee_2010.md` §3.5 does not arise here. The `time_limit_s` help text still says "each seed's" (`algorithm.py:557`).
-- `max_branches_b` is a UI parameter that does not exist in the paper (header docstring line 6, schema `algorithm.py:559-563`).
-- The `mode == "relocations"` branch and the lower bound (`algorithm.py:136-150`, `:373-378`) are unused in CRP-Time.
-- The algorithm builds its `ObjectiveSpec` from the config (`algorithm.py:498`) and does not force `mode = "crane_time"` the way `CRP_Time._objective_metrics` does (`problems/CRP_Time.py:80-83`). That is safe today, because the UI only offers `crane_time` (`problems/CRP_Time.py:144-154`) and the CLI sets it (`main.py:258-261`).
+- `fidelity = "faithful"` (`algorithm.py:493`) does not match §3.3 and §3.4.
+- The seed loop and the mean over seeds (`algorithm.py:504-571`) are left over from multi-seed evaluation. With `n_seeds = 1`, the final record's `metric` and `metrics` describe the same plan, so the `_push` issue from `lee_lee_2010.md` §3.5 does not arise here.
+- `max_branches_b` is a UI parameter that does not exist in the paper (header docstring line 7, schema `algorithm.py:590-594`).
+- The `mode == "relocations"` branch in CSUM (`algorithm.py:398-403`) is unused in CRP-Time. Since `6cf6b3c`, the lower bound itself is used by GBH.
+- The algorithm builds its `ObjectiveSpec` from the config (`algorithm.py:523`) and does not force `mode = "crane_time"` the way `CRP_Time._objective_metrics` does (`problems/CRP_Time.py:80-83`). That is safe today, because the UI only offers `crane_time` (`problems/CRP_Time.py:144-154`) and the CLI sets it (`main.py:258-261`).
+- **Platform point for Wei: saved results do not depend on the algorithm parameters.** A saved run's path is built from the problem, the algorithm name, the seed and the problem configuration (`core/results/store.py:165-180`); for CRP-Time the configuration part covers only the objective and time-model settings (`_objective_result_suffix`, `core/results/store.py:66-97`). The algorithm configuration is stored inside the file but plays no part in its name, so two runs of the same algorithm with different parameters (e.g. other time limits) on the same instance and objective overwrite each other: `save_run` writes to that path with mode `"w"` (`core/results/store.py:266-268`).
+- **Platform point for Wei: the web backend accepts CRP-Time only on random layouts.** `validate_source_for_problem` (`web/backend/benchmarks.py:280-301`), called when a job is started (`web/backend/api.py:230`), rejects the Caserta and Zhu sources for every problem outside `BENCH_PROBLEMS = {"CRP-R", "CRP-U"}` (`web/backend/benchmarks.py:37`, `:288-289`). A CRP-Time job on Caserta therefore fails with HTTP 422, "caserta benchmark requires CRP-R or CRP-U"; the same rule is on `origin/main`. Caserta runs of CRP-Time currently work only through the CLI (`main.py layout-run`). This blocks the standardisation requirement that each algorithm runs correctly through the web UI on the Caserta instances.
 
 ## 4. Behavioural checks
 
@@ -275,3 +290,98 @@ Before the fix, stack 7 was rejected only because of stack 5, which is BB and is
 Requires the Ünlüyurt & Aydın (2012) instances and their time model; neither is available.
 
 ### Check 4 — under the crane-time-only setting (f2 / f2vert) — **not done**
+
+### Check 5 — GBH as depth-first search (since `6cf6b3c`) — **passes**
+
+Reproduce with `scratchpad/azari_gbh_check.py` (not committed). It runs GBH alone on all 840 Caserta instances with `gbh_time_limit_s = 3` and compares it with the greedy pass of `3510021`. Machine: 16 logical processors (AMD64 Family 25 Model 117), Windows 11, conda env `rl`, 6 instances in parallel.
+
+Columns: *first=greedy*: the first complete GBH solution equals the old greedy solution, move for move. *LB0<=GBH<=greedy*: the GBH result lies between the lower bound of the initial layout and the greedy result. *UB strict*: each new GBH solution has strictly fewer movements than the previous one. *valid*: every GBH solution replays as a restricted-BRP solution (top-only moves, retrieval order, capacity, relocations only from the current target's stack, tiers). *exhausted*: GBH searched its whole tree before T. *greedy*, *GBH*, *LB0*: mean number of movements. *=LB0*: GBH reached LB₀. *max s*: longest GBH run. *brute=GBH*: on the three smallest classes, the minimum over the full FDS/SDS tree without pruning and without time limit equals the GBH result (instances where GBH exhausted its tree).
+
+```
+class        n first=greedy LB0<=GBH<=greedy UB strict valid exhausted  greedy     GBH    LB0  =LB0  max s brute=GBH
+data3-3     40        40/40            40/40     40/40 40/40     40/40   14.07   14.00  12.70  7/40   0.00     40/40
+data3-4     40        40/40            40/40     40/40 40/40     40/40   18.30   18.23  16.77  9/40   0.00     40/40
+data3-5     40        40/40            40/40     40/40 40/40     40/40   22.05   22.02  20.77 10/40   0.00         -
+data3-6     40        40/40            40/40     40/40 40/40     40/40   26.45   26.43  25.20 11/40   0.02         -
+data3-7     40        40/40            40/40     40/40 40/40     40/40   30.32   30.30  29.18 13/40   0.00         -
+data3-8     40        40/40            40/40     40/40 40/40     40/40   34.73   34.65  33.25  5/40   0.02         -
+data4-4     40        40/40            40/40     40/40 40/40     40/40   26.98   26.27  23.30  1/40   0.02     40/40
+data4-5     40        40/40            40/40     40/40 40/40     40/40   33.55   32.98  30.18  2/40   0.02         -
+data4-6     40        40/40            40/40     40/40 40/40     40/40   38.67   38.05  35.08  1/40   0.02         -
+data4-7     40        40/40            40/40     40/40 40/40     40/40   44.90   44.17  41.40  0/40   0.02         -
+data5-4     40        40/40            40/40     40/40 40/40     40/40   36.75   35.52  30.60  0/40   0.03         -
+data5-5     40        40/40            40/40     40/40 40/40     40/40   46.23   44.17  38.15  0/40   0.23         -
+data5-6     40        40/40            40/40     40/40 40/40     40/40   54.25   52.40  46.80  0/40   0.39         -
+data5-7     40        40/40            40/40     40/40 40/40     40/40   61.33   59.67  54.12  0/40   0.84         -
+data5-8     40        40/40            40/40     40/40 40/40     40/40   69.60   67.88  62.20  0/40   0.80         -
+data5-9     40        40/40            40/40     40/40 40/40     40/40   77.35   75.83  70.05  0/40   1.77         -
+data5-10    40        40/40            40/40     40/40 40/40     39/40   85.50   83.53  77.72  0/40   3.00         -
+data6-6     40        40/40            40/40     40/40 40/40     28/40   71.90   68.20  57.45  0/40   3.00         -
+data6-10    40        40/40            40/40     40/40 40/40     17/40  109.85  107.47  96.08  0/40   3.00         -
+data10-6    40        40/40            40/40     40/40 40/40      0/40  161.25  156.85 102.25  0/40   3.00         -
+data10-10   40        40/40            40/40     40/40 40/40      0/40  239.28  236.75 170.53  0/40   3.00         -
+
+hit the GBH limit: 116 instances; max overshoot 0.0 ms
+```
+
+- All checks hold on all 840 instances; the brute-force comparison holds on all 120 instances of data3-3, data3-4 and data4-4.
+- GBH searched its whole tree within 3 s on 724 of 840 instances; the 116 others (mostly data6-6, data6-10, data10-6, data10-10) stopped at the limit, and overshot it by less than 0.1 ms. GBH reached LB₀ on 59 instances, all in the classes with 3 or 4 tiers.
+- The worked examples still pass (Check 1, Check 2), and the edge case from A2 now raises the `RuntimeError` (§3.4).
+
+**Effect on the full run (descriptive, not a check).** `scratchpad/azari_compare.py` runs the complete algorithm before (`3510021`: greedy GBH, one 5 s budget) and after (`6cf6b3c`: GBH 3 s, CSUM 5 s) on instances 1–10 of every class, under f2 and f2vert. The old greedy pass took milliseconds, so CSUM had about 5 s in both versions; the differences come from the GBH solution, which sets the initial best time and set A. Columns: mean objective old/new, relative difference, number of instances where the new objective is lower/higher, mean relocations old/new.
+
+```
+time model f2
+class        n    obj old    obj new  diff % new<old new>old  rel old  rel new
+data3-3     10     455.28     455.28    0.00       0       0     4.40     4.40
+data3-4     10     637.80     637.80    0.00       0       0     6.30     6.30
+data3-5     10     805.32     805.32    0.00       0       0     7.30     7.30
+data3-6     10     978.48     978.48    0.00       0       0     8.60     8.60
+data3-7     10    1147.20    1147.20    0.00       0       0     9.40     9.40
+data3-8     10    1328.04    1328.04    0.00       0       0    10.30    10.30
+data4-4     10     869.52     869.52    0.00       0       0     9.00     9.00
+data4-5     10    1156.80    1156.80    0.00       0       0    12.40    12.40
+data4-6     10    1396.56    1391.52   -0.36       1       0    14.20    14.00
+data4-7     10    1672.92    1673.88    0.06       0       1    16.50    16.50
+data5-4     10    1258.08    1230.12   -2.22       5       1    16.00    15.10
+data5-5     10    1606.20    1569.12   -2.31       5       0    19.90    18.60
+data5-6     10    1936.80    1912.44   -1.26       6       0    22.80    21.70
+data5-7     10    2226.72    2190.96   -1.61       2       0    24.20    23.20
+data5-8     10    2667.72    2638.32   -1.10       6       0    29.10    28.20
+data5-9     10    3081.72    3044.28   -1.21       5       1    33.10    32.30
+data5-10    10    3446.04    3420.48   -0.74       5       0    36.10    34.40
+data6-6     10    2680.32    2544.48   -5.07       9       0    37.20    32.80
+data6-10    10    4484.40    4413.24   -1.59       7       0    50.60    48.50
+data10-6    10    5970.24    5857.68   -1.89       9       0   103.60   100.20
+data10-10   10    9663.72    9577.20   -0.90       7       0   137.10   134.60
+
+time model f2_vertical
+class        n    obj old    obj new  diff % new<old new>old  rel old  rel new
+data3-3     10     865.50     865.50    0.00       0       0     4.40     4.40
+data3-4     10    1204.82    1204.82    0.00       0       0     6.30     6.30
+data3-5     10    1526.14    1526.14    0.00       0       0     7.40     7.40
+data3-6     10    1802.65    1802.65    0.00       0       0     8.60     8.60
+data3-7     10    2095.91    2095.91    0.00       0       0     9.50     9.50
+data3-8     10    2432.00    2432.00    0.00       0       0    10.30    10.30
+data4-4     10    1886.56    1888.48    0.10       0       1     9.10     9.00
+data4-5     10    2491.07    2484.74   -0.25       1       0    12.40    12.50
+data4-6     10    2955.28    2936.15   -0.65       1       0    14.30    14.10
+data4-7     10    3468.48    3470.99    0.07       0       1    16.70    16.60
+data5-4     10    3011.39    2938.94   -2.41       5       1    16.30    15.30
+data5-5     10    3850.50    3739.06   -2.89       6       0    20.30    18.90
+data5-6     10    4525.73    4445.40   -1.77       4       1    23.60    22.10
+data5-7     10    5139.39    5026.77   -2.19       3       0    24.20    23.10
+data5-8     10    6138.98    6036.90   -1.66       6       0    29.70    28.50
+data5-9     10    7016.91    6885.41   -1.87       4       1    33.20    31.90
+data5-10    10    7774.51    7612.85   -2.08       6       1    36.50    34.50
+data6-6     10    6996.82    6500.56   -7.09       9       0    37.50    32.80
+data6-10    10   11082.82   10805.80   -2.50       9       0    50.40    48.10
+data10-6    10   21282.43   20726.65   -2.61       9       0   104.10   100.20
+data10-10   10   32534.15   32066.75   -1.44       7       0   136.80   134.60
+```
+
+On this sample the new version has a lower crane time on 67 of 210 instances under f2 and 70 under f2vert, and a higher one on 3 and 6. On the 3-tier classes the results are identical. The relocation count is reported only; it is not optimised. This is a sample of 10 instances per class, not a benchmark.
+
+**End-to-end.**
+- CLI, `main.py layout-run --problem "CRP-Time" --algo "Azari–Eskandari–Nourmohammadi (2017) CSUM" --layout benchmark/Caserta_dataset/data5-5-1.dat`: with `--time-model f2`, objective 1725.60, 23 relocations, 48 movements; with `--time-model f2_vertical`, objective 4135.64 for the same plan. Both exit with code 0.
+- Web backend, through the API the web UI uses (`scratchpad/azari_web_check.py`, FastAPI TestClient, results written to the scratchpad instead of `results/`): the catalog shows `gbh_time_limit_s` (default 3.0) and `csum_time_limit_s` (default 5.0). A CRP-Time job on Caserta is rejected with HTTP 422 (platform point, §3.5). Jobs on a random layout complete under f2 and f2vert.
