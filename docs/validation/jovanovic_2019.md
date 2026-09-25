@@ -72,7 +72,7 @@ Code: `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`
 
 ## 2. Comparison with the code
 
-File references without a directory are to `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`.
+File references without a directory are to `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`. Line numbers refer to `42a27fa` unless a row names a later commit; they will be updated after the repair (§4, "Repair runs").
 
 | Step | Paper (p.) | Code (file:line) | Verdict | Category |
 |---|---|---|---|---|
@@ -92,8 +92,8 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:300-313` | equal | — |
 | Ties in the argmax | not specified | strict `>` keeps the first stack in index order (`algorithm.py:290`) | not specified in paper | choice left open by paper |
 | Solution stored as 4-tuples (c, dd*(S), M[c], t) | p. 84 | `algorithm.py:316-317`; decoded to a plan in `_solution_to_plan` (`algorithm.py:42-91`) | equal | — |
-| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | val = 1 / max(cost − 0 + 1, 1): `lb_init_time = 0.0` (`algorithm.py:186`, `:211`, `:409`, `:416`); the NWL count is computed (`:185`) but not used | deviation | differs from paper |
-| val_f, val_v with LB_f, LB_v | eqs. 44–47, p. 85 | same: LB = 0; LB_f and LB_v are not implemented; `compute_lb_time` (`scoring.py:177-193`) is unused | deviation | differs from paper |
+| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | relocation objective: LB = 0, since `lb_time` returns a bound only for f2 and f2vert (`scoring.py:96-98`, since `f7a9c9a`); the NWL count is computed (`algorithm.py:185`) but not used | deviation | differs from paper (Zhu bound not implemented; accepted as a limitation of Check 1) |
+| val_f, val_v with LB_f, LB_v | eqs. 44–47, p. 85 | since `f7a9c9a`: `lb_time` computes eq. 44 or 45 literally (`scoring.py:96-138`) for the initial bay (`algorithm.py:187`); val uses it (`algorithm.py:212`, `:410`, `:417`) | equal | — |
 | O_f, O_v: per-operation costs, summed | eqs. 40–43, p. 85 | `movement_objective_cost` with the shared `ObjectiveSpec` (`algorithm.py:342-348`, `:366-372`), i.e. f2 and f2vert (`core/objectives.py:261-295`) | equal | — |
 | Parameters ts = 1.2, tpp = 30 or 5, tr = 7.77, hout = 1.5, hmax = Hmax + 1 | p. 88 | `ObjectiveSpec` defaults ts = 1.2, tpp = 30, tr = 2.59 + 5.18, hout = 1.5 (`core/objectives.py:141-145`); h_max = `max_tiers` + 1 (`core/objectives.py:280`); tpp = 5 via `pickup_place_s` | equal | — |
 | Tier numbering | p. 79 vs p. 85, 88 | 1-based: source tier = height before the pop, destination tier = height after the push (`algorithm.py:322-323`, `:364`), as in `annotate_plan_tiers` | not specified in paper | choice left open by paper |
@@ -146,6 +146,8 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 ### 3.3 Differs from the paper
 
 **No lower bound in val and in the early abort.** The paper's quality function subtracts a lower bound of the initial bay: the Zhu et al. (2012) bound for the relocation objective (eq. 33), LB_f or LB_v for crane time (eqs. 44–47). The early abort compares the partial cost plus the lower bound of the current bay with the best cost (Alg. 2; p. 85). The code sets the bound to 0 in both places (`algorithm.py:186`, comment "safe for every selectable objective"), so val = 1 / (O + 1) and an ant is aborted only when its cost so far reaches the best cost (`algorithm.py:350-352`). The CRP-R version of this algorithm (`algorithms/CRP_R/heuristic/jovanovic_2019_aco/`) does subtract a bound, the non-well-located count.
+
+Repair: step 1a (`f7a9c9a`) puts LB_f / LB_v of the initial bay into val. The early abort still has no bound (step 1b). For the relocation objective LB stays 0.
 
 Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, the greedy solution costs 1281.6 and the best solution of a 5000-iteration run 1262.4.
 - Pheromone scale: with LB_f, Δτ / τ0 for that best solution is 5.54; with LB = 0 it is 5.08. On this instance the missing bound changes the ratio little.
@@ -287,3 +289,27 @@ The spread of the size average across seeds is 0.08 relocations on 5 × 7, 0.7 s
 With 5000 iterations the code finds better O_v solutions than the paper reports, on every size of Table 5, although the paper used "around 5 times" more iterations for the crane-time objectives (p. 88). On O_f,30 and O_f,5 the code is close to the paper. The cause is not known.
 
 Hypothesis, to be tested after the repair: if the O_v error rises towards E_ACO once LB_v (eq. 45) is introduced, the missing early abort explains the difference.
+
+### Repair runs
+
+Each repair step is run on the code of its own commit, with the same jobs, settings and driver as the baseline. Raw results and scripts: `docs/validation/data/jovanovic_2019_repair/` (local, not in git).
+
+#### Step 1a — LB_f / LB_v in val (`f7a9c9a`), O_v
+
+Seed 0 on the 8 sizes of Table 5, and seeds 0–4 on 4 × 5; 480 runs.
+
+| T × S | OPT | E_ACO | baseline: code − OPT | step 1a: code − OPT |
+|---|---|---|---|---|
+| 3 × 3 | 904.0 | 1.8 | 0.0 | 0.0 |
+| 3 × 4 | 1187.0 | 6.2 | +0.7 | +1.1 |
+| 3 × 5 | 1460.8 | 6.8 | +0.4 | +0.4 |
+| 3 × 6 | 1758.4 | 12.4 | +1.8 | +1.9 |
+| 3 × 7 | 2043.4 | 18.3 | +2.3 | +2.3 |
+| 3 × 8 | 2362.6 | 25.5 | +6.8 | +2.7 |
+| 4 × 4 | 1928.1 | 10.7 | +1.8 | +2.3 |
+| 4 × 5 | 2424.6 | 20.2 | +4.6 | +3.9 |
+
+- Per instance against the baseline (seed 0, 320 instances): 11 better, 301 equal, 8 worse.
+- Seeds 0–4 on 4 × 5, average over 40 instances per seed: 2428.5, 2428.5, 2429.2, 2431.1, 2429.7 (baseline 2428.5–2429.8).
+
+Result: the O_v error stays far below E_ACO on every size. The changes fall within the seed variation. LB_v in val alone does not close the gap with the paper.
