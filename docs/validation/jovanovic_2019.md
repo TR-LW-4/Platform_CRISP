@@ -172,6 +172,8 @@ Step 3 found a second consequence: on a random UI layout (1 bay, 2 rows, 2 tiers
 
 **J2 — the greedy start does not cap n at MaxMoves.** The ants record n = min(M[c], MaxMoves) (`algorithm.py:278`), but the greedy recorded M[c] itself (`scoring.py:310` at `4cb92dd`). If the greedy solution is still S_best at a global update and has n > MaxMoves, the update indexes past the pheromone matrix (`algorithm.py:461-462`). On Caserta the greedy's largest n is 5 (MaxMoves = 10), so the bug is latent there. Scratch check with `max_moves = 1` on data4-4-7 at `4cb92dd`: `IndexError: index 2 is out of bounds for axis 2 with size 2`. Fixed in `802e4d1`: the greedy tuple uses min(n, MaxMoves) and M keeps the true count, as for the ants.
 
+**J3 — `get_best_solution()` always returns None.** Every progress record goes through `BaseAlgorithm._push`, which lowers `_best_metric` to the pushed metric (`core/base_algorithm.py:154-155`), and the progress pushes carry `best_cost` (`algorithm.py:483-486`). At the end, `_best_solution` is set only if `best_cost < self._best_metric` (`algorithm.py:505`), which is then never true, so `_best_solution` stays None. Seen in all 336 runs of the step 3 bit-identical comparison. Nothing in the platform calls `get_best_solution()` (only the docstring in `core/base_algorithm.py:79` names it), so the bug is latent. To be fixed in step 4.
+
 ### 3.5 Notes for the standardisation (not deviations)
 
 - The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`.
@@ -584,7 +586,7 @@ Expectation fixed before the change: neither branch is reached on the benchmark 
 | J2, data4-4-7, `max_moves = 1` | `IndexError` in the global update | runs; all greedy tuples n ≤ 1 |
 
 - Web UI: the random layout above, submitted as a job (`POST /api/jobs`), failed within a second with 0 records. The Workbench shows the status FAILED and a "Run error" banner whose first line is the `ValueError` message, followed by the traceback (screenshot `web_ui_j1.png`, local).
-- Bit-identical: `4cb92dd` against `802e4d1`, seed 0, 5000 iterations, instances 1 and 2 of all 21 sizes under the four objectives (168 runs per revision). Objective, relocations, f2, f2vert and the best solution are identical in all 168.
+- Bit-identical: `4cb92dd` against `802e4d1`, seed 0, 5000 iterations, instances 1 and 2 of all 21 sizes under the four objectives (168 runs per revision). Objective, relocations, f2 and f2vert are identical in all 168. The best solution itself could not be compared: `get_best_solution()` returns None for this algorithm (J3, §3.4).
 
 Result: J1 and J2 are fixed; on the benchmark set the behaviour is unchanged, as expected.
 
