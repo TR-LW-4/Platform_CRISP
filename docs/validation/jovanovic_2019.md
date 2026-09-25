@@ -102,7 +102,8 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | τ0 = (1/W) · val(S_g) | eq. 37, p. 84 | `tau_0 = val_greedy / n_stacks` (`algorithm.py:211-212`) | equal | — |
 | τmin = (1/W²) · val(S_best) | eq. 38, p. 84 | `algorithm.py:418` | equal | — |
 | How τmin is applied | not specified | as a floor in both the local and the global update (`algorithm.py:393-396`, `:429-432`); before the first global update τmin = τ0 / W (`:213`) | not specified in paper | choice left open by paper |
-| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | `time_so_far >= best_cost` after each relocation (`algorithm.py:350-352`): no LB term, and no check after a retrieval | deviation | differs from paper |
+| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | `time_so_far >= best_cost` after each relocation (`algorithm.py:350-352`), as in Alg. 2, but without the LB term | deviation | differs from paper |
+| val when O − LB + 1 < 1 | not specified | clamped: val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`) | not specified in paper | choice left open by paper |
 | Initial S_best | not specified (Alg. 2 uses \|S_best\| from the first ant on) | the greedy solution and its cost (`algorithm.py:179`, `:199-208`) | not specified in paper | choice left open by paper |
 | New best: "Check if S is valid new best solution" | Alg. 2, p. 84 | valid and strictly lower cost (`algorithm.py:399-403`) | equal | — |
 | Reinitialisation after MaxConst iterations without improvement, then global update | Alg. 2, p. 84 | `algorithm.py:405-413`, then `:415-432` | equal | — |
@@ -134,6 +135,8 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **τmin** is applied as a floor in both updates (`algorithm.py:393-396`, `:429-432`). **Reinitialisation** uses val(S_best) / W (`algorithm.py:409-412`). **Initial S_best** is the greedy solution (`algorithm.py:179`). **New best** requires a strictly lower cost (`algorithm.py:399`).
 
+**Clamp on val.** val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`). With a valid lower bound O − LB + 1 ≥ 1 and the clamp never binds. With LB_f taken literally from eq. 44 it can bind (§3.6); the paper does not say what val is then. Decision (Thom): keep the clamp.
+
 **Iterations for crane time.** The paper says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000; the help text's "10 000+" (`algorithm.py:519-521`) is not from the paper.
 
 **Runs and seeds.** One run per instance with `np.random.seed(cfg.seed)` (`algorithm.py:145`); the paper does not say how many runs Tables 1 and 5 average over.
@@ -147,6 +150,8 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, the greedy solution costs 1281.6 and the best solution of a 5000-iteration run 1262.4.
 - Pheromone scale: with LB_f, Δτ / τ0 for that best solution is 5.54; with LB = 0 it is 5.08. On this instance the missing bound changes the ratio little.
 - Early abort: LB_f is 86 % of the best cost. With the bound, an ant is aborted as soon as its cost so far plus the retrieval and relocation cost still ahead exceeds the best; without it, only once its cost so far alone does, which is near the end of the solution. The paper names early abort mainly as a way of "not wasting the information stored in the pheromone matrix" (p. 84): every tuple of the partial solution gets the local update, so ants that run on longer decay more pheromone entries.
+
+Where the check sits is as in the paper: Alg. 2 checks only after a relocation, and so does the code. A check after a retrieval would change nothing, because a retrieval adds to O exactly the term it removes from LB(Bay).
 
 **The heuristic uses dd* instead of dd for empty stacks.** Eq. 27 evaluates the heuristic with dd(S), which is N + 1 for every empty stack; dd*(S) = N + i(S) is only the pheromone index (eq. 29). The code uses dd* in both (`algorithm.py:278-282`), so an empty stack gets f = 1 / (1 + N + i(S) − c) instead of 1 / (N + 2 − c): the higher its index, the less attractive it looks. Under uniform pheromone the argmax is the same, because a well-located stack still beats any empty stack, an empty stack still beats any stack where c is not well-located, and among empty stacks the lowest index wins in both cases. The difference shows in the roulette choice and in the argmax once τ differs between stacks. Example: N = 35, c = 10, empty stack i = 7: f = 1/33 in the code against 1/27 in the paper.
 
@@ -163,6 +168,29 @@ Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, 
 - The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7`).
 - `fidelity = "adapted"` (`algorithm.py:109`). To be revisited after §3.3.
 - The base parameters `max_iterations` and `report_interval` appear in the UI but are not read; the ACO uses `n_iterations` and pushes every `n_iterations // 50` iterations (`algorithm.py:132`). Same platform point as in `azari_2017.md` §3.5.
+
+### 3.6 Observations on the paper
+
+**LB_f (eq. 44) is not a valid lower bound.** Eq. 44 counts, for every container, its retrieval from its current stack, plus tpp + ts for every non-well-located container. A relocated container is retrieved from its new stack, which can be closer to stack 0.
+
+Counterexample (checked by hand by Thom): three stacks, containers 1 and 2 in stack 3 with 2 on top, stacks 1 and 2 empty.
+- Plan: relocate 2 to stack 1, retrieve 1, retrieve 2. Cost by eq. 40: (4 ts + tpp) + (6 ts + tpp) + (2 ts + tpp) = 12 ts + 3 tpp.
+- Eq. 44: (6 ts + tpp) + (6 ts + tpp) + (tpp + ts) = 13 ts + 3 tpp.
+- With the shared evaluator (ts = 1.2, tpp = 30, Hmax = 2): plan 104.40, LB_f 105.60.
+
+In general, for a container relocated once from stack s to stack s′ and then retrieved, the horizontal cost is 2 ts (|s − s′| + s′), which equals 2 ts · s when s′ < s. The extra ts in the second term of eq. 44 is then not paid.
+
+LB_v (eq. 45) has the same horizontal term, but its vertical part leaves room for it. For the same container, moved from tier t to tier t′, eq. 41 exceeds the vertical part of eq. 45 by 2 tr (Hmax − t′). With tr = 7.77 s > ts, that covers the extra ts unless t′ = Hmax.
+
+On the Caserta instances, the literal LB of the initial bay against the best solution found by the baseline (§4):
+
+| Objective | Instances | LB above the cost of a found solution | LB / best (min, mean, max) |
+|---|---|---|---|
+| O_f,30 | 440 | 11 | 0.731, 0.920, 1.009 |
+| O_f,5 | 440 | 13 | 0.694, 0.909, 1.032 |
+| O_v | 320 | 0 | 0.670, 0.807, 1.000 |
+
+Consequences, if implemented literally: val can be clamped (§3.2), and the early abort can stop ants that would reach a solution below LB_f. Decision (Thom): implement eq. 44 literally and measure the effect after the lower bound is added to the early abort. Script: `docs/validation/data/jovanovic_2019_baseline/jov_lb_check.py` (local).
 
 ## 4. Behavioural checks
 
