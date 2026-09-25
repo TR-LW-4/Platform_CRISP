@@ -502,7 +502,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             metrics["progress"] = 1.0
             all_metrics.append(metrics)
 
-            if float(best_cost) < self._best_metric:
+            # <=: the progress pushes have already lowered _best_metric to best_cost
+            if float(best_cost) <= self._best_metric:
                 self._best_metric   = float(best_cost)
                 self._best_solution = [
                     (move.to_pos[0] - 1) * env.config.num_rows
