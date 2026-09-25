@@ -34,8 +34,8 @@ Code: `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`
 - A solution is stored as a list of 4-tuples (c, dd*(S), m_c, t) (p. 84).
 - Global update (ACS, only the best-so-far solution): τ = (1 − p)·τ + p·val(S_best) for all tuples in S_best (eq. 34–35, p. 84).
 - Local update after each ant, also for an aborted partial solution: τ = ϕ·τ for all tuples in S_i (eq. 36, p. 84).
-- Initial pheromone τ0 = 1 / (W · val(S_g)), with S_g the greedy solution (eq. 37, p. 84).
-- Minimum pheromone τ_min = 1 / (W² · val(S_best)) (eq. 38, p. 84). No maximum.
+- Initial pheromone τ0 = (1/W) · val(S_g), with S_g the greedy solution (eq. 37, p. 84).
+- Minimum pheromone τ_min = (1/W²) · val(S_best) (eq. 38, p. 84). No maximum.
 - Algorithm 2 (p. 84): per iteration, n ants each build a solution; an ant aborts as soon as |S| + LB(current bay) ≥ |S_best|; after MaxConst iterations without improvement the pheromone matrix is reinitialised; then the global update.
 
 ### Crane-time extension (Sec. 6, p. 85)
