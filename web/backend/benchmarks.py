@@ -37,8 +37,10 @@ from core.benchmarks.stow import (
 BENCH_PROBLEMS = frozenset({"CRP-R", "CRP-U"})
 BENCH_DUP_PROBLEMS = frozenset({"CRP-D"})
 BENCH_STOW_PROBLEMS = frozenset({"CRP-Stow"})
+CASERTA_ONLY_PROBLEMS = frozenset({"CRP-Time"})
+CASERTA_PROBLEMS = BENCH_PROBLEMS | CASERTA_ONLY_PROBLEMS
 # These problems only accept Caserta / Zhu / ZhuDup files — no random layouts.
-NO_RANDOM_PROBLEMS = BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
+NO_RANDOM_PROBLEMS = BENCH_PROBLEMS | BENCH_DUP_PROBLEMS | CASERTA_ONLY_PROBLEMS
 
 SOURCE_RANDOM = "random"
 SOURCE_CASERTA = "caserta"
@@ -81,7 +83,7 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
             "available": True,
         })
 
-    if problem_name in BENCH_PROBLEMS:
+    if problem_name in CASERTA_PROBLEMS:
         ws_by_height = index_ws_by_height(caserta_root())
         heights = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
         sources.append({
@@ -96,6 +98,7 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
             ),
         })
 
+    if problem_name in BENCH_PROBLEMS:
         sn_by_height = index_sn_pairs_by_height(zhu_root())
         zhu_heights = [h for h in ZHU_HEIGHT_WHITELIST if h in sn_by_height]
         sources.append({
@@ -164,9 +167,10 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
         "problem_name": problem_name,
         "sources": sources,
         "notes": (
-            "Caserta/Zhu support CRP-R and CRP-U; ZhuDup supports CRP-D; "
-            "the official BRLP .pro set supports CRP-Stow."
-            if problem_name not in BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
+            "Caserta supports CRP-R, CRP-U and CRP-Time; Zhu supports CRP-R "
+            "and CRP-U; ZhuDup supports CRP-D; the official BRLP .pro set "
+            "supports CRP-Stow."
+            if problem_name not in NO_RANDOM_PROBLEMS
             else None
         ),
     }
@@ -282,11 +286,13 @@ def validate_source_for_problem(problem_name: str, source: str) -> None:
         if problem_name in NO_RANDOM_PROBLEMS:
             raise ValueError(
                 f"{problem_name} uses standard benchmark instances only "
-                "(Caserta/Zhu for CRP-R/U, ZhuDup for CRP-D)"
+                "(Caserta/Zhu for CRP-R/U, Caserta for CRP-Time, ZhuDup for CRP-D)"
             )
         return
-    if source in {SOURCE_CASERTA, SOURCE_ZHU} and problem_name not in BENCH_PROBLEMS:
-        raise ValueError(f"{source} benchmark requires CRP-R or CRP-U")
+    if source == SOURCE_CASERTA and problem_name not in CASERTA_PROBLEMS:
+        raise ValueError("caserta benchmark requires CRP-R, CRP-U or CRP-Time")
+    if source == SOURCE_ZHU and problem_name not in BENCH_PROBLEMS:
+        raise ValueError("zhu benchmark requires CRP-R or CRP-U")
     if source == SOURCE_ZHU_DUP and problem_name not in BENCH_DUP_PROBLEMS:
         raise ValueError("zhu_dup benchmark requires CRP-D")
     if source == SOURCE_STOW and problem_name not in BENCH_STOW_PROBLEMS:

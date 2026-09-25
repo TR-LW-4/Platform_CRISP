@@ -88,7 +88,10 @@ class WebApiTests(unittest.TestCase):
                     "/api/benchmarks", params={"problem": "CRP-Time"}
                 ).json()["sources"]
             }
-            self.assertIn("random", time_sources)
+            self.assertNotIn("random", time_sources)
+            self.assertNotIn("zhu", time_sources)
+            self.assertIn("caserta", time_sources)
+            self.assertTrue(time_sources["caserta"]["available"])
 
             heights = sources["caserta"]["heights"]
             self.assertTrue(heights)
