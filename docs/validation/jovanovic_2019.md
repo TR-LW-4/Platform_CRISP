@@ -593,7 +593,7 @@ Expectation fixed before the change: neither branch is reached on the benchmark 
 | J1, random layout seed 4, stacks `[[1, 4], [2, 3]]` | no error; infeasible plan, objective 134.40 | `ValueError` (container 4 above target 1) |
 | J2, data4-4-7, `max_moves = 1` | `IndexError` in the global update | runs; all greedy tuples n ≤ 1 |
 
-- Web UI: the random layout above, submitted as a job (`POST /api/jobs`), failed within a second with 0 records. The Workbench shows the status FAILED and a "Run error" banner whose first line is the `ValueError` message, followed by the traceback (screenshot `web_ui_j1.png`, local).
+- Web UI: the random layout above, submitted as a job (`POST /api/jobs`), failed within a second with 0 records. The Workbench shows the status FAILED and a "Run error" banner whose first line is the `ValueError` message, followed by the traceback (screenshot `web_ui_j1.png`, local). Since `cc2c7ad`, CRP-Time no longer accepts random layouts, so this reproduction can no longer be run through the UI or the CLI.
 - Bit-identical: `4cb92dd` against `802e4d1`, seed 0, 5000 iterations, instances 1 and 2 of all 21 sizes under the four objectives (168 runs per revision). Objective, relocations, f2 and f2vert are identical in all 168. The best solution itself could not be compared: `get_best_solution()` returns None for this algorithm (J3, §3.4).
 
 Result: J1 and J2 are fixed; on the benchmark set the behaviour is unchanged, as expected.
@@ -612,7 +612,7 @@ Expectation fixed before the changes: no change in behaviour; bit-identical resu
 - `24b5fc1` → `b379031`, same subset: identical in objective, relocations, f2, f2vert and best solution in all 168.
 - Feasibility (scratch `jov_feasibility.py`): all 336 stored solutions, replayed as rBRP plans, are feasible (only top containers moved, retrievals in due-date order, height ≤ H, bay empty at the end), and their recomputed relocations, f2 and f2vert equal the reported values (largest deviation 0).
 - API: the catalog shows the new description; the configuration schema equals that of `802e4d1` except `n_iterations.help`.
-- Web UI: a default random CRP-Time layout (f2) completed in 3.1 s with 52 records, none carrying `lower_bound` or `iteration`; the Workbench shows COMPLETED, 52 updates and the convergence chart, with no error banner and no JavaScript exceptions (screenshot `web_ui_4c.png`, local). Caserta instances cannot be run for CRP-Time through the UI (platform point), so data3-5-1 was not used.
+- Web UI: a default random CRP-Time layout (f2) completed in 3.1 s with 52 records, none carrying `lower_bound` or `iteration`; the Workbench shows COMPLETED, 52 updates and the convergence chart, with no error banner and no JavaScript exceptions (screenshot `web_ui_4c.png`, local). Caserta instances cannot be run for CRP-Time through the UI (platform point), so data3-5-1 was not used. Update 25 Sept: Caserta is now enabled for CRP-Time (`06e2436`). A web UI job on data3-5-1 (f2) completes with 52 records, f2 757.20, f2vert 1428.675 and 6 relocations, with no error banner or JavaScript errors (screenshot `ui_jovanovic.png`, local). `main.py layout-run` on the same instance gives the same values (since `eb1f1e1`; before that fix the CLI timed out on this run because it joined the subprocess before draining the queue).
 
 Result: J3 is fixed; the cleanup does not change the behaviour.
 
