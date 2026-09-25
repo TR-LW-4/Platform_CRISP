@@ -93,7 +93,7 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:309-322` | equal | — |
 | Ties in the argmax | not specified | strict `>` keeps the first stack in index order (`algorithm.py:299`) | not specified in paper | choice left open by paper |
 | Solution stored as 4-tuples (c, dd*(S), M[c], t) | p. 84 | `algorithm.py:325-326`; decoded to a plan in `_solution_to_plan` (`algorithm.py:51-100`) | equal | — |
-| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | relocation objective: LB = 0, since `lb_time` returns a bound only for f2 and f2vert (`scoring.py:72-74`, since `f7a9c9a`); the unused NWL count (`algorithm.py:185` at `42a27fa`) was removed in `4c59f06` | deviation | differs from paper (Zhu bound not implemented; accepted as a limitation of Check 1) |
+| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | relocation objective: LB = 0 in val and in the early abort, since `lb_time` returns a bound only for f2 and f2vert (`scoring.py:72-74`, `:105-106`): `lb_init_time` = 0 (`algorithm.py:188`) in val (`:218`, `:437`, `:444`), and `use_lb` is false (`:204`), so `lb_cur` stays 0 (`:250`) and the abort (`:372`) compares \|S\| with \|S_best\| alone; the unused NWL count (`algorithm.py:185` at `42a27fa`) was removed in `4c59f06` | deviation | differs from paper: for the rBRP, p. 84 uses the bound of Zhu et al. (2012) (the number of non-well-located containers only for the uBRP); not implemented, accepted as a limitation of Check 1 |
 | val_f, val_v with LB_f, LB_v | eqs. 44–47, p. 85 | since `f7a9c9a`: `lb_time` computes eq. 44 or 45 literally (`scoring.py:72-114`) for the initial bay (`algorithm.py:188`); val uses it (`algorithm.py:218`, `:437`, `:444`) | equal | — |
 | O_f, O_v: per-operation costs, summed | eqs. 40–43, p. 85 | `movement_objective_cost` with the shared `ObjectiveSpec` (`algorithm.py:352-358`, `:387-393`), i.e. f2 and f2vert (`core/objectives.py:261-295`) | equal | — |
 | Parameters ts = 1.2, tpp = 30 or 5, tr = 7.77, hout = 1.5, hmax = Hmax + 1 | p. 88 | `ObjectiveSpec` defaults ts = 1.2, tpp = 30, tr = 2.59 + 5.18, hout = 1.5 (`core/objectives.py:141-145`); h_max = `max_tiers` + 1 (`core/objectives.py:280`); tpp = 5 via `pickup_place_s` | equal | — |
@@ -221,9 +221,9 @@ All runs below use the algorithm code as of `42a27fa` (last changed in `308d016`
 
 The paper gives its averages to 0.01 (Table 1) or 0.1 s (Table 5). The code's averages are rounded half-up to the same precision before comparing. No average of the code lies below OPT at that precision. On 3 × 3 the code reaches OPT exactly for O_f,30 (476.4) and for O_v (904.0), which supports the reading in §1 and §3.1 that O_f = f2 and O_v = f2vert, with the Schwarze & Voß tier numbering.
 
-### Check 1 — Table 1: relocations, rBRP, Hmax = T + 2 — **done (baseline)**
+### Check 1 — Table 1: relocations, rBRP, Hmax = T + 2 — **done (baseline; after the repair: Step 5)**
 
-Limitation: the code has no Zhu et al. (2012) bound (§3.3), so this check runs with LB = 0 in val and in the early abort. A difference from Table 1 is expected for that reason alone.
+Limitation: for the rBRP, eq. 33 and the early abort of Alg. 2 use the lower bound of Zhu et al. (2012) (p. 84: "In case of the rBRP we use the lower bound proposed by Zhu et al. (2012). In case of the uBRP we use the total number of containers that are not well-located in the bay."). The code has no Zhu bound, so LB = 0 for the relocation objective, both in val (`algorithm.py:188`, `:218`, `:437`, `:444`) and in the early abort (`use_lb` false at `:204`; abort at `:372`); the baseline at `42a27fa` did the same. Decision (Thom): accepted as a limitation. This may cause a difference from Table 1.
 
 | T × S | code | ACO (Table 1) | code − ACO | OPT (Table 1) |
 |---|---|---|---|---|
@@ -251,7 +251,7 @@ Limitation: the code has no Zhu et al. (2012) bound (§3.3), so this check runs 
 
 Result: 19 of 21 sizes are within ±0.10 of the ACO column. The code is worse on the two largest sizes: 10 × 6 by 0.28 and 10 × 10 by 1.05. That is larger than the seed spread on 5 × 7 (below). Whether the missing Zhu bound causes it has not been tested.
 
-### Check 2 — Table 5: O_f,30 and O_f,5 — **done (baseline)**
+### Check 2 — Table 5: O_f,30 and O_f,5 — **done (baseline; after the repair: Step 5)**
 
 | T × S | O_f,30 code | OPT | code − OPT | E_ACO | O_f,5 code | OPT | code − OPT | E_ACO |
 |---|---|---|---|---|---|---|---|---|
@@ -271,7 +271,7 @@ Result:
 - O_f,30: the error of the code is at most E_ACO on 9 of 11 sizes. It is larger on 4 × 6 (+0.6 against 0.4) and on 3 × 7 (+0.1 against 0.0, at the paper's rounding precision).
 - O_f,5: the error is at most E_ACO on 6 of 11 sizes. It is larger on 3 × 8 (+2.6 against 1.9), 4 × 5 (+1.5 against 1.3), 4 × 7 (+4.8 against 3.5) and 5 × 4 (+0.8 against 0.6), and on 3 × 4 (+0.1 against 0.0, at the rounding precision).
 
-### Check 3 — Table 5: O_v — **done (baseline)**
+### Check 3 — Table 5: O_v — **done (baseline; after the repair: Step 5)**
 
 | T × S | O_v code | OPT | code − OPT | E_ACO |
 |---|---|---|---|---|
@@ -609,3 +609,95 @@ Expectation fixed before the changes: no change in behaviour; bit-identical resu
 Result: J3 is fixed; the cleanup does not change the behaviour.
 
 Scripts and results: `docs/validation/data/jovanovic_2019_step4/` (local, not in git).
+
+#### Step 5 — full run after the repair (`b379031`)
+
+Same jobs, settings and driver as the baseline: 2520 runs, 5000 iterations, eq. 44 taken literally, LB = 0 for the relocation objective (Check 1); 74.1 min (baseline 82.5 min). The runner also stores `get_best_solution()` per run.
+
+Expectation fixed before the runs: O_f,30 and O_f,5 worse than the baseline because of the literal eq. 44 (step 1b); O_v without a measurable difference (steps 1a, 1b, 2); relocations about equal. Criterion as in step 2: sign test (two-sided, seed 0, all sizes) and seed ranges where measured.
+
+Feasibility: all 2520 stored solutions, replayed as rBRP plans, are feasible, and their recomputed relocations, f2, f2vert and objective equal the reported values (largest deviation 0). Reproducibility: the 1520 runs for O_f,30, O_f,5 and O_v are identical to those of step 2 (`4cb92dd`), as expected after the bit-identical steps 3 and 4.
+
+Relocations (Table 1), seed 0; per instance against the baseline:
+
+| T × S | ACO (Table 1) | baseline − ACO | step 5 − ACO | better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 | 5.00 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 3 × 4 | 6.18 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 3 × 5 | 7.02 | +0.01 | +0.01 | 0 / 40 / 0 |
+| 3 × 6 | 8.40 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 3 × 7 | 9.28 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 3 × 8 | 10.65 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 4 × 4 | 10.20 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 4 × 5 | 12.95 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 4 × 6 | 14.02 | +0.01 | +0.01 | 0 / 40 / 0 |
+| 4 × 7 | 16.12 | +0.01 | +0.01 | 0 / 40 / 0 |
+| 5 × 4 | 15.42 | +0.03 | +0.03 | 0 / 40 / 0 |
+| 5 × 5 | 18.95 | +0.03 | 0.00 | 1 / 39 / 0 |
+| 5 × 6 | 22.15 | 0.00 | 0.00 | 0 / 40 / 0 |
+| 5 × 7 | 24.33 | −0.03 | 0.00 | 0 / 39 / 1 |
+| 5 × 8 | 27.73 | +0.05 | +0.05 | 0 / 40 / 0 |
+| 5 × 9 | 30.50 | −0.02 | −0.02 | 0 / 40 / 0 |
+| 5 × 10 | 33.40 | −0.05 | −0.05 | 0 / 40 / 0 |
+| 6 × 6 | 31.05 | +0.10 | +0.03 | 2 / 37 / 1 |
+| 6 × 10 | 45.93 | +0.02 | +0.10 | 2 / 34 / 4 |
+| 10 × 6 | 79.50 | +0.28 | +0.55 | 14 / 11 / 15 |
+| 10 × 10 | 113.45 | +1.05 | +0.58 | 20 / 3 / 17 |
+
+O_f,30 (Table 5), seed 0:
+
+| T × S | E_ACO | baseline − OPT | step 5 − OPT | better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 | 0.0 | 0.0 | +0.1 | 0 / 39 / 1 |
+| 3 × 4 | 0.1 | +0.1 | +0.3 | 0 / 38 / 2 |
+| 3 × 5 | 0.1 | 0.0 | +0.3 | 0 / 37 / 3 |
+| 3 × 6 | 0.1 | 0.0 | +0.2 | 0 / 38 / 2 |
+| 3 × 7 | 0.0 | +0.1 | +0.7 | 1 / 33 / 6 |
+| 3 × 8 | 0.3 | 0.0 | +1.5 | 0 / 31 / 9 |
+| 4 × 4 | 0.0 | 0.0 | +0.6 | 0 / 38 / 2 |
+| 4 × 5 | 0.0 | 0.0 | +1.2 | 0 / 30 / 10 |
+| 4 × 6 | 0.4 | +0.6 | +1.2 | 2 / 31 / 7 |
+| 4 × 7 | 0.8 | +0.1 | +1.6 | 1 / 28 / 11 |
+| 5 × 4 | 1.7 | +0.9 | +1.9 | 1 / 32 / 7 |
+
+O_f,5 (Table 5), seed 0:
+
+| T × S | E_ACO | baseline − OPT | step 5 − OPT | better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 | 0.0 | 0.0 | +0.1 | 0 / 39 / 1 |
+| 3 × 4 | 0.0 | +0.1 | +0.3 | 1 / 36 / 3 |
+| 3 × 5 | 0.3 | 0.0 | +0.5 | 0 / 35 / 5 |
+| 3 × 6 | 0.8 | +0.5 | +1.0 | 1 / 33 / 6 |
+| 3 × 7 | 0.9 | +0.3 | +2.0 | 1 / 29 / 10 |
+| 3 × 8 | 1.9 | +2.6 | +3.4 | 5 / 22 / 13 |
+| 4 × 4 | 0.2 | +0.1 | +0.2 | 0 / 39 / 1 |
+| 4 × 5 | 1.3 | +1.5 | +2.2 | 3 / 29 / 8 |
+| 4 × 6 | 2.2 | +1.0 | +2.8 | 2 / 24 / 14 |
+| 4 × 7 | 3.5 | +4.8 | +4.3 | 8 / 22 / 10 |
+| 5 × 4 | 0.6 | +0.8 | +1.6 | 1 / 31 / 8 |
+
+O_v (Table 5), seed 0:
+
+| T × S | E_ACO | baseline − OPT | step 5 − OPT | better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 | 1.8 | 0.0 | 0.0 | 0 / 40 / 0 |
+| 3 × 4 | 6.2 | +0.7 | +0.7 | 0 / 40 / 0 |
+| 3 × 5 | 6.8 | +0.4 | +0.4 | 0 / 40 / 0 |
+| 3 × 6 | 12.4 | +1.8 | +2.1 | 4 / 33 / 3 |
+| 3 × 7 | 18.3 | +2.3 | +3.4 | 1 / 35 / 4 |
+| 3 × 8 | 25.5 | +6.8 | +5.6 | 4 / 31 / 5 |
+| 4 × 4 | 10.7 | +1.8 | +2.3 | 0 / 38 / 2 |
+| 4 × 5 | 20.2 | +4.6 | +4.1 | 4 / 33 / 3 |
+
+| Objective | Sign test vs baseline (better / worse, p) | Seed ranges, baseline → step 5 | Expected | Outcome |
+|---|---|---|---|---|
+| Relocations | 39 / 38, p = 1 | 5 × 7: 24.30–24.38 → 24.30–24.40 | about equal | as expected |
+| O_f,30 | 5 / 60, p = 4.9·10⁻¹³ | 4 × 5: 1170.18–1170.90 → 1170.90–1171.38 | worse | as expected |
+| O_f,5 | 22 / 79, p = 1.0·10⁻⁸ | — | worse | as expected |
+| O_v | 13 / 17, p = 0.59 | 4 × 5: 2428.55–2429.80 → 2428.61–2430.37 | no measurable difference | as expected |
+
+Mean running time per run, baseline → step 5: relocations 17.4 → 17.8 s, O_f,30 8.3 → 5.2 s, O_f,5 8.0 → 4.8 s, O_v 7.9 → 7.6 s.
+
+Result: every objective behaves as fixed in advance, so there is no new deviation to investigate. Against the paper: relocations within ±0.10 of Table 1 on 19 of 21 sizes (10 × 6 +0.55, 10 × 10 +0.58); O_f above E_ACO on 11 (O_f,30) and 10 (O_f,5) of 11 sizes, largely through the literal eq. 44 (§3.6, step 1b); O_v far below E_ACO on all sizes, unexplained ("Checks on the O_v difference").
+
+Scripts and results: `docs/validation/data/jovanovic_2019_step5/` (local, not in git).
