@@ -447,7 +447,7 @@ Scripts and results: `docs/validation/data/jovanovic_2019_checks2/` (local, not 
 | 4 × 6 | 1385.4 | 1385.4 | 428.5 | 428.5 | – | – |
 | 5 × 4 | 1230.0 | 1230.0 | 343.5 | 343.5 | – | – |
 
-On every complete size the average optimum equals the OPT column, and no baseline ACO result lies below the exact optimum. 3 × 8 and 4 × 7 are still being computed and will be added.
+On every complete size the average optimum equals the OPT column, and no baseline ACO result lies below the exact optimum. 3 × 8 and 4 × 7 were not completed (A* did not finish on all 40 instances; Table 5 reports averages only, so partial rows are not compared).
 
 **Eq. 41 — equal to f2vert.** Eq. 41 implemented literally with the tier numbering of Sec. 2 (p. 79): tier 0 is the ground and containers occupy tiers 1..H (H_S = 0 for an empty stack, eq. 2; H_S < H for a non-full stack, eq. 1). t(c) is the tier of c and H*_S the tier where c lands; hmax = Hmax + 1, hout = 1.5, tr = 7.77, ts = 1.2. On 1550 rBRP plans (the MinMax greedy and 30 random plans for each of 10 instances of 3 × 3, 3 × 5, 3 × 8, 4 × 4 and 4 × 5), eq. 41 and the shared f2vert agree on all 47 772 moves.
 
