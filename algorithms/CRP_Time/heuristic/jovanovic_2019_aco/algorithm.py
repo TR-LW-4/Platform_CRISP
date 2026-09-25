@@ -184,7 +184,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             # ── Greedy warm-start ────────────────────────────────────── #
             S_best, _legacy_greedy_cost = run_greedy_rbrp_time(
                 stacks_init, all_keys, n_total, max_tiers, key_to_1based_idx,
-                gantry_s, trolley_s, accel_s, spreader_s,
+                gantry_s, trolley_s, accel_s, spreader_s, max_moves,
             )
 
             # ── Initial lower bound ──────────────────────────────────── #

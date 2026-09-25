@@ -258,6 +258,7 @@ def run_greedy_rbrp_time(
     trolley_s:         float,
     accel_s:           float,
     spreader_s:        float,
+    max_moves:         int,
 ) -> Tuple[List[Tuple[int, int, int, int]], float]:
     """
     MinMax greedy rBRP warm-start that accumulates crane time instead of
@@ -312,8 +313,9 @@ def run_greedy_rbrp_time(
                 )
 
             d_val = dd_star(stacks[best_dst], n_total, key_to_1based_idx[best_dst])
-            mc    = M.get(c, 0)
-            solution.append((c, d_val, mc, target))
+            n     = M.get(c, 0)
+            # n = 0, ..., MaxMoves (p. 83); M keeps the true count, as for the ants
+            solution.append((c, d_val, min(n, max_moves), target))
 
             # Accumulate crane time for relocation; src_key IS src_pos (bay, row)
             cost, crane_pos = move_time_inline(
@@ -323,7 +325,7 @@ def run_greedy_rbrp_time(
 
             stacks[src_key].pop()
             stacks[best_dst].append(c)
-            M[c] = mc + 1
+            M[c] = n + 1
 
         # Retrieve target (also incurs crane time)
         if stacks[src_key] and stacks[src_key][-1] == target:
