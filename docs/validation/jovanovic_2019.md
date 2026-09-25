@@ -72,47 +72,47 @@ Code: `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`
 
 ## 2. Comparison with the code
 
-File references without a directory are to `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`. Line numbers refer to `42a27fa` unless a row names a later commit; they will be updated after the repair (§4, "Repair runs").
+File references without a directory are to `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`. Line references are to `b379031` unless a commit is given.
 
 | Step | Paper (p.) | Code (file:line) | Verdict | Category |
 |---|---|---|---|---|
-| 2D bay, W stacks, Hmax; Caserta instances | 79, 85–86 | stacks read in stack-index order (`algorithm.py:165-176`); Caserta loader: one stack per bay, `max_tiers` = T + 2 = Hmax (`core/benchmarks/caserta.py:154-160`, `:227-229`) | equal | — |
-| rBRP: only the container on top of the target's stack is relocated (RES) | 79; eq. 11, p. 81 | `algorithm.py:252-257` | equal | — |
-| Candidate stacks R_c: non-full stacks except the source | eq. 1, p. 80 | ACO `algorithm.py:270-274`; greedy `scoring.py:245-249` | equal | — |
-| dd(S) = minimum due date, N + 1 for an empty stack | eq. 2, p. 80 | greedy `scoring.py:24-31`; ACO keeps the stack minima with N + 1 for empty stacks (`algorithm.py:194`, `:327-336`, `:375-380`) | equal | — |
-| dif(c, d) | eq. 3, p. 80 | `scoring.py:52-66`; ACO inline `algorithm.py:281` | equal | — |
-| Greedy MinMax: argmin of dif over R_c | Alg. 1, eqs. 5, 7, p. 80 | `run_greedy_rbrp_time` (`scoring.py:200-280`) | equal | — |
-| Ties in MinMax | not specified | strict `<` keeps the first stack in index order (`scoring.py:251`) | not specified in paper | choice left open by paper |
-| Pheromone matrix τ_cdnt, d = 1..N + W, n = 0..MaxMoves | p. 83 | `np.full((N, N + W, MaxMoves + 1, N), τ0)` (`algorithm.py:214-217`); indices c − 1, d − 1, n, t − 1 (`:263-265`, `:284`) | equal | — |
-| dd*(S) = N + i(S) for an empty stack | p. 83 | `empty_d` (`algorithm.py:195`, `:278`); greedy `scoring.py:34-45`, `:258` | equal | — |
-| n = times c has already been moved | p. 83 | `min(M[c], MaxMoves)` before the move, `M[c] += 1` after (`algorithm.py:264`, `:339`) | equal | — |
-| n > MaxMoves | not specified | clamped to MaxMoves in the ants (`algorithm.py:278`) and, since `802e4d1`, in the greedy start (`scoring.py:316-318`); M keeps the true count (`algorithm.py:354`, `scoring.py:328`) | not specified in paper | choice left open by paper |
-| Greedy start without a destination stack (R_c empty) | not specified (Alg. 1, eq. 1, p. 80) | since `0bcfd7d`: `ValueError` (`scoring.py:307-313`); an ant in the same situation is marked invalid (`algorithm.py:309-311`) | not specified in paper | choice left open by paper |
-| Heuristic f(c, S) = 1 / (1 + dif(c, dd(S))) | eqs. 26–27, p. 83 | since `4cb92dd`: dif is computed with dd(S) = `smin` (N + 1 for an empty stack) (`algorithm.py:294-296`); the pheromone index and the tuple keep dd*(S) (`:292`, `:298`, `:331`) | equal | — |
-| g(α) = f(α) · τ_c,dd*(S),m_c,t | eqs. 29–30, p. 83 | `algorithm.py:284-285` | equal | — |
-| Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:300-313` | equal | — |
-| Ties in the argmax | not specified | strict `>` keeps the first stack in index order (`algorithm.py:290`) | not specified in paper | choice left open by paper |
-| Solution stored as 4-tuples (c, dd*(S), M[c], t) | p. 84 | `algorithm.py:316-317`; decoded to a plan in `_solution_to_plan` (`algorithm.py:42-91`) | equal | — |
-| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | relocation objective: LB = 0, since `lb_time` returns a bound only for f2 and f2vert (`scoring.py:96-98`, since `f7a9c9a`); the NWL count is computed (`algorithm.py:185`) but not used | deviation | differs from paper (Zhu bound not implemented; accepted as a limitation of Check 1) |
-| val_f, val_v with LB_f, LB_v | eqs. 44–47, p. 85 | since `f7a9c9a`: `lb_time` computes eq. 44 or 45 literally (`scoring.py:96-138`) for the initial bay (`algorithm.py:187`); val uses it (`algorithm.py:212`, `:410`, `:417`) | equal | — |
-| O_f, O_v: per-operation costs, summed | eqs. 40–43, p. 85 | `movement_objective_cost` with the shared `ObjectiveSpec` (`algorithm.py:342-348`, `:366-372`), i.e. f2 and f2vert (`core/objectives.py:261-295`) | equal | — |
+| 2D bay, W stacks, Hmax; Caserta instances | 79, 85–86 | stacks read in stack-index order (`algorithm.py:167-178`); Caserta loader: one stack per bay, `max_tiers` = T + 2 = Hmax (`core/benchmarks/caserta.py:154-160`, `:227-229`) | equal | — |
+| rBRP: only the container on top of the target's stack is relocated (RES) | 79; eq. 11, p. 81 | `algorithm.py:261-266` | equal | — |
+| Candidate stacks R_c: non-full stacks except the source | eq. 1, p. 80 | ACO `algorithm.py:279-283`; greedy `scoring.py:150-154` | equal | — |
+| dd(S) = minimum due date, N + 1 for an empty stack | eq. 2, p. 80 | greedy `scoring.py:23-30`; ACO keeps the stack minima with N + 1 for empty stacks (`algorithm.py:197`, `:337-346`, `:403-408`) | equal | — |
+| dif(c, d) | eq. 3, p. 80 | `scoring.py:51-65`; ACO inline `algorithm.py:290` | equal | — |
+| Greedy MinMax: argmin of dif over R_c | Alg. 1, eqs. 5, 7, p. 80 | `run_greedy_rbrp_time` (`scoring.py:121-181`) | equal | — |
+| Ties in MinMax | not specified | strict `<` keeps the first stack in index order (`scoring.py:156`) | not specified in paper | choice left open by paper |
+| Pheromone matrix τ_cdnt, d = 1..N + W, n = 0..MaxMoves | p. 83 | `np.full((N, N + W, MaxMoves + 1, N), τ0)` (`algorithm.py:221-224`); indices c − 1, d − 1, n, t − 1 (`:272-274`, `:293`) | equal | — |
+| dd*(S) = N + i(S) for an empty stack | p. 83 | `empty_d` (`algorithm.py:198`, `:287`); greedy `scoring.py:33-44`, `:168` | equal | — |
+| n = times c has already been moved | p. 83 | `min(M[c], MaxMoves)` before the move, `M[c] += 1` after (`algorithm.py:273`, `:349`) | equal | — |
+| n > MaxMoves | not specified | clamped to MaxMoves in the ants (`algorithm.py:273`) and, since `802e4d1`, in the greedy start (`scoring.py:169-171`); M keeps the true count (`algorithm.py:349`, `scoring.py:175`) | not specified in paper | choice left open by paper |
+| Greedy start without a destination stack (R_c empty) | not specified (Alg. 1, eq. 1, p. 80) | since `0bcfd7d`: `ValueError` (`scoring.py:160-166`); an ant in the same situation is marked invalid (`algorithm.py:304-306`) | not specified in paper | choice left open by paper |
+| Heuristic f(c, S) = 1 / (1 + dif(c, dd(S))) | eqs. 26–27, p. 83 | since `4cb92dd`: dif is computed with dd(S) = `smin` (N + 1 for an empty stack) (`algorithm.py:289-291`); the pheromone index and the tuple keep dd*(S) (`:287`, `:293`, `:326`) | equal | — |
+| g(α) = f(α) · τ_c,dd*(S),m_c,t | eqs. 29–30, p. 83 | `algorithm.py:293-294` | equal | — |
+| Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:309-322` | equal | — |
+| Ties in the argmax | not specified | strict `>` keeps the first stack in index order (`algorithm.py:299`) | not specified in paper | choice left open by paper |
+| Solution stored as 4-tuples (c, dd*(S), M[c], t) | p. 84 | `algorithm.py:325-326`; decoded to a plan in `_solution_to_plan` (`algorithm.py:51-100`) | equal | — |
+| val(S) = 1 / (\|S\| − LB + 1), LB of the initial bay (Zhu et al. 2012 for the rBRP) | eq. 33, p. 84 | relocation objective: LB = 0, since `lb_time` returns a bound only for f2 and f2vert (`scoring.py:72-74`, since `f7a9c9a`); the unused NWL count (`algorithm.py:185` at `42a27fa`) was removed in `4c59f06` | deviation | differs from paper (Zhu bound not implemented; accepted as a limitation of Check 1) |
+| val_f, val_v with LB_f, LB_v | eqs. 44–47, p. 85 | since `f7a9c9a`: `lb_time` computes eq. 44 or 45 literally (`scoring.py:72-114`) for the initial bay (`algorithm.py:188`); val uses it (`algorithm.py:218`, `:437`, `:444`) | equal | — |
+| O_f, O_v: per-operation costs, summed | eqs. 40–43, p. 85 | `movement_objective_cost` with the shared `ObjectiveSpec` (`algorithm.py:352-358`, `:387-393`), i.e. f2 and f2vert (`core/objectives.py:261-295`) | equal | — |
 | Parameters ts = 1.2, tpp = 30 or 5, tr = 7.77, hout = 1.5, hmax = Hmax + 1 | p. 88 | `ObjectiveSpec` defaults ts = 1.2, tpp = 30, tr = 2.59 + 5.18, hout = 1.5 (`core/objectives.py:141-145`); h_max = `max_tiers` + 1 (`core/objectives.py:280`); tpp = 5 via `pickup_place_s` | equal | — |
-| Tier numbering | p. 79 vs p. 85, 88 | 1-based: source tier = height before the pop, destination tier = height after the push (`algorithm.py:322-323`, `:364`), as in `annotate_plan_tiers` | not specified in paper | choice left open by paper |
-| Local update τ = ϕτ for all tuples of S_i, also for an aborted ant | eq. 36, p. 84 | `algorithm.py:383-396`, for valid and aborted ants | equal | — |
-| Global update with S_best only, after every iteration | eqs. 34–35, p. 84 | `algorithm.py:415-432` | equal | — |
-| τ0 = (1/W) · val(S_g) | eq. 37, p. 84 | `tau_0 = val_greedy / n_stacks` (`algorithm.py:211-212`) | equal | — |
-| τmin = (1/W²) · val(S_best) | eq. 38, p. 84 | `algorithm.py:418` | equal | — |
-| How τmin is applied | not specified | as a floor in both the local and the global update (`algorithm.py:393-396`, `:429-432`); before the first global update τmin = τ0 / W (`:213`) | not specified in paper | choice left open by paper |
-| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | since `c87b7d5`: `time_so_far + lb_cur >= best_cost` after each relocation (`algorithm.py:377`), with LB(Bay) kept incrementally (`:199-209`, `:254-255`, `:339`, `:365-373`, `:401-405`); LB = 0 for the relocation objective | equal | — |
-| val when O − LB + 1 < 1 | not specified | clamped: val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`) | not specified in paper | choice left open by paper |
-| Initial S_best | not specified (Alg. 2 uses \|S_best\| from the first ant on) | the greedy solution and its cost (`algorithm.py:179`, `:199-208`) | not specified in paper | choice left open by paper |
-| New best: "Check if S is valid new best solution" | Alg. 2, p. 84 | valid and strictly lower cost (`algorithm.py:399-403`) | equal | — |
-| Reinitialisation after MaxConst iterations without improvement, then global update | Alg. 2, p. 84 | `algorithm.py:405-413`, then `:415-432` | equal | — |
-| Value used for the reinitialisation | not specified | val(S_best) / W (`algorithm.py:409-412`) | not specified in paper | choice left open by paper |
-| p = 0.1, ϕ = 0.9, q0 = 0.9, n = 10, 5000 iterations (rBRP), MaxConst = 100, MaxMoves = 10 | p. 85–86 | defaults `rho` 0.1, `phi` 0.9, `q0` 0.9, `n_ants` 10, `n_iterations` 5000, `max_const_iter` 100, `max_moves` 10 (`algorithm.py:125-131`, schema `:511-560`) | equal | — |
+| Tier numbering | p. 79 vs p. 85, 88 | 1-based: source tier = height before the pop, destination tier = height after the push (`algorithm.py:331-332`, `:385`), as in `annotate_plan_tiers` | not specified in paper | choice left open by paper |
+| Local update τ = ϕτ for all tuples of S_i, also for an aborted ant | eq. 36, p. 84 | `algorithm.py:411-424`, for valid and aborted ants | equal | — |
+| Global update with S_best only, after every iteration | eqs. 34–35, p. 84 | `algorithm.py:443-460` | equal | — |
+| τ0 = (1/W) · val(S_g) | eq. 37, p. 84 | `tau_0 = val_greedy / n_stacks` (`algorithm.py:218-219`) | equal | — |
+| τmin = (1/W²) · val(S_best) | eq. 38, p. 84 | `algorithm.py:446` | equal | — |
+| How τmin is applied | not specified | as a floor in both the local and the global update (`algorithm.py:421-424`, `:457-460`); before the first global update τmin = τ0 / W (`:220`) | not specified in paper | choice left open by paper |
+| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | since `c87b7d5`: `time_so_far + lb_cur >= best_cost` after each relocation (`algorithm.py:372`), with LB(Bay) kept incrementally (`:194-204`, `:249-250`, `:334`, `:360-368`, `:396-400`); LB = 0 for the relocation objective | equal | — |
+| val when O − LB + 1 < 1 | not specified | clamped: val = 1 / max(O − LB + 1, 1) (`algorithm.py:218`, `:437`, `:444`) | not specified in paper | choice left open by paper |
+| Initial S_best | not specified (Alg. 2 uses \|S_best\| from the first ant on) | the greedy solution and its cost (`algorithm.py:181`, `:206-215`) | not specified in paper | choice left open by paper |
+| New best: "Check if S is valid new best solution" | Alg. 2, p. 84 | valid and strictly lower cost (`algorithm.py:427-431`) | equal | — |
+| Reinitialisation after MaxConst iterations without improvement, then global update | Alg. 2, p. 84 | `algorithm.py:433-441`, then `:443-460` | equal | — |
+| Value used for the reinitialisation | not specified | val(S_best) / W (`algorithm.py:437-440`) | not specified in paper | choice left open by paper |
+| p = 0.1, ϕ = 0.9, q0 = 0.9, n = 10, 5000 iterations (rBRP), MaxConst = 100, MaxMoves = 10 | p. 85–86 | defaults `rho` 0.1, `phi` 0.9, `q0` 0.9, `n_ants` 10, `n_iterations` 5000, `max_const_iter` 100, `max_moves` 10 (`algorithm.py:134-140`, schema `:536-585`) | equal | — |
 | Iterations for the crane-time objectives ("around 5 times higher") | p. 88 | default 5000 for every objective; since `b379031` the help text paraphrases Sec. 7.4 (`algorithm.py:539-546`) | not specified in paper | choice left open by paper |
-| Runs per instance, random seeds | not specified | one run, `np.random.seed(cfg.seed)` (`algorithm.py:124`, `:145`) | not specified in paper | choice left open by paper |
-| Objective: relocations (Table 1) or O_f / O_v (Table 5) | p. 84–85 | the search minimises the objective of the shared `ObjectiveSpec` (`algorithm.py:151`); CRP-Time offers only `crane_time` in the UI and the CLI (`problems/CRP_Time.py:144-154`, `main.py:258-261`); `objective_mode = "relocations"` can only be set programmatically | equal | unified 2D setting |
+| Runs per instance, random seeds | not specified | one run, `np.random.seed(cfg.seed)` (`algorithm.py:133`, `:154`) | not specified in paper | choice left open by paper |
+| Objective: relocations (Table 1) or O_f / O_v (Table 5) | p. 84–85 | the search minimises the objective of the shared `ObjectiveSpec` (`algorithm.py:160`); CRP-Time offers only `crane_time` in the UI and the CLI (`problems/CRP_Time.py:144-154`, `main.py:258-261`); `objective_mode = "relocations"` can only be set programmatically | equal | unified 2D setting |
 | Output: best solution found | Alg. 2 | `S_best` decoded and evaluated with the shared evaluator; since `24b5fc1` also returned by `get_best_solution()` (`algorithm.py:497-504`) | equal | — |
 
 Verdict: equal / deviation / not specified in paper.
@@ -122,35 +122,35 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 ### 3.1 Unified 2D setting
 
-**The paper's crane-time setting is the unified setting.** O_f and O_v (eqs. 40–43) are the Schwarze & Voß cost functions, and the parameters on p. 88 are the Voß & Schwarze values, so O_f,30 = f2, O_f,5 = f2 with tpp = 5, and O_v = f2vert. The code uses the shared evaluator for both (`algorithm.py:342-348`, `:366-372`). The instances are the Caserta instances with Hmax = T + 2, as in CRISP. For Table 5, "the paper's own settings" and the crane-time-only setting therefore coincide.
+**The paper's crane-time setting is the unified setting.** O_f and O_v (eqs. 40–43) are the Schwarze & Voß cost functions, and the parameters on p. 88 are the Voß & Schwarze values, so O_f,30 = f2, O_f,5 = f2 with tpp = 5, and O_v = f2vert. The code uses the shared evaluator for both (`algorithm.py:352-358`, `:387-393`). The instances are the Caserta instances with Hmax = T + 2, as in CRISP. For Table 5, "the paper's own settings" and the crane-time-only setting therefore coincide.
 
 **Relocation objective.** Table 1 uses the number of relocations. CRP-Time allows only crane time in the UI and the CLI, so the relocation objective can only be selected by setting `objective_mode = "relocations"` in the problem configuration from a script. The search then counts relocations: `movement_objective_cost` gives 1 per relocation and 0 per retrieval.
 
-**Crane start position.** `crane_pos = (1, 1)` (`algorithm.py:240`) is only read by the `rmgc_current` model; f2 and f2vert do not depend on it.
+**Crane start position.** `crane_pos = (1, 1)` (`algorithm.py:247`) is only read by the `rmgc_current` model; f2 and f2vert do not depend on it.
 
 ### 3.2 Choices left open by the paper
 
-**Ties.** In the greedy (`scoring.py:251`) and in the argmax of the transition rule (`algorithm.py:290`), the first stack in index order wins.
+**Ties.** In the greedy (`scoring.py:156`) and in the argmax of the transition rule (`algorithm.py:299`), the first stack in index order wins.
 
-**n beyond MaxMoves.** A container moved more than MaxMoves times uses n = MaxMoves: in the ants (`algorithm.py:278`) and, since `802e4d1`, in the greedy start (`scoring.py:316-318`). M keeps the true count in both.
+**n beyond MaxMoves.** A container moved more than MaxMoves times uses n = MaxMoves: in the ants (`algorithm.py:273`) and, since `802e4d1`, in the greedy start (`scoring.py:169-171`). M keeps the true count in both.
 
-**Greedy start without a free stack.** Alg. 1 (p. 80) has no case for an empty R_c (eq. 1), and without S_g the initial pheromone (eq. 37) is undefined. Decision (Thom): stop with an error (`scoring.py:307-313`, since `0bcfd7d`). An ant in the same situation is marked invalid (`algorithm.py:309-311`).
+**Greedy start without a free stack.** Alg. 1 (p. 80) has no case for an empty R_c (eq. 1), and without S_g the initial pheromone (eq. 37) is undefined. Decision (Thom): stop with an error (`scoring.py:160-166`, since `0bcfd7d`). An ant in the same situation is marked invalid (`algorithm.py:304-306`).
 
-**τmin** is applied as a floor in both updates (`algorithm.py:393-396`, `:429-432`). **Reinitialisation** uses val(S_best) / W (`algorithm.py:409-412`). **Initial S_best** is the greedy solution (`algorithm.py:179`). **New best** requires a strictly lower cost (`algorithm.py:399`).
+**τmin** is applied as a floor in both updates (`algorithm.py:421-424`, `:457-460`). **Reinitialisation** uses val(S_best) / W (`algorithm.py:437-440`). **Initial S_best** is the greedy solution (`algorithm.py:181`). **New best** requires a strictly lower cost (`algorithm.py:427`).
 
-**Clamp on val.** val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`). With a valid lower bound O − LB + 1 ≥ 1 and the clamp never binds. With LB_f taken literally from eq. 44 it can bind (§3.6); the paper does not say what val is then. Decision (Thom): keep the clamp.
+**Clamp on val.** val = 1 / max(O − LB + 1, 1) (`algorithm.py:218`, `:437`, `:444`). With a valid lower bound O − LB + 1 ≥ 1 and the clamp never binds. With LB_f taken literally from eq. 44 it can bind (§3.6); the paper does not say what val is then. Decision (Thom): keep the clamp.
 
 **Iterations for crane time.** Sec. 7.4 says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000 for every objective; this choice will be put to Wei. Since `b379031` the help text paraphrases Sec. 7.4 instead of suggesting "10 000+", which was not from the paper.
 - O_v: with 5000 iterations the code already does better than the paper (§4), so fewer iterations cannot explain that difference.
 - O_f: with literal eq. 44 and 5000 iterations the code does worse than the paper (§4, step 1b). With 25 000 iterations (O_f,5, seed 0, about 5.2× the running time) the gap closes on 4 × 7 (+3.5 against E_ACO 3.5) and mostly on 3 × 8 (+2.2 against 1.9). The condition fixed before that run is not met on 3 × 8 (seed spread not measured), and 3 × 8 discriminates poorly: no version of the code reaches E_ACO there at 5000 iterations. A full explanation by the number of iterations is not shown.
 
-**Runs and seeds.** One run per instance with `np.random.seed(cfg.seed)` (`algorithm.py:145`); the paper does not say how many runs Tables 1 and 5 average over.
+**Runs and seeds.** One run per instance with `np.random.seed(cfg.seed)` (`algorithm.py:154`); the paper does not say how many runs Tables 1 and 5 average over.
 
 **Tier numbering.** The code uses the Schwarze & Voß convention (ground tier 1, h_max = Hmax + 1), which §1 infers from the matching optimal values.
 
 ### 3.3 Differs from the paper
 
-**No lower bound in val and in the early abort.** The paper's quality function subtracts a lower bound of the initial bay: the Zhu et al. (2012) bound for the relocation objective (eq. 33), LB_f or LB_v for crane time (eqs. 44–47). The early abort compares the partial cost plus the lower bound of the current bay with the best cost (Alg. 2; p. 85). The code sets the bound to 0 in both places (`algorithm.py:186`, comment "safe for every selectable objective"), so val = 1 / (O + 1) and an ant is aborted only when its cost so far reaches the best cost (`algorithm.py:350-352`). The CRP-R version of this algorithm (`algorithms/CRP_R/heuristic/jovanovic_2019_aco/`) does subtract a bound, the non-well-located count.
+**No lower bound in val and in the early abort.** The paper's quality function subtracts a lower bound of the initial bay: the Zhu et al. (2012) bound for the relocation objective (eq. 33), LB_f or LB_v for crane time (eqs. 44–47). The early abort compares the partial cost plus the lower bound of the current bay with the best cost (Alg. 2; p. 85). The code sets the bound to 0 in both places (`algorithm.py:186` at `42a27fa`, comment "safe for every selectable objective"), so val = 1 / (O + 1) and an ant is aborted only when its cost so far reaches the best cost (`algorithm.py:350-352` at `42a27fa`). The CRP-R version of this algorithm (`algorithms/CRP_R/heuristic/jovanovic_2019_aco/`) does subtract a bound, the non-well-located count.
 
 Repair: step 1a (`f7a9c9a`) puts LB_f / LB_v of the initial bay into val. Step 1b (`c87b7d5`) adds LB(Bay) of the current bay to the early abort. For the relocation objective LB stays 0. Effect: §4, "Repair runs".
 
@@ -160,29 +160,29 @@ Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, 
 
 Where the check sits is as in the paper: Alg. 2 checks only after a relocation, and so does the code. A check after a retrieval would change nothing, because a retrieval adds to O exactly the term it removes from LB(Bay).
 
-**The heuristic uses dd* instead of dd for empty stacks.** Eq. 27 evaluates the heuristic with dd(S), which is N + 1 for every empty stack; dd*(S) = N + i(S) is only the pheromone index (eq. 29). The code uses dd* in both (`algorithm.py:278-282`), so an empty stack gets f = 1 / (1 + N + i(S) − c) instead of 1 / (N + 2 − c): the higher its index, the less attractive it looks. Under uniform pheromone the argmax is the same, because a well-located stack still beats any empty stack, an empty stack still beats any stack where c is not well-located, and among empty stacks the lowest index wins in both cases. The difference shows in the roulette choice and in the argmax once τ differs between stacks. Example: N = 35, c = 10, empty stack i = 7: f = 1/33 in the code against 1/27 in the paper.
+**The heuristic uses dd* instead of dd for empty stacks.** Eq. 27 evaluates the heuristic with dd(S), which is N + 1 for every empty stack; dd*(S) = N + i(S) is only the pheromone index (eq. 29). The code uses dd* in both (`algorithm.py:278-282` at `42a27fa`), so an empty stack gets f = 1 / (1 + N + i(S) − c) instead of 1 / (N + 2 − c): the higher its index, the less attractive it looks. Under uniform pheromone the argmax is the same, because a well-located stack still beats any empty stack, an empty stack still beats any stack where c is not well-located, and among empty stacks the lowest index wins in both cases. The difference shows in the roulette choice and in the argmax once τ differs between stacks. Example: N = 35, c = 10, empty stack i = 7: f = 1/33 in the code against 1/27 in the paper.
 
 Repair: step 2 (`4cb92dd`) evaluates the heuristic with dd(S); the pheromone index and the tuple in S keep dd*(S). Effect: §4, step 2.
 
 ### 3.4 Suspected bugs
 
-**J1 — the greedy start retrieves containers out of order when there is no room.** If no destination stack exists, `run_greedy_rbrp_time` breaks out of the relocation loop without retrieving the target (`scoring.py:255-256`) and continues with the next target, which can then be retrieved before the blocked one. Scratchpad check on stacks `[[1, 2], [3, 4]]` with H = 2 (target 1 blocked, the only other stack full): the greedy returns `[(4, 1, 0, 3)]`, a relocation of container 4 during target 3, and decoding it with `_solution_to_plan` raises `KeyError: None`. This requires an empty candidate list, which cannot occur on Caserta (`azari_2017.md` §3.2), so the bug is latent there. The ACO ants handle the same case by marking the solution invalid (`algorithm.py:295-297`).
+**J1 — the greedy start retrieves containers out of order when there is no room.** If no destination stack exists, `run_greedy_rbrp_time` breaks out of the relocation loop without retrieving the target (`scoring.py:255-256` at `42a27fa`) and continues with the next target, which can then be retrieved before the blocked one. Scratchpad check on stacks `[[1, 2], [3, 4]]` with H = 2 (target 1 blocked, the only other stack full): the greedy returns `[(4, 1, 0, 3)]`, a relocation of container 4 during target 3, and decoding it with `_solution_to_plan` raises `KeyError: None`. This requires an empty candidate list, which cannot occur on Caserta (`azari_2017.md` §3.2), so the bug is latent there. The ACO ants handle the same case by marking the solution invalid (`algorithm.py:304-306`).
 
 Step 3 found a second consequence: on a random UI layout (1 bay, 2 rows, 2 tiers, 4 containers, seed 4; stacks `[[1, 4], [2, 3]]`) the greedy skips both blocked targets without a relocation, the decoder builds a plan that retrieves container 1 from under container 4, and the run ends normally with objective 134.40. Fixed in `0bcfd7d`: the greedy stops with a `ValueError` (§3.2).
 
-**J2 — the greedy start does not cap n at MaxMoves.** The ants record n = min(M[c], MaxMoves) (`algorithm.py:278`), but the greedy recorded M[c] itself (`scoring.py:310` at `4cb92dd`). If the greedy solution is still S_best at a global update and has n > MaxMoves, the update indexes past the pheromone matrix (`algorithm.py:461-462`). On Caserta the greedy's largest n is 5 (MaxMoves = 10), so the bug is latent there. Scratch check with `max_moves = 1` on data4-4-7 at `4cb92dd`: `IndexError: index 2 is out of bounds for axis 2 with size 2`. Fixed in `802e4d1`: the greedy tuple uses min(n, MaxMoves) and M keeps the true count, as for the ants.
+**J2 — the greedy start does not cap n at MaxMoves.** The ants record n = min(M[c], MaxMoves) (`algorithm.py:273`), but the greedy recorded M[c] itself (`scoring.py:310` at `4cb92dd`). If the greedy solution is still S_best at a global update and has n > MaxMoves, the update indexes past the pheromone matrix (`algorithm.py:456-457`). On Caserta the greedy's largest n is 5 (MaxMoves = 10), so the bug is latent there. Scratch check with `max_moves = 1` on data4-4-7 at `4cb92dd`: `IndexError: index 2 is out of bounds for axis 2 with size 2`. Fixed in `802e4d1`: the greedy tuple uses min(n, MaxMoves) and M keeps the true count, as for the ants.
 
-**J3 — `get_best_solution()` always returns None.** Every progress record goes through `BaseAlgorithm._push`, which lowers `_best_metric` to the pushed metric (`core/base_algorithm.py:154-155`), and the progress pushes carry `best_cost` (`algorithm.py:483-486`). At the end, `_best_solution` is set only if `best_cost < self._best_metric` (`algorithm.py:505`), which is then never true, so `_best_solution` stays None. Seen in all 336 runs of the step 3 bit-identical comparison. Nothing in the platform calls `get_best_solution()` (only the docstring in `core/base_algorithm.py:79` names it), so the bug is latent. Fixed in `24b5fc1`: the final check uses `<=` (`algorithm.py:497`).
+**J3 — `get_best_solution()` always returns None.** Every progress record goes through `BaseAlgorithm._push`, which lowers `_best_metric` to the pushed metric (`core/base_algorithm.py:154-155`), and the progress pushes carry `best_cost` (`algorithm.py:474-477`). At the end, `_best_solution` is set only if `best_cost < self._best_metric` (`algorithm.py:505` at `802e4d1`), which is then never true, so `_best_solution` stays None. Seen in all 336 runs of the step 3 bit-identical comparison. Nothing in the platform calls `get_best_solution()` (only the docstring in `core/base_algorithm.py:79` names it), so the bug is latent. Fixed in `24b5fc1`: the final check uses `<=` (`algorithm.py:497`).
 
 ### 3.5 Notes for the standardisation (not deviations)
 
-- The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`. Corrected in `b379031` (`algorithm.py:107-114`).
-- Dead code from the legacy RMGC model: the greedy accumulates a crane time with inline gantry/trolley kinematics (`scoring.py:94-170`, `:263-277`) that is discarded (`_legacy_greedy_cost`, `algorithm.py:179-182`), and the four kinematics parameters are read only for that (`algorithm.py:159-163`). `compute_lb_time` (`scoring.py:177-193`) and `lb_init_nwl` (`algorithm.py:185`) are unused. Removed in `4c59f06`; the cost of S_g for eq. 37 still comes from the shared evaluator (`algorithm.py:209-218`).
-- Intermediate progress records carry `lower_bound = 0.0` and `iteration` (`algorithm.py:446-449`). The `lower_bound` value is not a lower bound, and the metric set differs from the other CRP-Time algorithms. Removed in `b379031`; the records now carry the same metrics as Azari.
-- The seed loop and the mean over seeds (`algorithm.py:124`, `:136`, `:490-501`) are left over from multi-seed evaluation; with `n_seeds = 1` the final record describes one plan. Kept: Azari has the same structure; to be decided for the three algorithms together.
-- The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7`). Lists all seven parameters since `b379031`.
-- `fidelity = "adapted"` (`algorithm.py:109`). To be discussed after the repair.
-- The base parameters `max_iterations` and `report_interval` appear in the UI but are not read; the ACO uses `n_iterations` and pushes every `n_iterations // 50` iterations (`algorithm.py:132`). Same platform point as in `azari_2017.md` §3.5.
+- The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105` at `42a27fa`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`. Corrected in `b379031` (`algorithm.py:107-114`).
+- Dead code from the legacy RMGC model: the greedy accumulates a crane time with inline gantry/trolley kinematics (at `42a27fa`: `scoring.py:94-170`, `:263-277`) that is discarded (`_legacy_greedy_cost`, `algorithm.py:179-182` at `42a27fa`), and the four kinematics parameters are read only for that (`algorithm.py:159-163` at `42a27fa`). `compute_lb_time` (`scoring.py:177-193` at `42a27fa`) and `lb_init_nwl` (`algorithm.py:185` at `42a27fa`) are unused. Removed in `4c59f06`; the cost of S_g for eq. 37 still comes from the shared evaluator (`algorithm.py:209-218`).
+- Intermediate progress records carry `lower_bound = 0.0` and `iteration` (`algorithm.py:446-449` at `42a27fa`). The `lower_bound` value is not a lower bound, and the metric set differs from the other CRP-Time algorithms. Removed in `b379031`; the records now carry the same metrics as Azari.
+- The seed loop and the mean over seeds (`algorithm.py:133`, `:145`, `:515-526`) are left over from multi-seed evaluation; with `n_seeds = 1` the final record describes one plan. Kept: Azari has the same structure; to be decided for the three algorithms together.
+- The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7` at `42a27fa`). Lists all seven parameters since `b379031`.
+- `fidelity = "adapted"` (`algorithm.py:118`). To be discussed after the repair.
+- The base parameters `max_iterations` and `report_interval` appear in the UI but are not read; the ACO uses `n_iterations` and pushes every `n_iterations // 50` iterations (`algorithm.py:141`). Same platform point as in `azari_2017.md` §3.5.
 - The shared evaluator (`core/objectives.py:356-381`) takes the tiers from the plan and does not check that the plan is feasible; the J1 plan in §3.4 was scored without error. Platform point for Wei.
 
 ### 3.6 Observations on the paper
