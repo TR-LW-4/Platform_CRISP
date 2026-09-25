@@ -303,8 +303,13 @@ def run_greedy_rbrp_time(
                     best_score = score
                     best_dst   = dst_key
 
+            # R_c is empty (eq. 1): Alg. 1 cannot continue, so S_g and
+            # tau_0 (eq. 37) are undefined.
             if best_dst is None:
-                break  # no room — pathological case
+                raise ValueError(
+                    f"Jovanović greedy start (Alg. 1): no free stack for container "
+                    f"{c} above target {target}; every other stack is full"
+                )
 
             d_val = dd_star(stacks[best_dst], n_total, key_to_1based_idx[best_dst])
             mc    = M.get(c, 0)
