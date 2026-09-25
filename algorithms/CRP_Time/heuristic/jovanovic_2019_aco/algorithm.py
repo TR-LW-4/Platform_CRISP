@@ -115,7 +115,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"
     objectives          = ["crane_time"]
-    fidelity            = "adapted"
+    fidelity            = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
