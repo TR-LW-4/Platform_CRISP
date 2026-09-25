@@ -168,10 +168,94 @@ Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, 
 
 The paper has no worked example. It reports averages over the 40 Caserta instances per size, which can be compared with the code (§1, "Validation material"). Running time of the current code with the default 5000 iterations, one instance, one process on the machine of `azari_2017.md` Check 5: data4-5-1 (f2) 7.7 s, data5-7-1 (relocations) 9.0 s, data10-10-1 (f2) 62.2 s.
 
-### Check 1 — Table 1: relocations, rBRP, Hmax = T + 2 — **not done**
+### Baseline of the current code
+
+All runs below use the algorithm code as of `42a27fa` (last changed in `308d016`), before any repair of §3.3–3.4. Setup:
+- 5000 iterations and the paper's other parameters (§1), one run per instance with seed 0, averaged over the 40 instances per size;
+- in-process runs through a scratch driver, 6 processes in parallel, nothing written to `results/`; 2520 runs in total, 82.5 min;
+- raw results, summary and scripts: `docs/validation/data/jovanovic_2019_baseline/` (local, not in git).
+
+The paper gives its averages to 0.01 (Table 1) or 0.1 s (Table 5). The code's averages are rounded half-up to the same precision before comparing. No average of the code lies below OPT at that precision. On 3 × 3 the code reaches OPT exactly for O_f,30 (476.4) and for O_v (904.0), which supports the reading in §1 and §3.1 that O_f = f2 and O_v = f2vert, with the Schwarze & Voß tier numbering.
+
+### Check 1 — Table 1: relocations, rBRP, Hmax = T + 2 — **done (baseline)**
 
 Limitation: the code has no Zhu et al. (2012) bound (§3.3), so this check runs with LB = 0 in val and in the early abort. A difference from Table 1 is expected for that reason alone.
 
-### Check 2 — Table 5: O_f,30 and O_f,5 — **not done**
+| T × S | code | ACO (Table 1) | code − ACO | OPT (Table 1) |
+|---|---|---|---|---|
+| 3 × 3 | 5.00 | 5.00 | 0.00 | 5.00 |
+| 3 × 4 | 6.18 | 6.18 | 0.00 | 6.18 |
+| 3 × 5 | 7.03 | 7.02 | +0.01 | 7.02 |
+| 3 × 6 | 8.40 | 8.40 | 0.00 | 8.40 |
+| 3 × 7 | 9.28 | 9.28 | 0.00 | 9.28 |
+| 3 × 8 | 10.65 | 10.65 | 0.00 | 10.65 |
+| 4 × 4 | 10.20 | 10.20 | 0.00 | 10.20 |
+| 4 × 5 | 12.95 | 12.95 | 0.00 | 12.95 |
+| 4 × 6 | 14.03 | 14.02 | +0.01 | 14.00 |
+| 4 × 7 | 16.13 | 16.12 | +0.01 | 16.12 |
+| 5 × 4 | 15.45 | 15.42 | +0.03 | 15.28 |
+| 5 × 5 | 18.98 | 18.95 | +0.03 | 18.65 |
+| 5 × 6 | 22.15 | 22.15 | 0.00 | 21.95 |
+| 5 × 7 | 24.30 | 24.33 | −0.03 | 22.08 |
+| 5 × 8 | 27.78 | 27.73 | +0.05 | – |
+| 5 × 9 | 30.48 | 30.50 | −0.02 | – |
+| 5 × 10 | 33.35 | 33.40 | −0.05 | – |
+| 6 × 6 | 31.15 | 31.05 | +0.10 | – |
+| 6 × 10 | 45.95 | 45.93 | +0.02 | – |
+| 10 × 6 | 79.78 | 79.50 | +0.28 | – |
+| 10 × 10 | 114.50 | 113.45 | +1.05 | – |
 
-### Check 3 — Table 5: O_v — **not done**
+Result: 19 of 21 sizes are within ±0.10 of the ACO column. The code is worse on the two largest sizes: 10 × 6 by 0.28 and 10 × 10 by 1.05. That is larger than the seed spread on 5 × 7 (below). Whether the missing Zhu bound causes it has not been tested.
+
+### Check 2 — Table 5: O_f,30 and O_f,5 — **done (baseline)**
+
+| T × S | O_f,30 code | OPT | code − OPT | E_ACO | O_f,5 code | OPT | code − OPT | E_ACO |
+|---|---|---|---|---|---|---|---|---|
+| 3 × 3 | 476.4 | 476.4 | 0.0 | 0.0 | 126.4 | 126.4 | 0.0 | 0.0 |
+| 3 × 4 | 633.7 | 633.6 | +0.1 | 0.1 | 178.5 | 178.4 | +0.1 | 0.0 |
+| 3 × 5 | 789.2 | 789.2 | 0.0 | 0.1 | 236.6 | 236.6 | 0.0 | 0.3 |
+| 3 × 6 | 968.2 | 968.2 | 0.0 | 0.1 | 303.7 | 303.2 | +0.5 | 0.8 |
+| 3 × 7 | 1137.1 | 1137.0 | +0.1 | 0.0 | 375.5 | 375.2 | +0.3 | 0.9 |
+| 3 × 8 | 1331.3 | 1331.3 | 0.0 | 0.3 | 457.7 | 455.1 | +2.6 | 1.9 |
+| 4 × 4 | 911.9 | 911.9 | 0.0 | 0.0 | 255.6 | 255.5 | +0.1 | 0.2 |
+| 4 × 5 | 1170.2 | 1170.2 | 0.0 | 0.0 | 344.5 | 343.0 | +1.5 | 1.3 |
+| 4 × 6 | 1386.0 | 1385.4 | +0.6 | 0.4 | 429.5 | 428.5 | +1.0 | 2.2 |
+| 4 × 7 | 1647.8 | 1647.7 | +0.1 | 0.8 | 537.6 | 532.8 | +4.8 | 3.5 |
+| 5 × 4 | 1230.9 | 1230.0 | +0.9 | 1.7 | 344.3 | 343.5 | +0.8 | 0.6 |
+
+Result:
+- O_f,30: the error of the code is at most E_ACO on 9 of 11 sizes. It is larger on 4 × 6 (+0.6 against 0.4) and on 3 × 7 (+0.1 against 0.0, at the paper's rounding precision).
+- O_f,5: the error is at most E_ACO on 6 of 11 sizes. It is larger on 3 × 8 (+2.6 against 1.9), 4 × 5 (+1.5 against 1.3), 4 × 7 (+4.8 against 3.5) and 5 × 4 (+0.8 against 0.6), and on 3 × 4 (+0.1 against 0.0, at the rounding precision).
+
+### Check 3 — Table 5: O_v — **done (baseline)**
+
+| T × S | O_v code | OPT | code − OPT | E_ACO |
+|---|---|---|---|---|
+| 3 × 3 | 904.0 | 904.0 | 0.0 | 1.8 |
+| 3 × 4 | 1187.7 | 1187.0 | +0.7 | 6.2 |
+| 3 × 5 | 1461.2 | 1460.8 | +0.4 | 6.8 |
+| 3 × 6 | 1760.2 | 1758.4 | +1.8 | 12.4 |
+| 3 × 7 | 2045.7 | 2043.4 | +2.3 | 18.3 |
+| 3 × 8 | 2369.4 | 2362.6 | +6.8 | 25.5 |
+| 4 × 4 | 1929.9 | 1928.1 | +1.8 | 10.7 |
+| 4 × 5 | 2429.2 | 2424.6 | +4.6 | 20.2 |
+
+Result: the error of the code is below E_ACO on all 8 sizes, by a wide margin: +4.6 against 20.2 on 4 × 5 and +6.8 against 25.5 on 3 × 8. See the open observation below.
+
+### Seed spread
+
+Seeds 0–4 on one size per objective, 40 instances each.
+
+| Objective, T × S | Seeds 0–4: average over 40 instances | Best of 5 per instance, averaged | Paper |
+|---|---|---|---|
+| Relocations, 5 × 7 | 24.30, 24.38, 24.33, 24.35, 24.33 | 24.25 | ACO 24.33 |
+| O_f,30, 4 × 5 | 1170.2, 1170.3, 1170.9, 1170.3, 1170.3 | 1170.2 | OPT + E_ACO 1170.2 |
+| O_v, 4 × 5 | 2429.2, 2429.6, 2429.1, 2428.5, 2429.8 | 2427.1 | OPT + E_ACO 2444.8 |
+
+The spread of the size average across seeds is 0.08 relocations on 5 × 7, 0.7 s for O_f,30 on 4 × 5 and 1.3 s for O_v on 4 × 5. The O_v gap to the paper on 4 × 5 (15.6 s between the code's seed-0 average and OPT + E_ACO) is not explained by seed variation.
+
+### Open observation — the code does better than the paper on O_v
+
+With 5000 iterations the code finds better O_v solutions than the paper reports, on every size of Table 5, although the paper used "around 5 times" more iterations for the crane-time objectives (p. 88). On O_f,30 and O_f,5 the code is close to the paper. The cause is not known.
+
+Hypothesis, to be tested after the repair: if the O_v error rises towards E_ACO once LB_v (eq. 45) is introduced, the missing early abort explains the difference.
