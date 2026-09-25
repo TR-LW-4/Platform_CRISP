@@ -87,7 +87,7 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | dd*(S) = N + i(S) for an empty stack | p. 83 | `empty_d` (`algorithm.py:195`, `:278`); greedy `scoring.py:34-45`, `:258` | equal | — |
 | n = times c has already been moved | p. 83 | `min(M[c], MaxMoves)` before the move, `M[c] += 1` after (`algorithm.py:264`, `:339`) | equal | — |
 | n > MaxMoves | not specified | clamped to MaxMoves (`algorithm.py:264`) | not specified in paper | choice left open by paper |
-| Heuristic f(c, S) = 1 / (1 + dif(c, dd(S))) | eqs. 26–27, p. 83 | dif is computed with d = dd*(S), i.e. N + i(S) instead of N + 1 for an empty stack (`algorithm.py:278-282`) | deviation | differs from paper |
+| Heuristic f(c, S) = 1 / (1 + dif(c, dd(S))) | eqs. 26–27, p. 83 | since `4cb92dd`: dif is computed with dd(S) = `smin` (N + 1 for an empty stack) (`algorithm.py:294-296`); the pheromone index and the tuple keep dd*(S) (`:292`, `:298`, `:331`) | equal | — |
 | g(α) = f(α) · τ_c,dd*(S),m_c,t | eqs. 29–30, p. 83 | `algorithm.py:284-285` | equal | — |
 | Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:300-313` | equal | — |
 | Ties in the argmax | not specified | strict `>` keeps the first stack in index order (`algorithm.py:290`) | not specified in paper | choice left open by paper |
@@ -158,6 +158,8 @@ Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, 
 Where the check sits is as in the paper: Alg. 2 checks only after a relocation, and so does the code. A check after a retrieval would change nothing, because a retrieval adds to O exactly the term it removes from LB(Bay).
 
 **The heuristic uses dd* instead of dd for empty stacks.** Eq. 27 evaluates the heuristic with dd(S), which is N + 1 for every empty stack; dd*(S) = N + i(S) is only the pheromone index (eq. 29). The code uses dd* in both (`algorithm.py:278-282`), so an empty stack gets f = 1 / (1 + N + i(S) − c) instead of 1 / (N + 2 − c): the higher its index, the less attractive it looks. Under uniform pheromone the argmax is the same, because a well-located stack still beats any empty stack, an empty stack still beats any stack where c is not well-located, and among empty stacks the lowest index wins in both cases. The difference shows in the roulette choice and in the argmax once τ differs between stacks. Example: N = 35, c = 10, empty stack i = 7: f = 1/33 in the code against 1/27 in the paper.
+
+Repair: step 2 (`4cb92dd`) evaluates the heuristic with dd(S); the pheromone index and the tuple in S keep dd*(S). Effect: §4, step 2.
 
 ### 3.4 Suspected bugs
 
@@ -442,3 +444,92 @@ On every complete size the average optimum equals the OPT column, and no baselin
 **Eq. 41 — equal to f2vert.** Eq. 41 implemented literally with the tier numbering of Sec. 2 (p. 79): tier 0 is the ground and containers occupy tiers 1..H (H_S = 0 for an empty stack, eq. 2; H_S < H for a non-full stack, eq. 1). t(c) is the tier of c and H*_S the tier where c lands; hmax = Hmax + 1, hout = 1.5, tr = 7.77, ts = 1.2. On 1550 rBRP plans (the MinMax greedy and 30 random plans for each of 10 instances of 3 × 3, 3 × 5, 3 × 8, 4 × 4 and 4 × 5), eq. 41 and the shared f2vert agree on all 47 772 moves.
 
 Conclusion: where checked, the code follows the paper (local update on aborted ants), the objective is the paper's (eq. 41 = f2vert), and the optimum it is compared with is the same (OPT column = exact optimum under f2vert). Two hypotheses for the O_v difference are refuted: the missing early abort (steps 1a and 1b) and a difference in objective convention. The difference on O_v remains unexplained.
+
+#### Step 2 — dd instead of dd* in the heuristic (`4cb92dd`), O_v, O_f,30 and O_f,5
+
+Only f(c, S) changes (eqs. 26–28): every empty stack now gets dd = N + 1. The pheromone index (eq. 29) and the tuple in S (Alg. 2) keep dd*(S) = N + i(S). A scratch control on an instrumented copy of `4cb92dd` (data3-8-1 O_v, data4-7-1 O_f,5, data4-5-3 O_f,30, data6-6-2 O_f,30; 200 iterations each) confirmed that f uses dd(S) at all 509 340 candidate evaluations (40 655 of them empty stacks) and that the pheromone index and all 110 996 tuples use dd*(S). The greedy start is unchanged (`scoring.py` already used dd).
+
+Fixed before the runs:
+- E1: under uniform τ the argmax is unchanged, since by eq. 3 a well-located stack still beats an empty one, an empty stack still beats one where c is not well-located, and a tie between empty stacks goes to the lowest index as before. Only the argmax branch is unchanged: in the roulette branch the probabilities change, so the same random draw can select another stack. The ACO run is therefore not expected to be identical for the same seed; only the greedy start is bit-identical.
+- E2: between two empty stacks, only τ decides.
+- E3: no measurable effect or a small worsening on O_f and O_v, most likely on wide bays.
+- Hypothesis H-dd: dd* favoured empty stacks with a low index, close to the I/O point, which suits crane time. If the O_v error rises measurably after step 2, especially on 3 × 6 to 3 × 8, dd* is a candidate explanation for part of the O_v difference with the paper; at most a part (3 × 8: E_ACO 25.5 against +4.4). If it does not rise measurably, this explanation is refuted too.
+- Control group: on sizes where few choices are affected (O_f on 3 × 3, 3 × 4, 4 × 4, 5 × 4; stated in advance as ≤ 1 %, measured 0.3–1.2 %, see the count below), hardly any per-instance differences are expected. Many differences there would point to something other than the intended change.
+- Criterion: sign test (two-sided, seed 0, all sizes) and seed ranges (seeds 0–4) per measured size, per objective. An effect is convincing only if the test and the seed ranges agree, or if the same sign recurs on several objectives. A single p < 0.05 on one of the three objectives counts as a weak signal.
+
+Where an effect can occur: share of the choices ants actually make (code `c87b7d5`, one 200-iteration run per instance, 40 instances) with at least two empty stacks among the candidates:
+
+| T × S | O_f,30: choices | ≥ 2 empty | O_f,5: choices | ≥ 2 empty | O_v: choices | ≥ 2 empty |
+|---|---|---|---|---|---|---|
+| 3 × 3 | 273 870 | 1.0 % | 277 898 | 1.1 % | 399 770 | 4.3 % |
+| 3 × 4 | 333 120 | 1.1 % | 326 228 | 1.2 % | 490 945 | 9.9 % |
+| 3 × 5 | 311 826 | 4.2 % | 341 322 | 6.1 % | 553 633 | 18.8 % |
+| 3 × 6 | 418 048 | 6.9 % | 429 415 | 10.9 % | 667 753 | 22.3 % |
+| 3 × 7 | 409 525 | 8.4 % | 409 689 | 11.2 % | 740 968 | 33.5 % |
+| 3 × 8 | 506 736 | 10.1 % | 530 335 | 15.2 % | 845 633 | 32.4 % |
+| 4 × 4 | 594 401 | 0.3 % | 600 267 | 0.6 % | 806 887 | 3.5 % |
+| 4 × 5 | 735 470 | 2.4 % | 687 102 | 2.2 % | 1 016 142 | 8.3 % |
+| 4 × 6 | 800 321 | 3.0 % | 804 117 | 3.5 % | – | – |
+| 4 × 7 | 890 966 | 5.0 % | 910 992 | 6.6 % | – | – |
+| 5 × 4 | 926 428 | 0.3 % | 933 967 | 0.4 % | – | – |
+
+Runs: same jobs as step 1b, plus seeds 1–4 on 3 × 8 (O_v) and on 4 × 7 and 3 × 8 (O_f,5), for both `c87b7d5` and `4cb92dd`. Error of the code (code − OPT), seed 0; per instance against step 1b.
+
+O_v:
+
+| T × S | E_ACO | step 1b | step 2 | per instance: better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 | 1.8 | 0.0 | 0.0 | 0 / 40 / 0 |
+| 3 × 4 | 6.2 | +0.7 | +0.7 | 0 / 40 / 0 |
+| 3 × 5 | 6.8 | +0.4 | +0.4 | 0 / 40 / 0 |
+| 3 × 6 | 12.4 | +1.1 | +2.1 | 4 / 33 / 3 |
+| 3 × 7 | 18.3 | +3.2 | +3.4 | 2 / 35 / 3 |
+| 3 × 8 | 25.5 | +4.4 | +5.6 | 4 / 30 / 6 |
+| 4 × 4 | 10.7 | +1.0 | +2.3 | 2 / 34 / 4 |
+| 4 × 5 | 20.2 | +4.9 | +4.1 | 2 / 37 / 1 |
+
+O_f,30:
+
+| T × S | E_ACO | step 1b | step 2 | per instance: better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 (control) | 0.0 | +0.1 | +0.1 | 0 / 40 / 0 |
+| 3 × 4 (control) | 0.1 | +0.3 | +0.3 | 0 / 40 / 0 |
+| 3 × 5 | 0.1 | +0.3 | +0.3 | 0 / 40 / 0 |
+| 3 × 6 | 0.1 | +0.2 | +0.2 | 1 / 38 / 1 |
+| 3 × 7 | 0.0 | +0.8 | +0.7 | 1 / 39 / 0 |
+| 3 × 8 | 0.3 | +0.8 | +1.5 | 0 / 35 / 5 |
+| 4 × 4 (control) | 0.0 | +0.1 | +0.6 | 0 / 39 / 1 |
+| 4 × 5 | 0.0 | +0.8 | +1.2 | 0 / 37 / 3 |
+| 4 × 6 | 0.4 | +1.1 | +1.2 | 0 / 39 / 1 |
+| 4 × 7 | 0.8 | +2.0 | +1.6 | 6 / 29 / 5 |
+| 5 × 4 (control) | 1.7 | +1.5 | +1.9 | 1 / 36 / 3 |
+
+O_f,5:
+
+| T × S | E_ACO | step 1b | step 2 | per instance: better / equal / worse |
+|---|---|---|---|---|
+| 3 × 3 (control) | 0.0 | +0.1 | +0.1 | 0 / 40 / 0 |
+| 3 × 4 (control) | 0.0 | +0.5 | +0.3 | 1 / 39 / 0 |
+| 3 × 5 | 0.3 | +0.3 | +0.5 | 1 / 38 / 1 |
+| 3 × 6 | 0.8 | +0.9 | +1.0 | 2 / 34 / 4 |
+| 3 × 7 | 0.9 | +1.4 | +2.0 | 3 / 32 / 5 |
+| 3 × 8 | 1.9 | +3.3 | +3.4 | 9 / 22 / 9 |
+| 4 × 4 (control) | 0.2 | +0.2 | +0.2 | 0 / 39 / 1 |
+| 4 × 5 | 1.3 | +2.0 | +2.2 | 4 / 33 / 3 |
+| 4 × 6 | 2.2 | +2.8 | +2.8 | 5 / 30 / 5 |
+| 4 × 7 | 3.5 | +4.9 | +4.3 | 7 / 25 / 8 |
+| 5 × 4 (control) | 0.6 | +1.8 | +1.6 | 4 / 36 / 0 |
+
+| Objective | Sign test (better / worse, p) | Seed ranges, step 1b → step 2 |
+|---|---|---|
+| O_v | 14 / 17, p = 0.72 | 3 × 8: 2365.40–2369.38 → 2366.93–2370.33; 4 × 5: 2428.16–2429.50 → 2428.61–2430.37 |
+| O_f,30 | 9 / 19, p = 0.087 | 4 × 5: 1170.90–1171.14 → 1170.90–1171.38 |
+| O_f,5 | 36 / 36, p = 1 | 3 × 8: 458.44–458.90 → 458.31–459.38; 4 × 7: 537.40–538.48 → 537.14–538.23 |
+
+Result:
+- No measurable effect on any of the three objectives: no sign test reaches p < 0.05, and the seed ranges overlap on every measured size.
+- The direction on O_f,30 (9 better, 19 worse, p = 0.087) and slightly on O_v (14 / 17) fits E3 (a small worsening), but stays below the threshold fixed in advance; O_f,5 is neutral (36 / 36).
+- H-dd is refuted: the O_v error does not rise measurably, also not on 3 × 6 to 3 × 8, where 22–34 % of the choices are affected. Even a real shift of the order seen on 3 × 8 (the seed ranges move by about 1) would be small against the gap with the paper (E_ACO 25.5 against +4.4), so dd* could explain at most a negligible part.
+- Control group: 5 of 160 (O_f,30) and 6 of 160 (O_f,5) instances differ, mostly on 5 × 4, consistent with the expectation of hardly any differences.
+
+Scripts and results: `docs/validation/data/jovanovic_2019_step2/` (local, not in git).
