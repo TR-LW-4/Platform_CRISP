@@ -119,8 +119,8 @@ class CRP_R(BaseProblem):
     def _build_episode(self) -> None:
         """Fill yard from ``extra['layout_file_path']`` (Caserta/Zhu-style file).
 
-        CRP-R / CRP-U require a layout file. Subclasses such as CRP-Time and
-        CRP-Stoch still fall back to a random yard when no file is set.
+        CRP-R / CRP-U / CRP-Time require a layout file. Subclasses such as
+        CRP-MO and CRP-Stoch still fall back to a random yard when no file is set.
         """
         cfg = self.config
         path_str = layout_path_from_extra(cfg.extra)
@@ -134,7 +134,7 @@ class CRP_R(BaseProblem):
             self.containers = apply_caserta_file_to_yard(self.yard, cfg, p)
             return
 
-        if self.name in ("CRP-R", "CRP-U"):
+        if self.name in ("CRP-R", "CRP-U", "CRP-Time"):
             raise ValueError(
                 f"{self.name} requires a Caserta/Zhu layout file "
                 "(set extra['layout_file_path']). Random layouts are disabled."
