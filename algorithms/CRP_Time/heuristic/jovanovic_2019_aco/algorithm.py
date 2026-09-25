@@ -36,7 +36,13 @@ from core.objectives import (
     movement_objective_cost,
 )
 from core.plan import Movement, RelocationPlan
-from .scoring import compute_lb, lb_time, run_greedy_rbrp_time
+from .scoring import (
+    compute_lb,
+    has_time_lb,
+    lb_container,
+    lb_time,
+    run_greedy_rbrp_time,
+)
 
 
 def _solution_to_plan(
@@ -190,12 +196,17 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             loc_init:       List[Any]      = [None] * (n_total + 1)
             stack_min_init: Dict[Any, int] = {}
             empty_d:        Dict[Any, int] = {}
+            nw_init:        List[bool]     = [False] * (n_total + 1)
 
             for key, prios in stacks_init.items():
                 stack_min_init[key] = min(prios) if prios else (n_total + 1)
                 empty_d[key]        = n_total + key_to_1based_idx[key]
-                for p in prios:
+                for i, p in enumerate(prios):
                     loc_init[p] = key
+                    nw_init[p]  = i > 0 and min(prios[:i]) < p
+
+            # LB(Bay) of the current bay for the early abort (Alg. 2)
+            use_lb = has_time_lb(objective_spec)
 
             best_plan = _solution_to_plan(
                 S_best, stacks_init, all_keys, n_total
@@ -240,6 +251,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                     smin         = dict(stack_min_init)
                     crane_pos    = (1, 1)            # crane starts at (bay=1, row=1)
                     time_so_far  = 0.0               # accumulated selected objective
+                    nw           = list(nw_init)
+                    lb_cur       = lb_init_time      # LB(Bay) of the current bay
 
                     for target in range(1, n_total + 1):
                         if not valid:
@@ -323,6 +336,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                                 from_tier=len(stacks[src_key]),
                                 to_tier=len(stacks[dst_key]) + 1,
                             )
+                            nw_new = smin[dst_key] < c
 
                             stacks[src_key].pop()
                             if smin[src_key] == c:
@@ -348,8 +362,19 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                             )
                             time_so_far += cost
 
-                            # All supported objective components are non-negative.
-                            if time_so_far >= best_cost:
+                            if use_lb:
+                                lb_cur += lb_container(
+                                    key_to_1based_idx[dst_key], movement.to_tier,
+                                    nw_new, objective_spec,
+                                ) - lb_container(
+                                    key_to_1based_idx[src_key], movement.from_tier,
+                                    nw[c], objective_spec,
+                                )
+                                nw[c] = nw_new
+
+                            # Alg. 2: stop once the partial cost plus LB(Bay)
+                            # reaches the best cost.
+                            if time_so_far + lb_cur >= best_cost:
                                 valid = False
 
                         # Retrieve target (also incurs crane time)
@@ -371,6 +396,13 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                                 crane_pos,
                             )
                             time_so_far += cost
+                            # The retrieval cost equals the term it removes
+                            # from LB(Bay), so no abort check is needed here.
+                            if use_lb:
+                                lb_cur -= lb_container(
+                                    key_to_1based_idx[src_key], movement.from_tier,
+                                    nw[target], objective_spec,
+                                )
 
                             stacks[src_key].pop()
                             if smin[src_key] == target:
