@@ -37,7 +37,6 @@ from core.objectives import (
 )
 from core.plan import Movement, RelocationPlan
 from .scoring import (
-    compute_lb,
     has_time_lb,
     lb_container,
     lb_time,
@@ -161,13 +160,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             max_tiers = int(env.config.max_tiers)
             n_stacks  = env.config.num_bays * env.config.num_rows
 
-            # Read kinematics from problem config (same keys as CRP-Time schema)
-            extra      = env.config.extra
-            gantry_s   = float(extra.get("gantry_s_per_bay",  3.5))
-            trolley_s  = float(extra.get("trolley_s_per_row", 1.2))
-            accel_s    = float(extra.get("gantry_accel_s",   40.0))
-            spreader_s = float(extra.get("spreader_s",        30.0))
-
             all_keys:          List[Any] = []
             key_to_1based_idx: Dict[Any, int] = {}
             stacks_init:       Dict[Any, List[int]] = {}
@@ -182,13 +174,12 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 )
 
             # ── Greedy warm-start ────────────────────────────────────── #
-            S_best, _legacy_greedy_cost = run_greedy_rbrp_time(
+            S_best = run_greedy_rbrp_time(
                 stacks_init, all_keys, n_total, max_tiers, key_to_1based_idx,
-                gantry_s, trolley_s, accel_s, spreader_s, max_moves,
+                max_moves,
             )
 
             # ── Initial lower bound ──────────────────────────────────── #
-            lb_init_nwl  = compute_lb(stacks_init)          # integer NWL count
             # LB_f / LB_v of the initial bay for val (eqs. 44–47)
             lb_init_time = lb_time(stacks_init, key_to_1based_idx, objective_spec)
 

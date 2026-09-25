@@ -15,9 +15,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.objectives import ObjectiveSpec
 
-# Truck pickup position — must match core/objectives.py _TRUCK_POS
-_TRUCK_POS: Tuple[int, int] = (0, 0)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stack value helpers  (copied from CRP_R/heuristic/jovanovic_2019_aco/scoring.py)
@@ -66,27 +63,6 @@ def dif(c: int, d: int, n_total: int) -> int:
         return d - c
     else:
         return 2 * n_total + 1 - d
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Lower bound  (copied)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def compute_lb(stacks: Dict[Any, List[int]]) -> int:
-    """
-    Lower bound on remaining relocations: number of non-well-located
-    containers in the current bay state.
-
-    Container c is non-well-located if ∃ d below c in the same stack with
-    d < c  (d is retrieved before c but c is blocking d).
-    """
-    lb = 0
-    for prios in stacks.values():
-        for i in range(1, len(prios)):
-            c = prios[i]
-            if min(prios[:i]) < c:
-                lb += 1
-    return lb
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,113 +115,7 @@ def lb_time(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Inline 2-D kinematics  (new — adapts KinematicsModel to avoid object overhead)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _travel_time(
-    pos_a:     Tuple[int, int],
-    pos_b:     Tuple[int, int],
-    gantry_s:  float,
-    trolley_s: float,
-    accel_s:   float,
-) -> float:
-    """
-    Repositioning time from pos_a to pos_b for a 2-D RMGC.
-
-    Gantry (bay axis) and trolley (row axis) move simultaneously, so total
-    travel time = max(gantry_time, trolley_time).
-    Acceleration overhead is added once when the gantry actually moves.
-
-    Mirrors KinematicsModel.travel_time() from core/objectives.py.
-    """
-    bay_diff  = abs(pos_b[0] - pos_a[0])
-    row_diff  = abs(pos_b[1] - pos_a[1])
-    gantry_t  = bay_diff * gantry_s + (accel_s if bay_diff > 0 else 0.0)
-    trolley_t = row_diff * trolley_s
-    return max(gantry_t, trolley_t)
-
-
-def move_time_inline(
-    crane_pos:  Tuple[int, int],
-    src_pos:    Tuple[int, int],
-    dst_pos:    Tuple[int, int],
-    gantry_s:   float,
-    trolley_s:  float,
-    accel_s:    float,
-    spreader_s: float,
-) -> Tuple[float, Tuple[int, int]]:
-    """
-    Crane time (seconds) to relocate a container from src_pos to dst_pos,
-    given the crane is currently at crane_pos.
-
-    Sequence (mirrors KinematicsModel.move_time()):
-      1. Reposition crane: crane_pos → src_pos
-      2. Pickup + carry:   src_pos   → dst_pos
-      3. Place-down:       spreader_s (combined pickup+place-down)
-
-    Returns
-    -------
-    cost          : total seconds for this move
-    new_crane_pos : dst_pos  (crane ends at destination)
-    """
-    cost = (
-        _travel_time(crane_pos, src_pos, gantry_s, trolley_s, accel_s)
-        + _travel_time(src_pos, dst_pos, gantry_s, trolley_s, accel_s)
-        + spreader_s
-    )
-    return cost, dst_pos
-
-
-def retrieval_time_inline(
-    crane_pos:  Tuple[int, int],
-    src_pos:    Tuple[int, int],
-    gantry_s:   float,
-    trolley_s:  float,
-    accel_s:    float,
-    spreader_s: float,
-) -> Tuple[float, Tuple[int, int]]:
-    """
-    Crane time (seconds) to retrieve a container from src_pos to the truck
-    at _TRUCK_POS = (0, 0).
-
-    Returns
-    -------
-    cost          : total seconds for this retrieval
-    new_crane_pos : _TRUCK_POS  (crane ends at truck position)
-    """
-    cost = (
-        _travel_time(crane_pos, src_pos, gantry_s, trolley_s, accel_s)
-        + _travel_time(src_pos, _TRUCK_POS, gantry_s, trolley_s, accel_s)
-        + spreader_s
-    )
-    return cost, _TRUCK_POS
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Crane-time lower bound  (new — adapts LB_f Eq. 44 to platform 2D model)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def compute_lb_time(n_nwl: int, spreader_s: float) -> float:
-    """
-    Lower bound on remaining crane time.
-
-    Each of the n_nwl non-well-located containers requires at least one
-    extra relocation costing at minimum spreader_s seconds (the irreducible
-    pickup + place-down time when crane is already at source and source/
-    destination share the same bay and row — i.e. travel time = 0).
-
-    This corresponds to the second term of LB_f (Eq. 44) adapted to the
-    platform's 2D kinematics: Σ_{c∈NW} (t_pp + t_s) ≥ n_nwl × spreader_s.
-
-    Returns
-    -------
-    float  lower-bound crane time in seconds
-    """
-    return n_nwl * spreader_s
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Greedy warm-start with crane-time accumulation  (new)
+# Greedy start S_g  (Alg. 1, p. 80)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_greedy_rbrp_time(
@@ -254,32 +124,15 @@ def run_greedy_rbrp_time(
     n_total:           int,
     max_tiers:         int,
     key_to_1based_idx: Dict[Any, int],
-    gantry_s:          float,
-    trolley_s:         float,
-    accel_s:           float,
-    spreader_s:        float,
     max_moves:         int,
-) -> Tuple[List[Tuple[int, int, int, int]], float]:
+) -> List[Tuple[int, int, int, int]]:
     """
-    MinMax greedy rBRP warm-start that accumulates crane time instead of
-    counting relocations.
-
-    Stack keys are (bay, row) tuples, so they double as spatial positions
-    for the kinematics model — no separate position mapping is needed.
-
-    Initial crane position is (1, 1), matching compute_crane_time() default
-    in core/objectives.py.
-
-    Returns
-    -------
-    solution   : list of (c, d_star, mc, t) 4-tuples for pheromone seeding
-    crane_time : total crane time in seconds for this greedy solution
+    MinMax greedy for the rBRP (Alg. 1). Returns S_g as (c, dd*(S), n, t)
+    4-tuples; its cost is evaluated by the caller with the shared evaluator.
     """
     stacks: Dict[Any, List[int]] = {k: list(v) for k, v in stacks_init.items()}
     M: Dict[int, int] = {}
     solution: List[Tuple[int, int, int, int]] = []
-    crane_pos: Tuple[int, int] = (1, 1)
-    total_time: float = 0.0
 
     for target in range(1, n_total + 1):
         src_key: Optional[Any] = next(
@@ -317,22 +170,12 @@ def run_greedy_rbrp_time(
             # n = 0, ..., MaxMoves (p. 83); M keeps the true count, as for the ants
             solution.append((c, d_val, min(n, max_moves), target))
 
-            # Accumulate crane time for relocation; src_key IS src_pos (bay, row)
-            cost, crane_pos = move_time_inline(
-                crane_pos, src_key, best_dst, gantry_s, trolley_s, accel_s, spreader_s
-            )
-            total_time += cost
-
             stacks[src_key].pop()
             stacks[best_dst].append(c)
             M[c] = n + 1
 
-        # Retrieve target (also incurs crane time)
+        # Retrieve target
         if stacks[src_key] and stacks[src_key][-1] == target:
-            cost, crane_pos = retrieval_time_inline(
-                crane_pos, src_key, gantry_s, trolley_s, accel_s, spreader_s
-            )
-            total_time += cost
             stacks[src_key].pop()
 
-    return solution, total_time
+    return solution
