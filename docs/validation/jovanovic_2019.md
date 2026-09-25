@@ -192,7 +192,7 @@ On the Caserta instances, the literal LB of the initial bay against the best sol
 | O_f,5 | 440 | 13 | 0.694, 0.909, 1.032 |
 | O_v | 320 | 0 | 0.670, 0.807, 1.000 |
 
-Consequences, if implemented literally: val can be clamped (§3.2), and the early abort can stop ants that would reach a solution below LB_f. Decision (Thom): implement eq. 44 literally and measure the effect after the lower bound is added to the early abort. Measured in §4, step 1b: O_f gets worse after step 1b, but not on the instances where LB_f is too high. Script: `docs/validation/data/jovanovic_2019_baseline/jov_lb_check.py` (local).
+Consequences, if implemented literally: val can be clamped (§3.2), and the early abort can stop ants that would reach a solution below LB_f. Decision (Thom): implement eq. 44 literally and measure the effect after the lower bound is added to the early abort. Measured in §4, step 1b: with the literal LB_f in the early abort, O_f gets worse; with a valid bound (eq. 44 without the ts) it hardly does. Script: `docs/validation/data/jovanovic_2019_baseline/jov_lb_check.py` (local).
 
 ## 4. Behavioural checks
 
@@ -290,7 +290,7 @@ With 5000 iterations the code finds better O_v solutions than the paper reports,
 
 Hypothesis, to be tested after the repair: if the O_v error rises towards E_ACO once LB_v (eq. 45) is introduced, the missing early abort explains the difference.
 
-Outcome (§4, steps 1a and 1b): the O_v error did not rise, neither with LB_v in val nor with LB_v in the early abort, although the abort now acts early. The hypothesis is not confirmed; the difference with the paper remains unexplained.
+Outcome (§4, steps 1a and 1b): the O_v error did not rise, neither with LB_v in val nor with LB_v in the early abort, although the abort now acts early. The hypothesis is refuted; the difference with the paper remains unexplained.
 
 ### Repair runs
 
@@ -314,7 +314,7 @@ Seed 0 on the 8 sizes of Table 5, and seeds 0–4 on 4 × 5; 480 runs.
 - Per instance against the baseline (seed 0, 320 instances): 11 better, 301 equal, 8 worse.
 - Seeds 0–4 on 4 × 5, average over 40 instances per seed: 2428.5, 2428.5, 2429.2, 2431.1, 2429.7 (baseline 2428.5–2429.8).
 
-Result: the O_v error stays far below E_ACO on every size. The changes fall within the seed variation. LB_v in val alone does not close the gap with the paper.
+Result: no measurable effect. The differences per size fall within the seed spread (4 × 5, seeds 0–4, over the baseline and steps 1a and 1b: 2428.2–2431.1). The O_v error stays far below E_ACO on every size.
 
 #### Step 1b — LB(Bay) in the early abort (`c87b7d5`), O_v, O_f,30 and O_f,5
 
@@ -384,5 +384,33 @@ O_f,5:
 - Relation to §3.6: none of the 52 worse O_f,30 instances is among the 11 where LB_f of the initial bay exceeds a found solution; for O_f,5 it is 1 of 78 (13 such instances). On 11 of 11 and 12 of 13 of those instances step 1b still finds a solution below LB_f of the initial bay.
 
 Result:
-- O_v: no rise towards E_ACO; the hypothesis in "Open observation" is not confirmed.
-- O_f: the error grows on most sizes and now exceeds E_ACO on more sizes than in the baseline. The worsening is not concentrated on the instances where LB_f is too high. Whether the overestimate of LB(Bay) during construction contributes elsewhere has not been tested.
+- O_v: no measurable effect; the differences per size fall within the seed spread (4 × 5, seeds 0–4: 2428.2–2431.1). The hypothesis in "Open observation" is refuted: the O_v error does not rise towards E_ACO, although the abort now acts early and on nearly every ant (the check is ≥, as in Alg. 2).
+- O_f: with LB_f taken literally from eq. 44, the error grows on every size and exceeds E_ACO on 10 (O_f,30) and 9 (O_f,5) of 11 sizes (baseline: 2 and 5). A scratch run with a valid bound (eq. 44 without the ts per non-well-located container; code otherwise as `c87b7d5`, not committed) brings the error back to about the baseline level: per instance against the baseline, O_f,30 6 better and 16 worse (literal: 4 and 52), O_f,5 30 better and 15 worse (literal: 17 and 78); O_f,30 on 4 × 5, seeds 0–4: 1170.3–1170.5 (literal 1170.9–1171.1, baseline 1170.2–1170.9). On O_f,30 a small difference with the baseline remains, e.g. +0.5 against 0.0 on 4 × 4. The worsening comes largely from the overestimate in eq. 44 (§3.6): the early abort can stop ants that could still improve on S_best. This is faithful to the paper, not a bug in the code.
+
+Error of the code (code − OPT), seed 0:
+
+| T × S | O_f,30: baseline | 1b literal | 1b valid bound | E_ACO | O_f,5: baseline | 1b literal | 1b valid bound | E_ACO |
+|---|---|---|---|---|---|---|---|---|
+| 3 × 3 | 0.0 | +0.1 | 0.0 | 0.0 | 0.0 | +0.1 | 0.0 | 0.0 |
+| 3 × 4 | +0.1 | +0.3 | 0.0 | 0.1 | +0.1 | +0.5 | +0.1 | 0.0 |
+| 3 × 5 | 0.0 | +0.3 | 0.0 | 0.1 | 0.0 | +0.3 | +0.1 | 0.3 |
+| 3 × 6 | 0.0 | +0.2 | +0.1 | 0.1 | +0.5 | +0.9 | +0.3 | 0.8 |
+| 3 × 7 | +0.1 | +0.8 | 0.0 | 0.0 | +0.3 | +1.4 | +0.5 | 0.9 |
+| 3 × 8 | 0.0 | +0.8 | +0.6 | 0.3 | +2.6 | +3.3 | +2.1 | 1.9 |
+| 4 × 4 | 0.0 | +0.1 | +0.5 | 0.0 | +0.1 | +0.2 | +0.2 | 0.2 |
+| 4 × 5 | 0.0 | +0.8 | +0.3 | 0.0 | +1.5 | +2.0 | +1.1 | 1.3 |
+| 4 × 6 | +0.6 | +1.1 | +0.3 | 0.4 | +1.0 | +2.8 | +0.9 | 2.2 |
+| 4 × 7 | +0.1 | +2.0 | +0.8 | 0.8 | +4.8 | +4.9 | +3.4 | 3.5 |
+| 5 × 4 | +0.9 | +1.5 | +1.1 | 1.7 | +0.8 | +1.8 | +0.5 | 0.6 |
+
+- Iterations. Scratch run with literal eq. 44 and 25 000 instead of 5000 iterations, O_f,5, seed 0, 3 × 8 and 4 × 7 (about 5.2× the running time per run). Interpretation fixed before the run: if the error is at or below E_ACO on both sizes, the paper's O_f results are compatible with literal eq. 44 plus about 5× as many iterations (compatible, not proven: one seed, two sizes); if not, the iterations do not explain the worsening. Result:
+  - the pre-registered condition is not met on 3 × 8, by 0.3 s (+2.2 against E_ACO 1.9); the seed spread on this size was not measured;
+  - the extra iterations close most of the gap: fully on 4 × 7 (+4.9 → +3.5 against E_ACO 3.5) and on 3 × 8 from +3.3 to +2.2; per instance 14 better and none worse. A full explanation is not shown;
+  - on 3 × 8 (O_f,5) no version of the code reaches E_ACO at 5000 iterations, the baseline included (+2.6; valid bound +2.1), so this size discriminates poorly.
+
+| T × S (O_f,5, seed 0) | E_ACO | baseline, 5000 | literal, 5000 | literal, 25 000 | valid bound, 5000 |
+|---|---|---|---|---|---|
+| 3 × 8 | 1.9 | +2.6 | +3.3 | +2.2 | +2.1 |
+| 4 × 7 | 3.5 | +4.8 | +4.9 | +3.5 | +3.4 |
+
+Raw results: `step1b_validlb_c87b7d5.jsonl` and `iters25k_c87b7d5.jsonl` in `docs/validation/data/jovanovic_2019_repair/` (local).
