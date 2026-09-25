@@ -102,7 +102,7 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | τ0 = (1/W) · val(S_g) | eq. 37, p. 84 | `tau_0 = val_greedy / n_stacks` (`algorithm.py:211-212`) | equal | — |
 | τmin = (1/W²) · val(S_best) | eq. 38, p. 84 | `algorithm.py:418` | equal | — |
 | How τmin is applied | not specified | as a floor in both the local and the global update (`algorithm.py:393-396`, `:429-432`); before the first global update τmin = τ0 / W (`:213`) | not specified in paper | choice left open by paper |
-| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | `time_so_far >= best_cost` after each relocation (`algorithm.py:350-352`), as in Alg. 2, but without the LB term | deviation | differs from paper |
+| Early abort: \|S\| + LB(Bay) ≥ \|S_best\|; for crane time with O and LB_f / LB_v | Alg. 2, p. 84; p. 85 | since `c87b7d5`: `time_so_far + lb_cur >= best_cost` after each relocation (`algorithm.py:377`), with LB(Bay) kept incrementally (`:199-209`, `:254-255`, `:339`, `:365-373`, `:401-405`); LB = 0 for the relocation objective | equal | — |
 | val when O − LB + 1 < 1 | not specified | clamped: val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`) | not specified in paper | choice left open by paper |
 | Initial S_best | not specified (Alg. 2 uses \|S_best\| from the first ant on) | the greedy solution and its cost (`algorithm.py:179`, `:199-208`) | not specified in paper | choice left open by paper |
 | New best: "Check if S is valid new best solution" | Alg. 2, p. 84 | valid and strictly lower cost (`algorithm.py:399-403`) | equal | — |
@@ -147,7 +147,7 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **No lower bound in val and in the early abort.** The paper's quality function subtracts a lower bound of the initial bay: the Zhu et al. (2012) bound for the relocation objective (eq. 33), LB_f or LB_v for crane time (eqs. 44–47). The early abort compares the partial cost plus the lower bound of the current bay with the best cost (Alg. 2; p. 85). The code sets the bound to 0 in both places (`algorithm.py:186`, comment "safe for every selectable objective"), so val = 1 / (O + 1) and an ant is aborted only when its cost so far reaches the best cost (`algorithm.py:350-352`). The CRP-R version of this algorithm (`algorithms/CRP_R/heuristic/jovanovic_2019_aco/`) does subtract a bound, the non-well-located count.
 
-Repair: step 1a (`f7a9c9a`) puts LB_f / LB_v of the initial bay into val. The early abort still has no bound (step 1b). For the relocation objective LB stays 0.
+Repair: step 1a (`f7a9c9a`) puts LB_f / LB_v of the initial bay into val. Step 1b (`c87b7d5`) adds LB(Bay) of the current bay to the early abort. For the relocation objective LB stays 0. Effect: §4, "Repair runs".
 
 Effect, measured on data4-5-1 under f2 (scratchpad computation): LB_f = 1087.2, the greedy solution costs 1281.6 and the best solution of a 5000-iteration run 1262.4.
 - Pheromone scale: with LB_f, Δτ / τ0 for that best solution is 5.54; with LB = 0 it is 5.08. On this instance the missing bound changes the ratio little.
@@ -192,7 +192,7 @@ On the Caserta instances, the literal LB of the initial bay against the best sol
 | O_f,5 | 440 | 13 | 0.694, 0.909, 1.032 |
 | O_v | 320 | 0 | 0.670, 0.807, 1.000 |
 
-Consequences, if implemented literally: val can be clamped (§3.2), and the early abort can stop ants that would reach a solution below LB_f. Decision (Thom): implement eq. 44 literally and measure the effect after the lower bound is added to the early abort. Script: `docs/validation/data/jovanovic_2019_baseline/jov_lb_check.py` (local).
+Consequences, if implemented literally: val can be clamped (§3.2), and the early abort can stop ants that would reach a solution below LB_f. Decision (Thom): implement eq. 44 literally and measure the effect after the lower bound is added to the early abort. Measured in §4, step 1b: O_f gets worse after step 1b, but not on the instances where LB_f is too high. Script: `docs/validation/data/jovanovic_2019_baseline/jov_lb_check.py` (local).
 
 ## 4. Behavioural checks
 
@@ -290,6 +290,8 @@ With 5000 iterations the code finds better O_v solutions than the paper reports,
 
 Hypothesis, to be tested after the repair: if the O_v error rises towards E_ACO once LB_v (eq. 45) is introduced, the missing early abort explains the difference.
 
+Outcome (§4, steps 1a and 1b): the O_v error did not rise, neither with LB_v in val nor with LB_v in the early abort, although the abort now acts early. The hypothesis is not confirmed; the difference with the paper remains unexplained.
+
 ### Repair runs
 
 Each repair step is run on the code of its own commit, with the same jobs, settings and driver as the baseline. Raw results and scripts: `docs/validation/data/jovanovic_2019_repair/` (local, not in git).
@@ -313,3 +315,74 @@ Seed 0 on the 8 sizes of Table 5, and seeds 0–4 on 4 × 5; 480 runs.
 - Seeds 0–4 on 4 × 5, average over 40 instances per seed: 2428.5, 2428.5, 2429.2, 2431.1, 2429.7 (baseline 2428.5–2429.8).
 
 Result: the O_v error stays far below E_ACO on every size. The changes fall within the seed variation. LB_v in val alone does not close the gap with the paper.
+
+#### Step 1b — LB(Bay) in the early abort (`c87b7d5`), O_v, O_f,30 and O_f,5
+
+Same jobs as the baseline for the three crane-time objectives; 1520 runs.
+
+O_v:
+
+| T × S | OPT | E_ACO | baseline: code − OPT | step 1a: code − OPT | step 1b: code − OPT |
+|---|---|---|---|---|---|
+| 3 × 3 | 904.0 | 1.8 | 0.0 | 0.0 | 0.0 |
+| 3 × 4 | 1187.0 | 6.2 | +0.7 | +1.1 | +0.7 |
+| 3 × 5 | 1460.8 | 6.8 | +0.4 | +0.4 | +0.4 |
+| 3 × 6 | 1758.4 | 12.4 | +1.8 | +1.9 | +1.1 |
+| 3 × 7 | 2043.4 | 18.3 | +2.3 | +2.3 | +3.2 |
+| 3 × 8 | 2362.6 | 25.5 | +6.8 | +2.7 | +4.4 |
+| 4 × 4 | 1928.1 | 10.7 | +1.8 | +2.3 | +1.0 |
+| 4 × 5 | 2424.6 | 20.2 | +4.6 | +3.9 | +4.9 |
+
+- Per instance against the baseline (seed 0, 320 instances): 14 better, 290 equal, 16 worse.
+- Seeds 0–4 on 4 × 5: 2429.5, 2428.2, 2428.7, 2429.5, 2428.9.
+
+The abort now acts early. One 5000-iteration run per instance (50 000 ants):
+
+| Instance, objective | Aborted ants before (`42a27fa`) | After (`c87b7d5`) | Mean target at abort, before → after | Best, before → after |
+|---|---|---|---|---|
+| data4-5-1, O_v | 1.3 % | 100.0 % | 19.3 → 11.1 of 20 | 2564.82 → 2564.82 |
+| data3-8-1, O_v | 0.0 % | 100.0 % | – → 9.7 of 24 | 2220.90 → 2220.90 |
+| data4-5-1, O_f,30 | 1.0 % | 100.0 % | 19.0 → 7.0 of 20 | 1262.40 → 1267.20 |
+
+Nearly every ant is aborted after step 1b, partly because the check is ≥ (Alg. 2): an ant that rebuilds S_best is aborted too.
+
+O_f,30:
+
+| T × S | OPT | E_ACO | baseline: code − OPT | step 1b: code − OPT |
+|---|---|---|---|---|
+| 3 × 3 | 476.4 | 0.0 | 0.0 | +0.1 |
+| 3 × 4 | 633.6 | 0.1 | +0.1 | +0.3 |
+| 3 × 5 | 789.2 | 0.1 | 0.0 | +0.3 |
+| 3 × 6 | 968.2 | 0.1 | 0.0 | +0.2 |
+| 3 × 7 | 1137.0 | 0.0 | +0.1 | +0.8 |
+| 3 × 8 | 1331.3 | 0.3 | 0.0 | +0.8 |
+| 4 × 4 | 911.9 | 0.0 | 0.0 | +0.1 |
+| 4 × 5 | 1170.2 | 0.0 | 0.0 | +0.8 |
+| 4 × 6 | 1385.4 | 0.4 | +0.6 | +1.1 |
+| 4 × 7 | 1647.7 | 0.8 | +0.1 | +2.0 |
+| 5 × 4 | 1230.0 | 1.7 | +0.9 | +1.5 |
+
+O_f,5:
+
+| T × S | OPT | E_ACO | baseline: code − OPT | step 1b: code − OPT |
+|---|---|---|---|---|
+| 3 × 3 | 126.4 | 0.0 | 0.0 | +0.1 |
+| 3 × 4 | 178.4 | 0.0 | +0.1 | +0.5 |
+| 3 × 5 | 236.6 | 0.3 | 0.0 | +0.3 |
+| 3 × 6 | 303.2 | 0.8 | +0.5 | +0.9 |
+| 3 × 7 | 375.2 | 0.9 | +0.3 | +1.4 |
+| 3 × 8 | 455.1 | 1.9 | +2.6 | +3.3 |
+| 4 × 4 | 255.5 | 0.2 | +0.1 | +0.2 |
+| 4 × 5 | 343.0 | 1.3 | +1.5 | +2.0 |
+| 4 × 6 | 428.5 | 2.2 | +1.0 | +2.8 |
+| 4 × 7 | 532.8 | 3.5 | +4.8 | +4.9 |
+| 5 × 4 | 343.5 | 0.6 | +0.8 | +1.8 |
+
+- Per instance against the baseline (seed 0, 440 instances each): O_f,30 4 better, 384 equal, 52 worse; O_f,5 17 better, 345 equal, 78 worse.
+- Seeds 0–4 on 4 × 5, O_f,30: 1171.0, 1170.9, 1171.0, 1171.1, 1170.9 (baseline 1170.2–1170.9).
+- Mean running time per run: 5.2 s for O_f,30 and O_f,5 (baseline 7.9 and 8.0 s), 7.4 s for O_v (baseline 6.9 s).
+- Relation to §3.6: none of the 52 worse O_f,30 instances is among the 11 where LB_f of the initial bay exceeds a found solution; for O_f,5 it is 1 of 78 (13 such instances). On 11 of 11 and 12 of 13 of those instances step 1b still finds a solution below LB_f of the initial bay.
+
+Result:
+- O_v: no rise towards E_ACO; the hypothesis in "Open observation" is not confirmed.
+- O_f: the error grows on most sizes and now exceeds E_ACO on more sizes than in the baseline. The worsening is not concentrated on the instances where LB_f is too high. Whether the overestimate of LB(Bay) during construction contributes elsewhere has not been tested.
