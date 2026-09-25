@@ -86,7 +86,8 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | Pheromone matrix τ_cdnt, d = 1..N + W, n = 0..MaxMoves | p. 83 | `np.full((N, N + W, MaxMoves + 1, N), τ0)` (`algorithm.py:214-217`); indices c − 1, d − 1, n, t − 1 (`:263-265`, `:284`) | equal | — |
 | dd*(S) = N + i(S) for an empty stack | p. 83 | `empty_d` (`algorithm.py:195`, `:278`); greedy `scoring.py:34-45`, `:258` | equal | — |
 | n = times c has already been moved | p. 83 | `min(M[c], MaxMoves)` before the move, `M[c] += 1` after (`algorithm.py:264`, `:339`) | equal | — |
-| n > MaxMoves | not specified | clamped to MaxMoves (`algorithm.py:264`) | not specified in paper | choice left open by paper |
+| n > MaxMoves | not specified | clamped to MaxMoves in the ants (`algorithm.py:278`) and, since `802e4d1`, in the greedy start (`scoring.py:316-318`); M keeps the true count (`algorithm.py:354`, `scoring.py:328`) | not specified in paper | choice left open by paper |
+| Greedy start without a destination stack (R_c empty) | not specified (Alg. 1, eq. 1, p. 80) | since `0bcfd7d`: `ValueError` (`scoring.py:307-313`); an ant in the same situation is marked invalid (`algorithm.py:309-311`) | not specified in paper | choice left open by paper |
 | Heuristic f(c, S) = 1 / (1 + dif(c, dd(S))) | eqs. 26–27, p. 83 | since `4cb92dd`: dif is computed with dd(S) = `smin` (N + 1 for an empty stack) (`algorithm.py:294-296`); the pheromone index and the tuple keep dd*(S) (`:292`, `:298`, `:331`) | equal | — |
 | g(α) = f(α) · τ_c,dd*(S),m_c,t | eqs. 29–30, p. 83 | `algorithm.py:284-285` | equal | — |
 | Transition rule: argmax g if q < q0, else roulette on g / Σg | eqs. 31–32, p. 83 | `algorithm.py:300-313` | equal | — |
@@ -131,7 +132,9 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **Ties.** In the greedy (`scoring.py:251`) and in the argmax of the transition rule (`algorithm.py:290`), the first stack in index order wins.
 
-**n beyond MaxMoves.** A container moved more than MaxMoves times uses n = MaxMoves (`algorithm.py:264`).
+**n beyond MaxMoves.** A container moved more than MaxMoves times uses n = MaxMoves: in the ants (`algorithm.py:278`) and, since `802e4d1`, in the greedy start (`scoring.py:316-318`). M keeps the true count in both.
+
+**Greedy start without a free stack.** Alg. 1 (p. 80) has no case for an empty R_c (eq. 1), and without S_g the initial pheromone (eq. 37) is undefined. Decision (Thom): stop with an error (`scoring.py:307-313`, since `0bcfd7d`). An ant in the same situation is marked invalid (`algorithm.py:309-311`).
 
 **τmin** is applied as a floor in both updates (`algorithm.py:393-396`, `:429-432`). **Reinitialisation** uses val(S_best) / W (`algorithm.py:409-412`). **Initial S_best** is the greedy solution (`algorithm.py:179`). **New best** requires a strictly lower cost (`algorithm.py:399`).
 
@@ -165,6 +168,10 @@ Repair: step 2 (`4cb92dd`) evaluates the heuristic with dd(S); the pheromone ind
 
 **J1 — the greedy start retrieves containers out of order when there is no room.** If no destination stack exists, `run_greedy_rbrp_time` breaks out of the relocation loop without retrieving the target (`scoring.py:255-256`) and continues with the next target, which can then be retrieved before the blocked one. Scratchpad check on stacks `[[1, 2], [3, 4]]` with H = 2 (target 1 blocked, the only other stack full): the greedy returns `[(4, 1, 0, 3)]`, a relocation of container 4 during target 3, and decoding it with `_solution_to_plan` raises `KeyError: None`. This requires an empty candidate list, which cannot occur on Caserta (`azari_2017.md` §3.2), so the bug is latent there. The ACO ants handle the same case by marking the solution invalid (`algorithm.py:295-297`).
 
+Step 3 found a second consequence: on a random UI layout (1 bay, 2 rows, 2 tiers, 4 containers, seed 4; stacks `[[1, 4], [2, 3]]`) the greedy skips both blocked targets without a relocation, the decoder builds a plan that retrieves container 1 from under container 4, and the run ends normally with objective 134.40. Fixed in `0bcfd7d`: the greedy stops with a `ValueError` (§3.2).
+
+**J2 — the greedy start does not cap n at MaxMoves.** The ants record n = min(M[c], MaxMoves) (`algorithm.py:278`), but the greedy recorded M[c] itself (`scoring.py:310` at `4cb92dd`). If the greedy solution is still S_best at a global update and has n > MaxMoves, the update indexes past the pheromone matrix (`algorithm.py:461-462`). On Caserta the greedy's largest n is 5 (MaxMoves = 10), so the bug is latent there. Scratch check with `max_moves = 1` on data4-4-7 at `4cb92dd`: `IndexError: index 2 is out of bounds for axis 2 with size 2`. Fixed in `802e4d1`: the greedy tuple uses min(n, MaxMoves) and M keeps the true count, as for the ants.
+
 ### 3.5 Notes for the standardisation (not deviations)
 
 - The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`.
@@ -174,6 +181,7 @@ Repair: step 2 (`4cb92dd`) evaluates the heuristic with dd(S); the pheromone ind
 - The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7`).
 - `fidelity = "adapted"` (`algorithm.py:109`). To be revisited after §3.3.
 - The base parameters `max_iterations` and `report_interval` appear in the UI but are not read; the ACO uses `n_iterations` and pushes every `n_iterations // 50` iterations (`algorithm.py:132`). Same platform point as in `azari_2017.md` §3.5.
+- The shared evaluator (`core/objectives.py:356-381`) takes the tiers from the plan and does not check that the plan is feasible; the J1 plan in §3.4 was scored without error. Platform point for Wei.
 
 ### 3.6 Observations on the paper
 
@@ -533,3 +541,51 @@ Result:
 - Control group: 5 of 160 (O_f,30) and 6 of 160 (O_f,5) instances differ, mostly on 5 × 4, consistent with the expectation of hardly any differences.
 
 Scripts and results: `docs/validation/data/jovanovic_2019_step2/` (local, not in git).
+
+#### Step 3 — J1 and J2 in the greedy start (`0bcfd7d`, `802e4d1`)
+
+Paper basis: Alg. 1 (p. 80) has no case for an empty R_c (eq. 1, p. 80), while Alg. 2 and eq. 37 (p. 84) need S_g; n = 0, …, MaxMoves (p. 83), MaxMoves = 10 (p. 86).
+
+Count before the change (instrumented scratch copy of `4cb92dd`; all 21 sizes × 40 instances; ants: one 200-iteration run per instance under the relocation objective, O_f,30, O_f,5 and O_v):
+
+| T × S | Greedy: starts without a solution | Greedy: largest n | Ants: choices | No candidate | M[c] > MaxMoves | Largest M[c] |
+|---|---|---|---|---|---|---|
+| 3 × 3 | 0 / 40 | 2 | 1 351 158 | 0 | 0 | 3 |
+| 3 × 4 | 0 / 40 | 2 | 1 643 889 | 0 | 0 | 4 |
+| 3 × 5 | 0 / 40 | 2 | 1 766 721 | 0 | 0 | 3 |
+| 3 × 6 | 0 / 40 | 1 | 2 165 650 | 0 | 0 | 3 |
+| 3 × 7 | 0 / 40 | 1 | 2 302 924 | 0 | 0 | 4 |
+| 3 × 8 | 0 / 40 | 1 | 2 660 494 | 0 | 0 | 3 |
+| 4 × 4 | 0 / 40 | 3 | 2 822 093 | 0 | 0 | 5 |
+| 4 × 5 | 0 / 40 | 2 | 3 483 192 | 0 | 0 | 4 |
+| 4 × 6 | 0 / 40 | 2 | 3 819 600 | 0 | 0 | 4 |
+| 4 × 7 | 0 / 40 | 2 | 4 345 172 | 0 | 0 | 4 |
+| 5 × 4 | 0 / 40 | 3 | 4 333 558 | 0 | 0 | 5 |
+| 5 × 5 | 0 / 40 | 3 | 5 415 399 | 0 | 0 | 6 |
+| 5 × 6 | 0 / 40 | 3 | 6 294 516 | 0 | 0 | 5 |
+| 5 × 7 | 0 / 40 | 2 | 6 636 924 | 0 | 0 | 4 |
+| 5 × 8 | 0 / 40 | 2 | 7 621 175 | 0 | 0 | 4 |
+| 5 × 9 | 0 / 40 | 2 | 8 474 836 | 0 | 0 | 4 |
+| 5 × 10 | 0 / 40 | 2 | 9 218 377 | 0 | 0 | 4 |
+| 6 × 6 | 0 / 40 | 3 | 9 130 408 | 0 | 0 | 6 |
+| 6 × 10 | 0 / 40 | 3 | 13 098 788 | 0 | 0 | 5 |
+| 10 × 6 | 0 / 40 | 5 | 25 442 141 | 0 | 0 | 8 |
+| 10 × 10 | 0 / 40 | 5 | 37 339 528 | 0 | 0 | 8 |
+
+- Greedy: 0 of 840 starts without a solution, and no tuple with n > MaxMoves (largest n: 5). The greedy is deterministic and does not depend on the objective, so this count is complete.
+- Ants: 159 366 543 choices, none without a candidate stack and none with M[c] > MaxMoves (largest M[c]: 8); this holds for 200-iteration runs.
+
+Expectation fixed before the change: neither branch is reached on the benchmark set, so the behaviour there does not change, and with the same seed the results are bit-identical.
+
+| Check | `4cb92dd` | `802e4d1` |
+|---|---|---|
+| J1, stacks `[[1, 2], [3, 4]]`, H = 2 | `KeyError: None` when decoding | `ValueError` (container 2 above target 1) |
+| J1, random layout seed 4, stacks `[[1, 4], [2, 3]]` | no error; infeasible plan, objective 134.40 | `ValueError` (container 4 above target 1) |
+| J2, data4-4-7, `max_moves = 1` | `IndexError` in the global update | runs; all greedy tuples n ≤ 1 |
+
+- Web UI: the random layout above, submitted as a job (`POST /api/jobs`), failed within a second with 0 records. The Workbench shows the status FAILED and a "Run error" banner whose first line is the `ValueError` message, followed by the traceback (screenshot `web_ui_j1.png`, local).
+- Bit-identical: `4cb92dd` against `802e4d1`, seed 0, 5000 iterations, instances 1 and 2 of all 21 sizes under the four objectives (168 runs per revision). Objective, relocations, f2, f2vert and the best solution are identical in all 168.
+
+Result: J1 and J2 are fixed; on the benchmark set the behaviour is unchanged, as expected.
+
+Scripts and results: `docs/validation/data/jovanovic_2019_step3/` (local, not in git).
