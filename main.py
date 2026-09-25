@@ -78,12 +78,15 @@ def cmd_test():
     )
     from core.base_problem import ProblemConfig
     from core.base_algorithm import AlgorithmConfig
+    from core.caserta_benchmark import DEFAULT_CASERTA_DIR, problem_config_for_caserta_dat
     import multiprocessing as mp
 
     _PREFERRED = ("Caserta (2012) HEUR", "Kim–Hong (2006) ENAR")
 
     print("\n=== Smoke Test ===")
     cfg = ProblemConfig(num_bays=3, num_rows=2, max_tiers=3, num_containers=8, num_groups=2)
+    # CRP-Time rejects random layouts, so it runs on a small Caserta instance.
+    time_cfg = problem_config_for_caserta_dat(DEFAULT_CASERTA_DIR / "data3-3-1.dat", {})
     for pname in list_problems():
         pcls = get_problem_class(pname)
         if pcls is None:
@@ -114,7 +117,7 @@ def cmd_test():
 
         # partial() instead of a closure: Windows spawns workers and must
         # pickle this factory, which cannot reach a function-local object.
-        factory = partial(pcls, config=cfg)
+        factory = partial(pcls, config=time_cfg if pname == "CRP-Time" else cfg)
 
         proc = mp.Process(target=algo.train, args=(factory, q, ev), daemon=True)
         proc.start()
@@ -147,6 +150,12 @@ def cmd_run(problem: str, algo: str, iterations: int):
         return
     if acls is None:
         print(f"Unknown algorithm: {algo}")
+        return
+    if problem == "CRP-Time":
+        print(
+            "CRP-Time does not use random layouts; run it on a layout file with "
+            'python main.py layout-run --problem "CRP-Time" --layout <file>'
+        )
         return
 
     cfg_p = ProblemConfig()
