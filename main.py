@@ -287,6 +287,8 @@ def cmd_layout_run(
     inst = acls(config=cfg_a)
 
     import multiprocessing as mp
+    import queue
+    import time
 
     factory = partial(pcls, config=prob_cfg)
 
@@ -294,7 +296,14 @@ def cmd_layout_run(
     ev = mp.Event()
     proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
     proc.start()
-    proc.join(timeout=timeout)
+    # Drain while waiting: a child blocked on a full queue pipe cannot exit.
+    records = []
+    deadline = time.monotonic() + timeout
+    while proc.is_alive() and time.monotonic() < deadline:
+        try:
+            records.append(q.get(timeout=0.2))
+        except queue.Empty:
+            pass
     ev.set()
     if proc.is_alive():
         proc.terminate()
@@ -309,7 +318,6 @@ def cmd_layout_run(
         )
         return
 
-    records = []
     while not q.empty():
         records.append(q.get_nowait())
 
