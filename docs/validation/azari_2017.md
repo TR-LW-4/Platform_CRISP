@@ -235,6 +235,8 @@ No complete solution (edge case, not from the paper)
 
 Since `c575446`, `best_total_moves` no longer exists: `total_moves` is `len(best_moves)` (`algorithm.py:130`), and if CSUM finds no complete solution, the GBH solution is returned (§3.2). A forced run on data5-5-1 in which the CSUM clock has already expired returns the GBH solution (48 movements, f2 = 1725.60) instead of raising (§4, Check 6).
 
+**Observation, not investigated — "completed" with an empty plan on a layout without an rBRP solution.** Via the web API (code at `802e4d1`; Azari last changed in `dc24c95`), a random CRP-Time layout with 1 bay, 2 rows, max_tiers = 2, 4 containers and seed 4 gives stacks `[[1, 4], [2, 3]]`: container 1 is under container 4 and the other stack is full, so no move is possible and the instance has no rBRP solution. The job ended with status "completed", objective 0.0, 0 relocations and 0 moves. This layout differs from the one in A2 (`[[1, 2], [3, 4]]`, which raises a `RuntimeError`); why this one does not raise has not been investigated. The shared evaluator does not check feasibility either (platform point, `docs/notes_for_wei.md`).
+
 ### 3.5 Notes for the standardisation (not deviations)
 
 - `fidelity = "faithful"` (`algorithm.py:468`) is kept. It did not match the code before `c575446`; since then GBH and CSUM follow Fig. 2 and Fig. 3, the cap is removed (`dc24c95`), and the remaining differences are the unified crane-time model (§3.1) and choices the paper leaves open (§3.2). `adapted` is used on the platform for replaced methods, such as Lee–Lee's local search instead of a MIP.
