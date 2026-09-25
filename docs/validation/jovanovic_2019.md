@@ -110,10 +110,10 @@ File references without a directory are to `algorithms/CRP_Time/heuristic/jovano
 | Reinitialisation after MaxConst iterations without improvement, then global update | Alg. 2, p. 84 | `algorithm.py:405-413`, then `:415-432` | equal | — |
 | Value used for the reinitialisation | not specified | val(S_best) / W (`algorithm.py:409-412`) | not specified in paper | choice left open by paper |
 | p = 0.1, ϕ = 0.9, q0 = 0.9, n = 10, 5000 iterations (rBRP), MaxConst = 100, MaxMoves = 10 | p. 85–86 | defaults `rho` 0.1, `phi` 0.9, `q0` 0.9, `n_ants` 10, `n_iterations` 5000, `max_const_iter` 100, `max_moves` 10 (`algorithm.py:125-131`, schema `:511-560`) | equal | — |
-| Iterations for the crane-time objectives ("around 5 times higher") | p. 88 | default 5000 for every objective; the help text suggests "10 000+" (`algorithm.py:514-522`) | not specified in paper | choice left open by paper |
+| Iterations for the crane-time objectives ("around 5 times higher") | p. 88 | default 5000 for every objective; since `b379031` the help text paraphrases Sec. 7.4 (`algorithm.py:539-546`) | not specified in paper | choice left open by paper |
 | Runs per instance, random seeds | not specified | one run, `np.random.seed(cfg.seed)` (`algorithm.py:124`, `:145`) | not specified in paper | choice left open by paper |
 | Objective: relocations (Table 1) or O_f / O_v (Table 5) | p. 84–85 | the search minimises the objective of the shared `ObjectiveSpec` (`algorithm.py:151`); CRP-Time offers only `crane_time` in the UI and the CLI (`problems/CRP_Time.py:144-154`, `main.py:258-261`); `objective_mode = "relocations"` can only be set programmatically | equal | unified 2D setting |
-| Output: best solution found | Alg. 2 | `S_best` decoded and evaluated with the shared evaluator (`algorithm.py:459-470`) | equal | — |
+| Output: best solution found | Alg. 2 | `S_best` decoded and evaluated with the shared evaluator; since `24b5fc1` also returned by `get_best_solution()` (`algorithm.py:497-504`) | equal | — |
 
 Verdict: equal / deviation / not specified in paper.
 Category: unified 2D setting / choice left open by paper / differs from paper (bug).
@@ -140,7 +140,7 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **Clamp on val.** val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`). With a valid lower bound O − LB + 1 ≥ 1 and the clamp never binds. With LB_f taken literally from eq. 44 it can bind (§3.6); the paper does not say what val is then. Decision (Thom): keep the clamp.
 
-**Iterations for crane time.** Sec. 7.4 says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000 for every objective; this choice will be put to Wei. The help text's "10 000+" (`algorithm.py:519-521`) is not from the paper.
+**Iterations for crane time.** Sec. 7.4 says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000 for every objective; this choice will be put to Wei. Since `b379031` the help text paraphrases Sec. 7.4 instead of suggesting "10 000+", which was not from the paper.
 - O_v: with 5000 iterations the code already does better than the paper (§4), so fewer iterations cannot explain that difference.
 - O_f: with literal eq. 44 and 5000 iterations the code does worse than the paper (§4, step 1b). With 25 000 iterations (O_f,5, seed 0, about 5.2× the running time) the gap closes on 4 × 7 (+3.5 against E_ACO 3.5) and mostly on 3 × 8 (+2.2 against 1.9). The condition fixed before that run is not met on 3 × 8 (seed spread not measured), and 3 × 8 discriminates poorly: no version of the code reaches E_ACO there at 5000 iterations. A full explanation by the number of iterations is not shown.
 
@@ -172,16 +172,16 @@ Step 3 found a second consequence: on a random UI layout (1 bay, 2 rows, 2 tiers
 
 **J2 — the greedy start does not cap n at MaxMoves.** The ants record n = min(M[c], MaxMoves) (`algorithm.py:278`), but the greedy recorded M[c] itself (`scoring.py:310` at `4cb92dd`). If the greedy solution is still S_best at a global update and has n > MaxMoves, the update indexes past the pheromone matrix (`algorithm.py:461-462`). On Caserta the greedy's largest n is 5 (MaxMoves = 10), so the bug is latent there. Scratch check with `max_moves = 1` on data4-4-7 at `4cb92dd`: `IndexError: index 2 is out of bounds for axis 2 with size 2`. Fixed in `802e4d1`: the greedy tuple uses min(n, MaxMoves) and M keeps the true count, as for the ants.
 
-**J3 — `get_best_solution()` always returns None.** Every progress record goes through `BaseAlgorithm._push`, which lowers `_best_metric` to the pushed metric (`core/base_algorithm.py:154-155`), and the progress pushes carry `best_cost` (`algorithm.py:483-486`). At the end, `_best_solution` is set only if `best_cost < self._best_metric` (`algorithm.py:505`), which is then never true, so `_best_solution` stays None. Seen in all 336 runs of the step 3 bit-identical comparison. Nothing in the platform calls `get_best_solution()` (only the docstring in `core/base_algorithm.py:79` names it), so the bug is latent. To be fixed in step 4.
+**J3 — `get_best_solution()` always returns None.** Every progress record goes through `BaseAlgorithm._push`, which lowers `_best_metric` to the pushed metric (`core/base_algorithm.py:154-155`), and the progress pushes carry `best_cost` (`algorithm.py:483-486`). At the end, `_best_solution` is set only if `best_cost < self._best_metric` (`algorithm.py:505`), which is then never true, so `_best_solution` stays None. Seen in all 336 runs of the step 3 bit-identical comparison. Nothing in the platform calls `get_best_solution()` (only the docstring in `core/base_algorithm.py:79` names it), so the bug is latent. Fixed in `24b5fc1`: the final check uses `<=` (`algorithm.py:497`).
 
 ### 3.5 Notes for the standardisation (not deviations)
 
-- The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`.
-- Dead code from the legacy RMGC model: the greedy accumulates a crane time with inline gantry/trolley kinematics (`scoring.py:94-170`, `:263-277`) that is discarded (`_legacy_greedy_cost`, `algorithm.py:179-182`), and the four kinematics parameters are read only for that (`algorithm.py:159-163`). `compute_lb_time` (`scoring.py:177-193`) and `lb_init_nwl` (`algorithm.py:185`) are unused.
-- Intermediate progress records carry `lower_bound = 0.0` and `iteration` (`algorithm.py:446-449`). The `lower_bound` value is not a lower bound, and the metric set differs from the other CRP-Time algorithms.
-- The seed loop and the mean over seeds (`algorithm.py:124`, `:136`, `:490-501`) are left over from multi-seed evaluation; with `n_seeds = 1` the final record describes one plan.
-- The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7`).
-- `fidelity = "adapted"` (`algorithm.py:109`). To be revisited after §3.3.
+- The class description says the crane-time objective is computed "via platform 2-D KinematicsModel (bay × row, gantry + trolley)" (`algorithm.py:98-105`). The search uses the selected f2 or f2vert through the shared evaluator; the kinematics model is only read by `rmgc_current`. Corrected in `b379031` (`algorithm.py:107-114`).
+- Dead code from the legacy RMGC model: the greedy accumulates a crane time with inline gantry/trolley kinematics (`scoring.py:94-170`, `:263-277`) that is discarded (`_legacy_greedy_cost`, `algorithm.py:179-182`), and the four kinematics parameters are read only for that (`algorithm.py:159-163`). `compute_lb_time` (`scoring.py:177-193`) and `lb_init_nwl` (`algorithm.py:185`) are unused. Removed in `4c59f06`; the cost of S_g for eq. 37 still comes from the shared evaluator (`algorithm.py:209-218`).
+- Intermediate progress records carry `lower_bound = 0.0` and `iteration` (`algorithm.py:446-449`). The `lower_bound` value is not a lower bound, and the metric set differs from the other CRP-Time algorithms. Removed in `b379031`; the records now carry the same metrics as Azari.
+- The seed loop and the mean over seeds (`algorithm.py:124`, `:136`, `:490-501`) are left over from multi-seed evaluation; with `n_seeds = 1` the final record describes one plan. Kept: Azari has the same structure; to be decided for the three algorithms together.
+- The header docstring lists 3 of the 7 parameters (`algorithm.py:5-7`). Lists all seven parameters since `b379031`.
+- `fidelity = "adapted"` (`algorithm.py:109`). To be discussed after the repair.
 - The base parameters `max_iterations` and `report_interval` appear in the UI but are not read; the ACO uses `n_iterations` and pushes every `n_iterations // 50` iterations (`algorithm.py:132`). Same platform point as in `azari_2017.md` §3.5.
 - The shared evaluator (`core/objectives.py:356-381`) takes the tiers from the plan and does not check that the plan is feasible; the J1 plan in §3.4 was scored without error. Platform point for Wei.
 
@@ -591,3 +591,21 @@ Expectation fixed before the change: neither branch is reached on the benchmark 
 Result: J1 and J2 are fixed; on the benchmark set the behaviour is unchanged, as expected.
 
 Scripts and results: `docs/validation/data/jovanovic_2019_step3/` (local, not in git).
+
+#### Step 4 — J3 and cleanup (`24b5fc1`, `4c59f06`, `b379031`)
+
+- 4a (`24b5fc1`): J3 fixed; the final check against `_best_metric` uses `<=` (`algorithm.py:497`).
+- 4b (`4c59f06`): dead legacy code removed from `scoring.py` and `algorithm.py`: the greedy's own RMGC crane-time accumulation and its four kinematics inputs, `compute_lb_time`, `compute_lb`, `lb_init_nwl`. A repo-wide search (including `web/` and `tests/`) found no other use; `compute_lb` and `_TRUCK_POS` also exist in the CRP-R/CRP-U versions and in `core/objectives.py` as separate definitions, which are untouched. `compute_lb_time` (n_nwl · spreader_s, unused) is not the `lb_time` of step 1a. The cost of S_g for eq. 37 comes from the shared evaluator (`algorithm.py:209-218`), not from the greedy's own time.
+- 4c (`b379031`): description, header docstring (all seven parameters), `n_iterations` help (paraphrase of Sec. 7.4), and the progress records without `lower_bound` and `iteration`. Neither key is read by the frontend or the backend.
+
+Expectation fixed before the changes: no change in behaviour; bit-identical results.
+
+- `802e4d1` → `24b5fc1`, seed 0, 5000 iterations, instances 1 and 2 of all 21 sizes under the four objectives (168 runs per revision): objective, relocations, f2 and f2vert identical in all 168; `get_best_solution()` returns a solution in 168 of 168 (802e4d1: in none).
+- `24b5fc1` → `b379031`, same subset: identical in objective, relocations, f2, f2vert and best solution in all 168.
+- Feasibility (scratch `jov_feasibility.py`): all 336 stored solutions, replayed as rBRP plans, are feasible (only top containers moved, retrievals in due-date order, height ≤ H, bay empty at the end), and their recomputed relocations, f2 and f2vert equal the reported values (largest deviation 0).
+- API: the catalog shows the new description; the configuration schema equals that of `802e4d1` except `n_iterations.help`.
+- Web UI: a default random CRP-Time layout (f2) completed in 3.1 s with 52 records, none carrying `lower_bound` or `iteration`; the Workbench shows COMPLETED, 52 updates and the convergence chart, with no error banner and no JavaScript exceptions (screenshot `web_ui_4c.png`, local). Caserta instances cannot be run for CRP-Time through the UI (platform point), so data3-5-1 was not used.
+
+Result: J3 is fixed; the cleanup does not change the behaviour.
+
+Scripts and results: `docs/validation/data/jovanovic_2019_step4/` (local, not in git).
