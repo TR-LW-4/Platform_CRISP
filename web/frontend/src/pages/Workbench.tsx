@@ -32,6 +32,10 @@ const LAYOUT_HIDDEN_KEYS = [
   'num_containers',
   'num_groups',
   'seed',
+  // enable_* only drive the random-layout generators.
+  'enable_weight',
+  'enable_size',
+  'enable_type',
 ]
 
 function compatible(algorithm: AlgorithmInfo, problemName: string) {
