@@ -5,6 +5,10 @@ Ant Colony System with crane-time objective
 n_iterations --- 5000 --- Colony iterations per layout
 n_ants --- 10 --- Ants per iteration
 q0 --- 0.9 --- Exploitation rate
+rho --- 0.1 --- Global update rate
+phi --- 0.9 --- Local evaporation
+max_moves --- 10 --- MaxMoves (pheromone depth)
+max_const_iter --- 100 --- Stagnation threshold (MaxConst)
 
 ------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
@@ -101,12 +105,12 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     name                = "Jovanović et al. (2019) ACO (CRP-Time)"
     category            = "Heuristic"
     description         = (
-        "[single-bay origin]  "
-        "Jovanović, Tuba, Voß (EJOR 2019) rBRP-ACO adapted for CRP-Time "
-        "(Section 6). Crane-time objective via platform 2-D KinematicsModel "
-        "(bay × row, gantry + trolley). Same 4-D pheromone τ[c][d][m_c][t] "
-        "and MinMax heuristic as the CRP-R version; val(S) and early "
-        "termination use seconds instead of relocation counts."
+        "[single-bay origin] ACO for the restricted BRP with crane-time "
+        "objectives (EJOR 2019, Sec. 5-6). Ants choose relocations with the "
+        "MinMax heuristic and a pheromone matrix tau[c][d][n][t]; the crane "
+        "time (f2 or f2vert) is evaluated with the shared evaluator, and the "
+        "quality function and early abort use the paper's lower bounds "
+        "LB_f / LB_v (eqs. 44-47)."
     )
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"
@@ -183,7 +187,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             # LB_f / LB_v of the initial bay for val (eqs. 44–47)
             lb_init_time = lb_time(stacks_init, key_to_1based_idx, objective_spec)
 
-            # ── Opt-1: precompute location + stack-min arrays ─────────── #
+            # ── Precompute locations and stack minima ─────────────────── #
             loc_init:       List[Any]      = [None] * (n_total + 1)
             stack_min_init: Dict[Any, int] = {}
             empty_d:        Dict[Any, int] = {}
@@ -467,10 +471,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                         kinematics=kinematics,
                         initial_yard=initial_yard,
                     )
-                    report_metrics.update({
-                        "lower_bound": float(lb_init_time),
-                        "iteration": float(iteration + 1),
-                    })
                     self._push(
                         result_queue,
                         step     = seed + 1,
@@ -540,9 +540,9 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 "type": "int", "default": 5000, "min": 100, "max": 50000,
                 "label": "ACO iterations",
                 "help": (
-                    "Colony iterations per layout. Paper uses 5 000 for rBRP; "
-                    "crane-time convergence is slower — consider 10 000+ for "
-                    "best quality (see paper Section 7.4)."
+                    "Colony iterations per layout. 5000 in the paper "
+                    "(relocations); Sec. 7.4 reports about 5x more iterations "
+                    "for crane time."
                 ),
             },
             "n_ants": {
