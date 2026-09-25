@@ -416,3 +416,29 @@ Error of the code (code − OPT), seed 0:
 | 4 × 7 | 3.5 | +4.8 | +4.9 | +3.5 | +3.4 |
 
 Raw results: `step1b_validlb_c87b7d5.jsonl` and `iters25k_c87b7d5.jsonl` in `docs/validation/data/jovanovic_2019_repair/` (local).
+
+#### Checks on the O_v difference
+
+Scripts and results: `docs/validation/data/jovanovic_2019_checks2/` (local, not in git).
+
+**Local update on aborted ants — equal.** Alg. 2 and the text on p. 84 apply the local update rule to S also when its construction was aborted. The code (`c87b7d5`) adds the tuple to S before the relocation is applied and before the abort check (`algorithm.py:331`; check `:377-378`), then leaves the relocation loop (`:266-267`), skips the retrieval (`:381-382`) and the remaining targets (`:258-259`), and applies the local update to all of S without a condition on `valid` (`:416-429`). An ant without a destination stack (`:310`) is treated the same way.
+
+**OPT column of Table 5 — equal to the exact rBRP optimum under f2 and f2vert.** Exact optima by A* over bay states (restricted BRP, Hmax = T + 2), with an admissible bound: retrieval of every container from its current position plus, per non-well-located container, tpp (f2) or 2 tr (f2vert). Checked against a full dynamic program on the 80 instances of 3 × 3 and 3 × 4 (largest difference 5·10⁻¹³). Averages over 40 instances:
+
+| T × S | O_f,30: exact | Table 5 | O_f,5: exact | Table 5 | O_v: exact | Table 5 |
+|---|---|---|---|---|---|---|
+| 3 × 3 | 476.4 | 476.4 | 126.4 | 126.4 | 904.0 | 904.0 |
+| 3 × 4 | 633.6 | 633.6 | 178.4 | 178.4 | 1187.0 | 1187.0 |
+| 3 × 5 | 789.2 | 789.2 | 236.6 | 236.6 | 1460.8 | 1460.8 |
+| 3 × 6 | 968.2 | 968.2 | 303.2 | 303.2 | 1758.4 | 1758.4 |
+| 3 × 7 | 1137.0 | 1137.0 | 375.2 | 375.2 | 2043.4 | 2043.4 |
+| 4 × 4 | 911.9 | 911.9 | 255.5 | 255.5 | 1928.1 | 1928.1 |
+| 4 × 5 | 1170.2 | 1170.2 | 343.0 | 343.0 | 2424.6 | 2424.6 |
+| 4 × 6 | 1385.4 | 1385.4 | 428.5 | 428.5 | – | – |
+| 5 × 4 | 1230.0 | 1230.0 | 343.5 | 343.5 | – | – |
+
+On every complete size the average optimum equals the OPT column, and no baseline ACO result lies below the exact optimum. 3 × 8 and 4 × 7 are still being computed and will be added.
+
+**Eq. 41 — equal to f2vert.** Eq. 41 implemented literally with the tier numbering of Sec. 2 (p. 79): tier 0 is the ground and containers occupy tiers 1..H (H_S = 0 for an empty stack, eq. 2; H_S < H for a non-full stack, eq. 1). t(c) is the tier of c and H*_S the tier where c lands; hmax = Hmax + 1, hout = 1.5, tr = 7.77, ts = 1.2. On 1550 rBRP plans (the MinMax greedy and 30 random plans for each of 10 instances of 3 × 3, 3 × 5, 3 × 8, 4 × 4 and 4 × 5), eq. 41 and the shared f2vert agree on all 47 772 moves.
+
+Conclusion: where checked, the code follows the paper (local update on aborted ants), the objective is the paper's (eq. 41 = f2vert), and the optimum it is compared with is the same (OPT column = exact optimum under f2vert). Two hypotheses for the O_v difference are refuted: the missing early abort (steps 1a and 1b) and a difference in objective convention. The difference on O_v remains unexplained.
