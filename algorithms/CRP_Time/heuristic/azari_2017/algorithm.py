@@ -485,7 +485,8 @@ class Azari2017CSUM(BaseAlgorithm):
 
             env = problem_factory()
             env.config.seed = int(cfg.seed) + seed_idx
-            env.reset()
+            # Keep targets already on top so their retrievals are planned and scored.
+            env.reset(options={"skip_auto_retrieve": True})
             initial_yard = copy.deepcopy(env.yard)
 
             positions = sorted(env.yard.stacks.keys())
