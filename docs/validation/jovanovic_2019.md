@@ -54,7 +54,7 @@ Code: `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`
 - Stopping criterion: 5000 colony iterations for the rBRP (1000 for the uBRP).
 - Stagnation: MaxConst = 100 iterations without improvement → reinitialise pheromones.
 - MaxMoves = 10.
-- Crane-time experiments: Hmax = T + 2; ts = 1.2 s; tpp = 30 s (Of,30) or 5 s (Of,5); tr = 7.77 s; hout = 1.5; hmax = Hmax + 1 (p. 88). The paper says the ACO needed "around 5 times" more iterations for the crane-time objectives than for the relocation count (p. 88); whether the stopping criterion was raised accordingly is not stated.
+- Crane-time experiments: Hmax = T + 2; ts = 1.2 s; tpp = 30 s (Of,30) or 5 s (Of,5); tr = 7.77 s; hout = 1.5; hmax = Hmax + 1 (p. 88). Sec. 7.4 (p. 88): "the number of iterations of the ACO algorithm in case of the objective functions based on the crane operation time was around 5 times higher than in the case when the objective function is the number of relocations." The paper gives no stopping value for these runs; the rBRP stopping criterion is 5000 iterations (p. 86).
 
 ### Not specified in the paper
 - Tie-breaking in MinMax and in the argmax of the transition rule.
@@ -137,7 +137,9 @@ Category: unified 2D setting / choice left open by paper / differs from paper (b
 
 **Clamp on val.** val = 1 / max(O − LB + 1, 1) (`algorithm.py:211`, `:409`, `:416`). With a valid lower bound O − LB + 1 ≥ 1 and the clamp never binds. With LB_f taken literally from eq. 44 it can bind (§3.6); the paper does not say what val is then. Decision (Thom): keep the clamp.
 
-**Iterations for crane time.** The paper says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000; the help text's "10 000+" (`algorithm.py:519-521`) is not from the paper.
+**Iterations for crane time.** Sec. 7.4 says the number of iterations for the crane-time objectives "was around 5 times higher" than for the relocation count (p. 88), without a stopping value. The default stays 5000 for every objective; this choice will be put to Wei. The help text's "10 000+" (`algorithm.py:519-521`) is not from the paper.
+- O_v: with 5000 iterations the code already does better than the paper (§4), so fewer iterations cannot explain that difference.
+- O_f: with literal eq. 44 and 5000 iterations the code does worse than the paper (§4, step 1b). With 25 000 iterations (O_f,5, seed 0, about 5.2× the running time) the gap closes on 4 × 7 (+3.5 against E_ACO 3.5) and mostly on 3 × 8 (+2.2 against 1.9). The condition fixed before that run is not met on 3 × 8 (seed spread not measured), and 3 × 8 discriminates poorly: no version of the code reaches E_ACO there at 5000 iterations. A full explanation by the number of iterations is not shown.
 
 **Runs and seeds.** One run per instance with `np.random.seed(cfg.seed)` (`algorithm.py:145`); the paper does not say how many runs Tables 1 and 5 average over.
 
