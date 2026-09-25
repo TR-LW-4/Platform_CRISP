@@ -36,7 +36,7 @@ from core.objectives import (
     movement_objective_cost,
 )
 from core.plan import Movement, RelocationPlan
-from .scoring import compute_lb, run_greedy_rbrp_time
+from .scoring import compute_lb, lb_time, run_greedy_rbrp_time
 
 
 def _solution_to_plan(
@@ -183,7 +183,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
             # ── Initial lower bound ──────────────────────────────────── #
             lb_init_nwl  = compute_lb(stacks_init)          # integer NWL count
-            lb_init_time = 0.0  # safe for every selectable objective
+            # LB_f / LB_v of the initial bay for val (eqs. 44–47)
+            lb_init_time = lb_time(stacks_init, key_to_1based_idx, objective_spec)
 
             # ── Opt-1: precompute location + stack-min arrays ─────────── #
             loc_init:       List[Any]      = [None] * (n_total + 1)

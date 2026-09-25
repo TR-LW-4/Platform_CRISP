@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.objectives import ObjectiveSpec
+
 # Truck pickup position — must match core/objectives.py _TRUCK_POS
 _TRUCK_POS: Tuple[int, int] = (0, 0)
 
@@ -85,6 +87,55 @@ def compute_lb(stacks: Dict[Any, List[int]]) -> int:
             if min(prios[:i]) < c:
                 lb += 1
     return lb
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Crane-time lower bounds LB_f and LB_v  (Sec. 6, eqs. 44–45, p. 85)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def has_time_lb(spec: ObjectiveSpec) -> bool:
+    """The paper defines a crane-time bound only for O_f (f2) and O_v (f2vert)."""
+    return spec.mode == "crane_time" and spec.time_model in ("f2", "f2_vertical")
+
+
+def lb_container(s: int, t: int, nw: bool, spec: ObjectiveSpec) -> float:
+    """
+    Contribution of one container at stack s, tier t to LB_f (eq. 44) or
+    LB_v (eq. 45): its retrieval from the current position, plus the
+    minimal relocation cost if it is non-well-located (nw).
+
+    Taken literally from the paper; LB_f is not always a valid lower bound
+    (see docs/validation/jovanovic_2019.md §3.6).
+    """
+    ts = spec.stack_s_per_stack
+    if spec.time_model == "f2":
+        tpp = spec.pickup_place_s
+        return tpp + 2.0 * s * ts + ((tpp + ts) if nw else 0.0)
+    tr = spec.empty_vertical_s_per_tier + spec.loaded_vertical_s_per_tier
+    h_max = spec.max_tiers + 1
+    return (
+        (2.0 * h_max - t - spec.outside_height) * tr
+        + 2.0 * s * ts
+        + ((2.0 * tr + ts) if nw else 0.0)
+    )
+
+
+def lb_time(
+    stacks: Dict[Any, List[int]],
+    key_to_1based_idx: Dict[Any, int],
+    spec: ObjectiveSpec,
+) -> float:
+    """LB_f or LB_v of a bay (tiers 1-based from the ground); 0 without a paper bound."""
+    if not has_time_lb(spec):
+        return 0.0
+    total = 0.0
+    for key, prios in stacks.items():
+        below_min = None
+        for i, c in enumerate(prios):
+            nw = below_min is not None and below_min < c
+            total += lb_container(key_to_1based_idx[key], i + 1, nw, spec)
+            below_min = c if below_min is None else min(below_min, c)
+    return total
 
 
 # ─────────────────────────────────────────────────────────────────────────────
