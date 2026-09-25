@@ -291,8 +291,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                                 sm    = smin[dst_key]
                                 d_val = sm if sm <= n_total else empty_d[dst_key]
 
-                                # Heuristic attractiveness (unchanged from CRP-R)
-                                dif_val = (d_val - c) if d_val > c else (2 * n_total + 1 - d_val)
+                                # Eq. 27
+                                dif_val = (sm - c) if sm > c else (2 * n_total + 1 - sm)
                                 f_val   = 1.0 / (1.0 + dif_val)
 
                                 tau = float(pheromone[c_i, d_val - 1, mc_cl, t_i])
