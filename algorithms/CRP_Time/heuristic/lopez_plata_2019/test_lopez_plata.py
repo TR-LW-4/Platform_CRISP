@@ -37,8 +37,12 @@ MIN_MOVES = [(1, 6), (1, 0), (2, 0), (2, 0), (3, 0), (3, 0), (4, 0), (5, 0),
 MIN_COST = [(1, 2), (1, 0), (2, 1), (2, 0), (2, 0), (3, 0), (3, 0), (4, 0),
             (5, 0), (1, 0), (1, 0), (5, 0), (2, 0), (5, 0), (4, 0)]
 
-PRINTED = CostModel(n_T=4)                                          # eta1 = gamma1 = 2, eta2 = gamma2 = 1
-SENTENCE = CostModel(n_T=4, eta1=1, gamma1=1, eta2=2, gamma2=2)     # "costs twice when loaded"
+# Weights are always passed explicitly. W_PRINTED: the numbers at Fig. 2 and on p. 445;
+# W_LOADED: loaded twice as heavy (Sec. 7.7, Table 5), the default since O01.
+W_PRINTED = dict(eta1=2, gamma1=2, eta2=1, gamma2=1)
+W_LOADED = dict(eta1=1, gamma1=1, eta2=2, gamma2=2)
+PRINTED = CostModel(n_T=4, **W_PRINTED)
+LOADED = CostModel(n_T=4, **W_LOADED)
 
 
 class TestOperatingCost(unittest.TestCase):
@@ -50,8 +54,8 @@ class TestOperatingCost(unittest.TestCase):
 
     def test_fig2_both_weight_readings(self):
         """O01 does not change f of a restricted plan (V02 in the log)."""
-        self.assertEqual(f(FIG2, MIN_MOVES, SENTENCE), 531)
-        self.assertEqual(f(FIG2, MIN_COST, SENTENCE), 513)
+        self.assertEqual(f(FIG2, MIN_MOVES, LOADED), 531)
+        self.assertEqual(f(FIG2, MIN_COST, LOADED), 513)
 
     def test_trips_asymmetric_weights(self):
         """m uses eta1/gamma1 and m' eta2/gamma2 (hand values, n_T + epsilon = 6)."""
@@ -95,7 +99,7 @@ class TestOperatingCost(unittest.TestCase):
             (FIG2, PRINTED, [], (7, 0)),                    # no stack 7
             (FIG2, PRINTED, [], (1, 7)),
             (FIG2, PRINTED, [], (0, 1)),
-            ([[1, 3], [4, 5], []], CostModel(n_T=2), [], (1, 2)),   # stack 2 is full
+            ([[1, 3], [4, 5], []], CostModel(n_T=2, **W_LOADED), [], (1, 2)),   # stack 2 is full
         ]
         for stacks, cost, prefix, move in cases:
             with self.subTest(move=move, prefix=prefix):
@@ -107,7 +111,7 @@ class TestOperatingCost(unittest.TestCase):
 
     def test_stack_above_n_T(self):
         with self.assertRaises(ValueError):
-            Bay(FIG2, CostModel(n_T=2))
+            Bay(FIG2, CostModel(n_T=2, **W_LOADED))
 
 
 TS, TPP = 1.2, 30.0
@@ -163,7 +167,7 @@ class TestCompletePlan(unittest.TestCase):
         algo, rec = _run(cfg)
         moves = _replay(cfg, algo.get_best_solution())
         self.assertEqual(sum(d == 0 for _, d in moves), 13)
-        self.assertAlmostEqual(rec.extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4)))
+        self.assertAlmostEqual(rec.extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4, **W_LOADED)))
 
     def test_fig2_stack_mapping(self):
         """Paper stack s is bay s, at distance s from the truck: f2 equals the formula on the executed plan."""
@@ -185,7 +189,7 @@ class TestCompletePlan(unittest.TestCase):
         self.assertEqual(rec.metrics["relocations"], sum(d != 0 for _, d in moves))
         self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_formula(moves))
         self.assertAlmostEqual(rec.extra["operating_cost"],
-                               f(stacks, moves, CostModel(n_T=cfg.max_tiers)))
+                               f(stacks, moves, CostModel(n_T=cfg.max_tiers, **W_LOADED)))
 
     def test_truncated_phi_raises(self):
         cfg = _config(self.fig2, max_tiers=4)

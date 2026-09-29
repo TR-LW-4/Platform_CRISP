@@ -17,15 +17,16 @@ Move = Tuple[int, int]
 @dataclass(frozen=True)
 class CostModel:
     """n_T is both the stack capacity and the height term of eq. 1-2 (p. 437).
-    Index 1 = crane unloaded, 2 = loaded (p. 437). The default weights are the
-    printed values (p. 438, 445); the text on p. 445 suggests the opposite (O01)."""
+    Index 1 = crane unloaded, 2 = loaded (p. 437). By default a loaded move costs
+    twice as much (Sec. 7.7, p. 449; Table 5, p. 450); the numbers printed at
+    Fig. 2 (p. 438) and on p. 445 are the other way round (O01)."""
 
     n_T: int
     epsilon: float = 2.0
-    eta1: float = 2.0
-    gamma1: float = 2.0
-    eta2: float = 1.0
-    gamma2: float = 1.0
+    eta1: float = 1.0
+    gamma1: float = 1.0
+    eta2: float = 2.0
+    gamma2: float = 2.0
 
     def _trip(self, s1: int, t1: int, s2: int, t2: int, eta: float, gamma: float) -> float:
         # Rise to n_T + epsilon, travel |s1 - s2| stacks, lower to t2.
