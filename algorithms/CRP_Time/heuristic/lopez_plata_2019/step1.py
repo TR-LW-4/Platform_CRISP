@@ -6,19 +6,25 @@ Nodes are Bay objects carrying phi' and g (operating_cost.py).
 
 from __future__ import annotations
 
+import heapq
 import math
-from typing import List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .measures import block_term, h, q
 from .operating_cost import Bay
 
 
-def algorithm1(root: Bay, ub: float, beta: Optional[int] = None) -> Tuple[List[Bay], Optional[Bay], float]:
+def algorithm1(root: Bay, ub: float, beta: Optional[int] = None,
+               collect: Optional[Callable[[Bay], None]] = None,
+               stats: Optional[Dict[str, int]] = None) -> Tuple[List[Bay], Optional[Bay], float]:
     """Algorithm 1 with children placed at the front of N, i.e. depth-first. Only relocation
     children are tested against ub (line 18, O17). With beta, a node at depth beta (moves from
     the root, retrievals included) is collected instead of expanded (Sec. 6.1). A leaf at any
     depth <= beta updates ub and best (lines 8-10, O05).
     Returns the collected nodes N_beta, the best leaf (None if none beat ub) and the final ub.
+    With collect, each node at depth beta is passed to it instead (the node is then modified
+    further, so collect must copy what it keeps) and the returned list is empty. With stats,
+    stats["visited"] counts the nodes taken from N.
 
     Implemented as a recursion on one Bay with apply/undo: the children of a node are generated,
     tested with the ub of that moment and sorted before any of them is explored, which is the order
@@ -27,13 +33,19 @@ def algorithm1(root: Bay, ub: float, beta: Optional[int] = None) -> Tuple[List[B
     bay, collected = root.copy(), []
     best: Optional[Bay] = None
     cost = bay.cost
+    if collect is None:
+        collect = lambda node: collected.append(node.copy())  # noqa: E731
+    if stats is not None:
+        stats.setdefault("visited", 0)
 
     def visit(h_n: float) -> None:
         nonlocal ub, best
+        if stats is not None:
+            stats["visited"] += 1
         if bay.target is None:
             return
         if beta is not None and len(bay.phi) == beta:
-            collected.append(bay.copy())
+            collect(bay)
             return
         s = bay.target_stack()
         stack = bay.stacks[s - 1]
@@ -68,6 +80,45 @@ def algorithm1(root: Bay, ub: float, beta: Optional[int] = None) -> Tuple[List[B
 
     visit(h(bay))
     return collected, best, ub
+
+
+class RunningSelection:
+    """Collector for algorithm1 that keeps only what select() would return: the lam nodes
+    with the lowest g and the lam nodes with the lowest q seen so far, ties to the node found
+    first. Memory stays of the order of lam however many nodes reach depth beta."""
+
+    def __init__(self, lam: int, n_C: int):
+        self.lam, self.n_C, self.count = lam, n_C, 0
+        self._by_g: List[tuple] = []   # max-heaps of (-key, -index, node): the worst kept node on top
+        self._by_q: List[tuple] = []
+
+    def _keeps(self, heap: List[tuple], key: float, index: int) -> bool:
+        return len(heap) < self.lam or (key, index) < (-heap[0][0], -heap[0][1])
+
+    def _add(self, heap: List[tuple], key: float, index: int, node: Bay) -> None:
+        entry = (-key, -index, node)
+        if len(heap) < self.lam:
+            heapq.heappush(heap, entry)
+        else:
+            heapq.heapreplace(heap, entry)
+
+    def __call__(self, bay: Bay) -> None:
+        index = self.count
+        self.count += 1
+        g, q_n = bay.g, q(bay, self.n_C)
+        node = None
+        if self._keeps(self._by_g, g, index):
+            node = bay.copy()
+            self._add(self._by_g, g, index, node)
+        if self._keeps(self._by_q, q_n, index):
+            self._add(self._by_q, q_n, index, node or bay.copy())
+
+    def result(self) -> List[Bay]:
+        """N = N_g + N_q in the order of select()."""
+        n_g = [e[2] for e in sorted(self._by_g, key=lambda e: (-e[0], -e[1]))]
+        n_q = [e[2] for e in sorted(self._by_q, key=lambda e: (-e[0], -e[1]))]
+        taken = {id(n) for n in n_g}
+        return n_g + [n for n in n_q if id(n) not in taken]
 
 
 def select(nodes: List[Bay], lam: int, n_C: int) -> List[Bay]:

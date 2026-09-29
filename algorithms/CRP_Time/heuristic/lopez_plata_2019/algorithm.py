@@ -31,7 +31,7 @@ from core.plan import Movement, RelocationPlan
 
 from .measures import beta, greedy, q
 from .operating_cost import Bay, CostModel, Move, f
-from .step1 import algorithm1, select
+from .step1 import RunningSelection, algorithm1
 
 
 # ================================================================ #
@@ -293,8 +293,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             # ----- Step 1 (Sec. 6.1): the greedy (Sec. 7.1) gives ub and |phi| for beta (eq. 29),
             # Algorithm 1 runs to depth beta, and N = N_g + N_q -----
             greedy_phi, ub = greedy(root)
-            nodes, leaf, _ = algorithm1(root, ub, beta(len(greedy_phi), n_C, theta))
-            partials = select(nodes, lam, n_C)
+            selection = RunningSelection(lam, n_C)
+            _, leaf, _ = algorithm1(root, ub, beta(len(greedy_phi), n_C, theta), selection)
+            partials = selection.result()
 
             # phi_best starts as the greedy solution (O20); the best leaf of step 1 is a candidate (O05).
             candidates = [greedy_phi] + ([leaf.phi] if leaf else [])
