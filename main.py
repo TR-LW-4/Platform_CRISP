@@ -229,9 +229,9 @@ def cmd_layout_run(
 
     from core.registry import get_algorithm_class, get_problem_class
     from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
-    from core.caserta_benchmark import problem_config_for_caserta_dat
+    from core.benchmarks.caserta import problem_config_for_caserta_dat
     from core.result_store import moves_from_records, save_run
-    from core.zhu_benchmark import problem_config_for_zhu_txt
+    from core.benchmarks.zhu import problem_config_for_zhu_txt
 
     root = Path(__file__).resolve().parent
     p = (root / layout).resolve() if not Path(layout).is_absolute() else Path(layout).resolve()

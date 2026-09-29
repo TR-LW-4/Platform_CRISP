@@ -200,12 +200,9 @@ class BaseProblem(gym.Env, ABC):
         }
 
     def render(self, mode: str = "rgb_array") -> Optional[np.ndarray]:
-        """Default: delegate to visualisation module if available."""
-        try:
-            from visualization.bay_renderer import render_yard
-            return render_yard(self.yard, self.config)
-        except ImportError:
-            return None
+        """No image renderer. The web workbench draws yard snapshots in the frontend."""
+        del mode
+        return None
 
     # ---------------------------------------------------------------- #
     # Config schema for GUI                                              #

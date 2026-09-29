@@ -2,8 +2,7 @@
 
 **Container Relocation & Stowage Platform**
 
-A research platform for container-yard relocation and stowage problems. It supports heuristics, exact methods, evolutionary algorithms, and reproducible experiments, with a live web workbench.
-Each problem class keeps a Gymnasium-compatible `reset` / `step` interface for step-wise simulation, solution validation, web replay, and optional learning-based extensions.
+A research platform for container-yard relocation and stowage problems. It supports heuristics, exact methods, evolutionary algorithms, and reproducible experiments, with a interactive web workbench.
 
 ---
 
@@ -20,7 +19,7 @@ Check the install:
 
 ```bash
 conda activate rl
-python -c "import fastapi, gymnasium, matplotlib; print('All OK')"
+python -c "import fastapi, gymnasium; print('All OK')"
 ```
 
 ---
@@ -235,48 +234,9 @@ Platform_CRISP/
 │   ├── CRP_Prem/
 │   ├── CRP_Stow/
 │   └── CRP_Stoch/
-├── visualization/        rendering for the environment and web replay
 ├── web/
 │   ├── backend/          FastAPI catalog, jobs, and results
 │   └── frontend/         React + TypeScript UI
 ├── main.py               CLI / web entry
 └── requirements.txt      dependencies
 ```
-
----
-
-## Collaboration
-
-The default branch is `main`. Open a branch per problem family and send a pull request. Do not push straight to `main`.
-
-| Branch | Scope |
-|--------|--------|
-| `crp-time` | `algorithms/CRP_Time/` and CRP-Time experiments |
-
-```bash
-git clone https://github.com/TR-LW-4/Platform_CRISP.git
-cd Platform_CRISP
-git checkout crp-time
-```
-
-Conventions:
-
-- Put a new Time method in `algorithms/CRP_Time/<category>/<paper_key>/`
-- Use the same module-header style as `algorithms/CRP_R/heuristic/caserta_2009_lah/algorithm.py` (main file) and `scoring.py` (helpers)
-- Push to `origin crp-time`, then open a PR into `main`
-
----
-
-## FAQ
-
-**Q: The browser does not open after `python main.py web`?**  
-A: Open `http://127.0.0.1:8000` yourself.
-
-**Q: Training is slow?**  
-A: Lower `max_iterations`, or first try a cheap heuristic such as `Caserta (2012) HEUR`.
-
-**Q: How do I reuse earlier stowage-gym code?**  
-A: `problems/CRP_Stow.py` follows the original `stowage_gym.py` logic.
-
-**Q: How are results saved?**  
-A: Finished Workbench runs write to `results/`. The Compare page can summarise and export CSV.
