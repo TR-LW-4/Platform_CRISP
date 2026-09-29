@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import math
 from fractions import Fraction
+from functools import lru_cache
 from typing import List, Tuple
 
-from .operating_cost import Bay, Move
+from .operating_cost import Bay, CostModel, Move
 
 
 def non_located(stack: List[int]) -> List[bool]:
@@ -23,21 +24,23 @@ def non_located(stack: List[int]) -> List[bool]:
     return flags
 
 
-def h(bay: Bay) -> float:
-    """Estimate of the remaining operating cost, summed over the blocks present (Sec. 5.1, p. 442).
+@lru_cache(maxsize=None)
+def block_term(cost: CostModel, s: int, t: int, bad: bool) -> float:
+    """Term of the block at (s, t) in h (Sec. 5.1, p. 442).
     EstRet (eq. 21): descend from n_T + epsilon to c, carry c to the retrieval point.
-    EstRel (eq. 22): EstRet plus one relocation to the top tier n_T of the adjacent stack
-    towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1."""
-    cost = bay.cost
-    top = cost.n_T + cost.epsilon
-    total = 0.0
-    for s, stack in enumerate(bay.stacks, 1):
-        for t, bad in enumerate(non_located(stack), 1):
-            descend = cost.m(s, top, s, t)
-            total += descend + cost.m_loaded(s, t, 0, 1)
-            if bad:
-                total += descend + cost.m_loaded(s, t, s + 1 if s == 1 else s - 1, cost.n_T)
-    return total
+    EstRel (eq. 22), if c is non-located: EstRet plus one relocation to the top tier n_T of the
+    adjacent stack towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1."""
+    descend = cost.m(s, cost.n_T + cost.epsilon, s, t)
+    term = descend + cost.m_loaded(s, t, 0, 1)
+    if bad:
+        term += descend + cost.m_loaded(s, t, s + 1 if s == 1 else s - 1, cost.n_T)
+    return term
+
+
+def h(bay: Bay) -> float:
+    """Estimate of the remaining operating cost: block_term summed over the blocks present."""
+    return sum(block_term(bay.cost, s, t, bad)
+               for s, stack in enumerate(bay.stacks, 1) for t, bad in enumerate(non_located(stack), 1))
 
 
 def q(bay: Bay, n_C: int) -> float:

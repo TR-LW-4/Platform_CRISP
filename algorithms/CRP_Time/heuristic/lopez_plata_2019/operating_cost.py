@@ -9,7 +9,7 @@ Blocks are identified by their retrieval order r(c) = 1..n_C.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 Move = Tuple[int, int]
 
@@ -87,6 +87,14 @@ class Bay:
         self.phi.append(move)
         self.g += cost
         return cost
+
+    def undo(self, move: Move, crane: Tuple[int, int], target: Optional[int], g: float) -> None:
+        """Reverse apply(move); crane, target and g are the values from before the move."""
+        s, s2 = move
+        block = target if s2 == 0 else self.stacks[s2 - 1].pop()
+        self.stacks[s - 1].append(block)
+        self.crane, self.target, self.g = crane, target, g
+        self.phi.pop()
 
     def _check(self, s: int, s2: int) -> None:
         n_S = len(self.stacks)
