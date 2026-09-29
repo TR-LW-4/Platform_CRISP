@@ -29,6 +29,7 @@ from problems.CRP_Time import CRP_Time
 from .algorithm import LopezPlata2019Heuristic
 from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
+from .step1 import algorithm1, select
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
 FIG2 = [[9, 1, 8], [11, 3, 2], [5, 4], [13, 6], [12, 10, 7], []]
@@ -231,6 +232,139 @@ class TestMeasures(unittest.TestCase):
         self.assertEqual(beta(25, 9), 5)              # 25 * 0.4 * 0.5 = 5 exactly
         self.assertEqual(beta(18, 13, theta=10), 2)   # 18 * 0.1 * 1.25 = 2.25
         self.assertEqual(beta(29, 10), 16)            # 29 * 0.4 * 1.4375 = 16.675: floor, not round
+
+
+def _sequences(bay, k):
+    """Brute force: every restricted move sequence of length k from bay that does not end in or
+    pass through the complete configuration."""
+    if k == 0:
+        yield tuple(bay.phi)
+        return
+    if bay.target is None:
+        return
+    s = bay.target_stack()
+    moves = [(s, 0)] if bay.stacks[s - 1][-1] == bay.target else [
+        (s, d) for d in range(1, len(bay.stacks) + 1) if d != s and len(bay.stacks[d - 1]) < bay.cost.n_T]
+    for mv in moves:
+        child = bay.copy()
+        child.apply(mv)
+        yield from _sequences(child, k - 1)
+
+
+def _algorithm1_reference(root, ub, depth):
+    """Recursive transcription of Algorithm 1 with the depth limit, written apart from step1.py."""
+    collected, state = [], {"ub": ub, "best": None}
+
+    def visit(n):
+        if len(n.phi) == depth:
+            collected.append(tuple(n.phi))
+            return
+        s = n.target_stack()
+        if n.stacks[s - 1][-1] == n.target:
+            child = n.copy()
+            child.apply((s, 0))
+            if child.target is None:
+                if child.g < state["ub"]:
+                    state["ub"], state["best"] = child.g, tuple(child.phi)
+            else:
+                visit(child)
+            return
+        kids = []
+        for d in range(1, len(n.stacks) + 1):
+            if d != s and len(n.stacks[d - 1]) < n.cost.n_T:
+                c = n.copy()
+                c.apply((s, d))
+                if c.g + h(c) < state["ub"]:
+                    kids.append(c)
+        for c in sorted(kids, key=lambda c: c.g):
+            visit(c)
+
+    visit(root)
+    return collected, state["best"], state["ub"]
+
+
+class TestStep1(unittest.TestCase):
+
+    def test_algorithm1_exact(self):
+        """Without a depth limit, Algorithm 1 with ub = f(greedy) is exact: min(f(best), ub) equals the
+        exact optimum on Fig. 2 (513) and on each Caserta 3x3 instance (average 497.40, V06)."""
+        for w in (W_LOADED, W_PRINTED):
+            root = Bay(FIG2, CostModel(n_T=4, **w))
+            _, ub = greedy(root)
+            _, best, _ = algorithm1(root, ub)
+            self.assertEqual(min(best.g if best else math.inf, ub), 513)
+            values = []
+            for i in range(1, 41):
+                stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat")[2]
+                cost = CostModel(n_T=5, **w)
+                root = Bay(stacks, cost)
+                _, ub = greedy(root)
+                _, best, _ = algorithm1(root, ub)
+                value = min(best.g if best else math.inf, ub)
+                self.assertAlmostEqual(value, _remaining_optimum(stacks, cost)[tuple(map(tuple, stacks)), (0, 1)])
+                values.append(value)
+            self.assertAlmostEqual(sum(values) / 40, 497.40)
+
+    def test_n_beta_brute_force(self):
+        """With ub = infinity and no leaf within beta, N_beta is every restricted sequence of length beta."""
+        for depth in (3, 6):
+            nodes, best, ub = algorithm1(Bay(FIG2, LOADED), math.inf, depth)
+            self.assertEqual(sorted(tuple(n.phi) for n in nodes), sorted(_sequences(Bay(FIG2, LOADED), depth)))
+            self.assertEqual((best, ub), (None, math.inf))
+
+    def test_n_beta_reference(self):
+        """With ub = f(greedy), N_beta, the best leaf and the final ub equal the recursive transcription,
+        in the same order; at beta = 15 leaves (14 moves and more) lower ub during the search.
+        Every collected node has depth exactly beta, is not complete, and g = f(phi)."""
+        for w in (W_LOADED, W_PRINTED):
+            cost = CostModel(n_T=4, **w)
+            _, ub = greedy(Bay(FIG2, cost))
+            for depth in (3, 9, 15):
+                nodes, best, final_ub = algorithm1(Bay(FIG2, cost), ub, depth)
+                ref_nodes, ref_best, ref_ub = _algorithm1_reference(Bay(FIG2, cost), ub, depth)
+                self.assertEqual([tuple(n.phi) for n in nodes], ref_nodes)
+                self.assertEqual((tuple(best.phi) if best else None, final_ub), (ref_best, ref_ub))
+                for n in nodes:
+                    self.assertEqual(len(n.phi), depth)
+                    self.assertIsNotNone(n.target)
+                    self.assertAlmostEqual(n.g, f(FIG2, n.phi, cost))
+                if depth == 15:
+                    self.assertIsNotNone(best)
+                    self.assertLess(final_ub, ub)
+
+    def test_select_by_hand(self):
+        """N_g + N_q (O06 (a), O07). n_C = 2, maxDist = 2; q by hand (eq. 23-26):
+        A [1], [2]: 2.0; B [1, 2], []: 2.5; C [], [1, 2]: 3.5; D [2, 1], []: 1.5; E [], [2, 1]: 2.5.
+        g: A 10, B 5, C 5, D 7, E 20; discovery order A, B, C, D, E. Ties keep that order."""
+        layouts = {"A": [[1], [2]], "B": [[1, 2], []], "C": [[], [1, 2]], "D": [[2, 1], []], "E": [[], [2, 1]]}
+        g = {"A": 10, "B": 5, "C": 5, "D": 7, "E": 20}
+        nodes = []
+        for name in "ABCDE":
+            n = Bay(layouts[name], LOADED)
+            n.g = g[name]
+            nodes.append(n)
+        names = {id(n): name for n, name in zip(nodes, "ABCDE")}
+        for lam, expected in ((1, "BD"), (2, "BCDA"), (3, "BCDA"), (10, "BCDAE")):
+            self.assertEqual("".join(names[id(n)] for n in select(nodes, lam, 2)), expected, lam)
+
+    def test_deterministic(self):
+        """Step 1 and the whole run give the same result twice and for another seed."""
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
+        cost = CostModel(n_T=5, **W_LOADED)
+        runs = []
+        for _ in range(2):
+            root = Bay(stacks, cost)
+            phi, ub = greedy(root)
+            nodes, best, _ = algorithm1(root, ub, beta(len(phi), 12))
+            runs.append(([tuple(n.phi) for n in select(nodes, 500, 12)], best and tuple(best.phi)))
+        self.assertEqual(runs[0], runs[1])
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")
+        plans = []
+        for seed in (0, 7):
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=seed))
+            algo.train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
+            plans.append(algo.get_best_solution())
+        self.assertEqual(plans[0], plans[1])
 
 
 TS, TPP = 1.2, 30.0

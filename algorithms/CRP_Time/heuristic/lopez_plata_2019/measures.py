@@ -60,7 +60,7 @@ def greedy(bay: Bay) -> Tuple[List[Move], float]:
     bay = bay.copy()
     cost, phi, total = bay.cost, [], 0.0
     while bay.target is not None:
-        s = next(i for i, st in enumerate(bay.stacks, 1) if bay.target in st)
+        s = bay.target_stack()
         stack = bay.stacks[s - 1]
         if stack[-1] == bay.target:
             move = (s, 0)

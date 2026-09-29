@@ -43,9 +43,10 @@ class CostModel:
 
 
 class Bay:
-    """Configuration and crane position under the restricted rule (p. 437)."""
+    """Configuration and crane position under the restricted rule (p. 437). As a search
+    node it also holds phi, the moves from the root, and g = f(phi) (p. 441)."""
 
-    __slots__ = ("stacks", "cost", "crane", "target")
+    __slots__ = ("stacks", "cost", "crane", "target", "phi", "g")
 
     def __init__(self, stacks: Sequence[Sequence[int]], cost: CostModel):
         self.stacks: List[List[int]] = [list(s) for s in stacks]  # bottom -> top
@@ -54,12 +55,19 @@ class Bay:
         self.cost = cost
         self.crane: Tuple[int, int] = (0, 1)  # dummy move (0, 0): start at the retrieval point
         self.target = min((c for s in self.stacks for c in s), default=None)  # c*
+        self.phi: List[Move] = []
+        self.g = 0.0
 
     def copy(self) -> "Bay":
         other = Bay.__new__(Bay)
         other.stacks = [list(s) for s in self.stacks]
         other.cost, other.crane, other.target = self.cost, self.crane, self.target
+        other.phi, other.g = list(self.phi), self.g
         return other
+
+    def target_stack(self) -> int:
+        """s(c*), 1-based."""
+        return next(s for s, st in enumerate(self.stacks, 1) if self.target in st)
 
     def apply(self, move: Move) -> float:
         """Carry out one move; return its term of eq. 3: the empty trip from the
@@ -76,6 +84,8 @@ class Bay:
             drop = len(self.stacks[s2 - 1])  # tier after the move
         cost = self.cost.m(*self.crane, s, pick) + self.cost.m_loaded(s, pick, s2, drop)
         self.crane = (s2, drop)
+        self.phi.append(move)
+        self.g += cost
         return cost
 
     def _check(self, s: int, s2: int) -> None:
