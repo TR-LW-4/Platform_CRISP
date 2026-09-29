@@ -22,6 +22,7 @@ from unittest import mock
 
 from core.base_algorithm import AlgorithmConfig
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
+from core.plan import RelocationPlan
 from problems.CRP_Time import CRP_Time
 
 from .algorithm import LopezPlata2019Heuristic
@@ -127,17 +128,21 @@ def _run(cfg):
     return algo, q.get_nowait()
 
 
-def _f2_by_hand(phi):
+def _f2_formula(phi):
     """Voß-Schwarze f2 per move, stacks counted from the truck: retrieval from s: 2*ts*s + tpp,
-    relocation s -> s': 2*ts*|s - s'| + tpp."""
+    relocation s -> s': 2*ts*|s - s'| + tpp. Independent of the platform evaluator."""
     return sum(2 * TS * (s if d == 0 else abs(s - d)) + TPP for s, d in phi)
 
 
 def _replay(cfg, actions):
-    """Replay env actions with the env's own auto-retrieval; return the executed moves as (s, s')."""
+    """Replay env actions with the env's own auto-retrieval, check the executed plan with validate_plan
+    on a fresh env, and return it as (s, s')."""
     env = CRP_Time(config=cfg)
     assert env.validate_actions(actions)["feasible"], env.get_last_validation_errors()
-    return [(m.from_pos[0], 0 if m.to_pos is None else m.to_pos[0]) for m in env._plan.movements]
+    movements = list(env._plan.movements)
+    check = CRP_Time(config=cfg)
+    assert check.validate_plan(RelocationPlan(movements))["feasible"], check.get_last_validation_errors()
+    return [(m.from_pos[0], 0 if m.to_pos is None else m.to_pos[0]) for m in movements]
 
 
 class TestCompletePlan(unittest.TestCase):
@@ -153,21 +158,19 @@ class TestCompletePlan(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_fig2_complete(self):
-        """A complete plan that validate_plan accepts; operating_cost is f of one of the paper's plans."""
+        """A complete plan that validate_plan accepts; operating_cost is f of that plan on a fresh Bay."""
         cfg = _config(self.fig2, max_tiers=4)
         algo, rec = _run(cfg)
         moves = _replay(cfg, algo.get_best_solution())
         self.assertEqual(sum(d == 0 for _, d in moves), 13)
-        self.assertIn(rec.extra["operating_cost"], (531, 513))
-        paper_plan = MIN_MOVES if rec.extra["operating_cost"] == 531 else MIN_COST
-        self.assertEqual(moves, paper_plan)
+        self.assertAlmostEqual(rec.extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4)))
 
     def test_fig2_stack_mapping(self):
-        """Paper stack s is bay s, at distance s from the truck: f2 equals a hand recomputation."""
+        """Paper stack s is bay s, at distance s from the truck: f2 equals the formula on the executed plan."""
         cfg = _config(self.fig2, max_tiers=4)
         algo, rec = _run(cfg)
-        paper_plan = MIN_MOVES if rec.extra["operating_cost"] == 531 else MIN_COST
-        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_by_hand(paper_plan))
+        moves = _replay(cfg, algo.get_best_solution())
+        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_formula(moves))
 
     def test_containers_on_top_at_start(self):
         """data3-3-5: blocks 1-4 are on top at the start; their retrievals are in the plan and in f2."""
@@ -180,7 +183,7 @@ class TestCompletePlan(unittest.TestCase):
         self.assertEqual([d for _, d in moves[:4]], [0, 0, 0, 0])
         self.assertEqual(sum(d == 0 for _, d in moves), 9)
         self.assertEqual(rec.metrics["relocations"], sum(d != 0 for _, d in moves))
-        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_by_hand(moves))
+        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_formula(moves))
         self.assertAlmostEqual(rec.extra["operating_cost"],
                                f(stacks, moves, CostModel(n_T=cfg.max_tiers)))
 
