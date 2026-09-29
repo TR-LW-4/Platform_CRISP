@@ -111,7 +111,7 @@ MATLAB).  Bounds and `opt` are always computed.
   Algorithm` currently does).  Setting `batch_size = 1` makes the SCRP
   environment behave *exactly* as CRP-R (single realization, `E[R]`
   reduces to the deterministic reshuffle count).
-- No CRP-R / CRP-U / CRP-Time / CRP-D / CRP-Stow / CRP-Prem algorithm
+- No CRP-R / CRP-U / CRP-Time / CRP-D / CRP-Stow algorithm
   file was modified.
 
 ## References

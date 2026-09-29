@@ -75,7 +75,7 @@ npm run build
 The platform has eight problem classes. They are not aliases of one CRP. They differ along these axes:
 
 ```
-Task / objective     Time | Prem | Stow | Stoch     ← different problems; do not mix primary metrics
+Task / objective     Time | Stow | Stoch            ← different problems; do not mix primary metrics
 Relocation rule      R vs U                         ← distinct-priority CRP only
 Priorities           R/U = distinct; D = duplicate  ← CRP-D also uses restricted_relocation
 Geometry             num_bays                       ← a config field, not a family
@@ -90,7 +90,6 @@ Information          Online | batch-stochastic      ← separate families
 | **CRP-Time** | same rules as CRP-R, crane-time objective | Restricted + distinct; minimise selected crane time. Relocations are reported only | crane_time (also reports every time model) |
 | **CRP-MO** | same rules as CRP-Time, two objectives | Restricted + distinct; minimise (relocations, crane time) as a vector. No algorithm registered yet | relocations and crane_time |
 | **CRP-Online** | OCRP / limited look-ahead | Same dynamics as CRP-R, but future retrievals are revealed with `lookahead_h`. `lookahead_h=0` matches Zehendner 2017 | relocations |
-| **CRP-Prem** | pre-marshalling | No retrievals; reshuffle the bay until every stack is internally sorted | moves |
 | **CRP-Stow** | BRLP / POCRP | Retrieve according to a vessel stowage plan. `rc_ratio>0` enables **POCRP-RC** (rolled containers) | relocations |
 | **CRP-Stoch** | SCRP | Ordered batches; intra-batch order is uniform-random. `batch_size=1` reduces to CRP-R. This is not the same as CRP-Online progressive revelation | expected_relocations |
 
@@ -106,7 +105,7 @@ The live catalog is the registry, not a static table on this page:
 python main.py list
 ```
 
-Family directories and paper lists live in `algorithms/<family>/README.md` (`CRP_R`, `CRP_U`, `CRP_D`, `CRP_Time`, `CRP_MO`, `CRP_Online`, `CRP_Prem`, `CRP_Stow`, `CRP_Stoch`).
+Family directories and paper lists live in `algorithms/<family>/README.md` (`CRP_R`, `CRP_U`, `CRP_D`, `CRP_Time`, `CRP_MO`, `CRP_Online`, `CRP_Stow`, `CRP_Stoch`).
 
 > **Placement.** One family shares one `ProblemConfig` (`num_bays`, `num_rows`, `max_tiers`, `num_containers`, …). Put a new method in `algorithms/<primary_problem>/<category>/<paper_key>/` and list runnable families in `compatible_problems`. Keep the problem definition and objective unchanged; only the method changes.
 >
@@ -231,7 +230,6 @@ Platform_CRISP/
 │   ├── CRP_Time/
 │   ├── CRP_MO/
 │   ├── CRP_Online/
-│   ├── CRP_Prem/
 │   ├── CRP_Stow/
 │   └── CRP_Stoch/
 ├── web/
