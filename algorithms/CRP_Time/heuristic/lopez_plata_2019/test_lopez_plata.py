@@ -225,11 +225,13 @@ class TestMeasures(unittest.TestCase):
                 self.assertEqual([d for _, d in phi[:4]], [0, 0, 0, 0])
 
     def test_p_and_beta(self):
-        """T5, eq. 29-30 as printed: p jumps at 9 and 25; beta = floor(|phi| * theta/100 * p)."""
-        self.assertEqual([p(n) for n in (9, 10, 24, 25)], [0.5, 1.4375, 0.5625, 1.5])
+        """T5, eq. 29-30 with the ends of eq. 30 swapped (O02 (c)): p is 1.5 up to n_C = 9, the printed
+        ramp 1.5 - (n_C - 9)/16 in between and 0.5 from 25; beta = floor(|phi| * theta/100 * p)."""
+        self.assertEqual([p(n) for n in (5, 9, 10, 24, 25, 60)], [1.5, 1.5, 1.4375, 0.5625, 0.5, 0.5])
         self.assertEqual(beta(18, 13), 9)             # 18 * 0.4 * 1.25 = 9 exactly
         self.assertEqual(beta(29, 15), 13)            # 29 * 0.4 * 1.125 = 13.05
-        self.assertEqual(beta(25, 9), 5)              # 25 * 0.4 * 0.5 = 5 exactly
+        self.assertEqual(beta(25, 9), 15)             # 25 * 0.4 * 1.5 = 15 exactly
+        self.assertEqual(beta(40, 25), 8)             # 40 * 0.4 * 0.5 = 8 exactly
         self.assertEqual(beta(18, 13, theta=10), 2)   # 18 * 0.1 * 1.25 = 2.25
         self.assertEqual(beta(29, 10), 16)            # 29 * 0.4 * 1.4375 = 16.675: floor, not round
 

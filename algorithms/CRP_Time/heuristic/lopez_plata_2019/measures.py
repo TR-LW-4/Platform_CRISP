@@ -77,12 +77,13 @@ def greedy(bay: Bay) -> Tuple[List[Move], float]:
 
 
 def p(n_C: int) -> Fraction:
-    """Eq. 30 (p. 446) as printed; it jumps at n_C = 9 and 25 (O02)."""
+    """Eq. 30 (p. 446) with the end values swapped (O02 (c)): the printed ramp runs from 1.5
+    at n_C = 9 to 0.5 at n_C = 25, so the printed ends 0.5 and 1.5 are read as a misprint."""
     if n_C <= 9:
-        return Fraction(1, 2)
+        return Fraction(3, 2)
     if n_C < 25:
         return Fraction(3, 2) - Fraction(n_C - 9, 25 - 9)
-    return Fraction(3, 2)
+    return Fraction(1, 2)
 
 
 def beta(phi_len: int, n_C: int, theta: float = 40) -> int:
