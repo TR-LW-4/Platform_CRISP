@@ -57,6 +57,16 @@ class TestOperatingCost(unittest.TestCase):
             self.assertEqual(sum(steps[:k]), f(FIG2, MIN_COST[:k], PRINTED))
         self.assertIsNone(bay.target)
 
+    def test_fig2_per_move(self):
+        """Hand-checked terms of eq. 3, min-moves solution (n_T + epsilon = 6, printed weights).
+        Move 1, relocate 8 from (1,3) to (6,1): m(0,1,1,3) = 5*2 + 1*2 + 3*2 = 18, m'(1,3,6,1) = 3 + 5 + 5 = 13.
+        Move 2, retrieve 1 from (1,2); the crane is still at (6,1): m(6,1,1,2) = 5*2 + 5*2 + 4*2 = 28,
+        m'(1,2,0,1) = 4 + 1 + 5 = 10.
+        Move 9, retrieve 8 from (6,1): m(0,1,6,1) = 5*2 + 6*2 + 5*2 = 32, m'(6,1,0,1) = 5 + 6 + 5 = 16."""
+        bay = Bay(FIG2, PRINTED)
+        steps = [bay.apply(mv) for mv in MIN_MOVES]
+        self.assertEqual((steps[0], steps[1], steps[8]), (31, 38, 48))
+
     def test_copy_is_independent(self):
         bay = Bay(FIG2, PRINTED)
         other = bay.copy()
