@@ -30,6 +30,9 @@ from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
+from core.plan import Movement, RelocationPlan
+
+from .operating_cost import Bay, CostModel, Move
 
 
 # ================================================================ #
@@ -89,8 +92,9 @@ class _SearchState:
     stacks: list of lists, each inner list = priorities bottom -> top.
     retrieved: set of priorities already retrieved.
     next_target: smallest priority still in the yard (cmin).
+    phi: moves (s, s') from the root, stacks 1-based, s' = 0 for a retrieval (p. 437-438).
     """
-    __slots__ = ("stacks", "nT", "nS", "priorities", "next_target")
+    __slots__ = ("stacks", "nT", "nS", "priorities", "next_target", "phi")
 
     def __init__(self, stacks: List[List[int]], nT: int):
         self.stacks = [list(s) for s in stacks]
@@ -101,9 +105,12 @@ class _SearchState:
             for p in s:
                 self.priorities.add(p)
         self.next_target = min(self.priorities) if self.priorities else 0
+        self.phi: List[Move] = []
 
     def copy(self) -> "_SearchState":
-        return _SearchState([list(s) for s in self.stacks], self.nT)
+        st = _SearchState([list(s) for s in self.stacks], self.nT)
+        st.phi = list(self.phi)
+        return st
 
     def height(self, s: int) -> int:
         return len(self.stacks[s])
@@ -145,10 +152,12 @@ class _SearchState:
         """Move top of src to dst (assumes legal)."""
         blk = self.stacks[src].pop()
         self.stacks[dst].append(blk)
+        self.phi.append((src + 1, dst + 1))
 
     def apply_retrieval(self, s: int) -> int:
         """Remove top of s (must be next_target). Return the priority."""
         blk = self.stacks[s].pop()
+        self.phi.append((s + 1, 0))
         self.priorities.discard(blk)
         if self.priorities:
             self.next_target = min(self.priorities)
@@ -188,6 +197,35 @@ class _SearchState:
             if self.next_target in stk:
                 return si
         return None
+
+
+def _retrieve_on_top(state: _SearchState) -> None:
+    """Retrieve c* while it is on top of its stack, as env.reset() does."""
+    while state.priorities:
+        s = state._current_blocker_stack()
+        if state.top(s) != state.next_target:
+            return
+        state.apply_retrieval(s)
+
+
+def _plan_from_phi(stacks: List[List[int]], phi: List[Move], cost: CostModel,
+                   n_rows: int) -> Tuple[float, RelocationPlan, List[int]]:
+    """Replay phi through Bay (impossible moves raise ValueError). Return f(phi) (eq. 3),
+    the platform plan and the env actions (0-based destination of each relocation).
+    Stack s is flat index s - 1, i.e. (bay, row) with bays counted from the retrieval point."""
+    def pos(s: int) -> Tuple[int, int]:
+        return (s - 1) // n_rows + 1, (s - 1) % n_rows + 1
+
+    bay = Bay(stacks, cost)
+    plan, actions, f_phi = RelocationPlan(), [], 0.0
+    for s, s2 in phi:
+        stack = bay.stacks[s - 1] if 1 <= s <= len(bay.stacks) else []
+        block = stack[-1] if stack else None
+        f_phi += bay.apply((s, s2))
+        plan.add(Movement(block, pos(s), None if s2 == 0 else pos(s2)))
+        if s2:
+            actions.append(s2 - 1)
+    return f_phi, plan, actions
 
 
 def _build_initial_search_state(containers, max_tiers: int, num_bays: int, num_rows: int) -> _SearchState:
@@ -554,7 +592,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             np.random.seed(seed)
 
             env = problem_factory()
-            _, info = env.reset()
+            # Containers on top at the start stay in the yard, so their retrievals are part of phi.
+            env.reset(options={"skip_auto_retrieve": True})
 
             # Snapshot initial yard for internal search
             n_bays = env.config.num_bays
@@ -570,13 +609,14 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                     init_stacks[flat].append(int(c.priority))
 
             initial_state = _SearchState(init_stacks, nT)
+            _retrieve_on_top(initial_state)
 
             # ----- Step 1: promising partial solutions -----
             partials = _limited_a_star(initial_state, cost_model, delta, max_nodes)
             if not partials:
                 partials = [initial_state]
 
-            best_solution: List[int] = []
+            best_phi: List[Move] = []
             best_cost = float("inf")
 
             for _exp in range(num_exp):
@@ -603,51 +643,32 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 # Post-process
                 cleaned = _remove_temporary_moves(collected_dests, init_stacks, nT, cost_model)
 
-                # ----- Replay on real environment to get accurate metrics & plan -----
-                env2 = problem_factory()
-                env2.reset()
-                total_cost = 0.0
-                actions: List[int] = []
+                phi_for_this, op_cost_for_this = self._construct_solution(
+                    initial_state, cost_model, delta, max_nodes, num_exp, mu)
 
-                # We need to map our internal flat indices back to platform actions.
-                # Because the internal state advanced some blocks, we replay the forced moves.
-                # Simpler & robust approach: rebuild the action list by running the same decisions on env2.
-
-                # Re-run the decision process on env2 to collect exact platform actions.
-                # The helper returns (actions, operating_cost_from_paper_model).
-                actions_for_this, op_cost_for_this = self._construct_solution(env2, cost_model, delta, max_nodes, num_exp, mu)
-
-                # Execute the actions on env2 so we can get full platform metrics later if needed.
-                for a in actions_for_this:
-                    if env2._done:
-                        break
-                    _, r, done, _, _ = env2.step(a)
-                    actions.append(int(a))
-                    if done:
-                        break
-
-                # Select best solution using the paper's operating cost (not crane_time).
+                # Selection still on the old step-2 relocation cost, not on f (C15).
                 if op_cost_for_this < best_cost:
                     best_cost = op_cost_for_this
-                    best_solution = actions_for_this
+                    best_phi = phi_for_this
 
-            # Final evaluation on the best solution
+            # The plan is phi_best itself; the problem validates it and reports its metrics.
+            try:
+                operating_cost, plan, best_solution = _plan_from_phi(
+                    init_stacks, best_phi, CostModel(n_T=nT), n_rows)
+            except ValueError as err:
+                raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err
             env_final = problem_factory()
-            env_final.reset()
-            for a in best_solution:
-                if env_final._done:
-                    break
-                env_final.step(a)
+            if not env_final.validate_plan(plan).get("feasible"):
+                raise RuntimeError("López-Plata: plan rejected by validate_plan: "
+                                   + "; ".join(env_final.get_last_validation_errors()))
 
             final_metrics = env_final.get_metrics()
-            final_metrics["operating_cost"] = best_cost
+            final_metrics["operating_cost"] = operating_cost
             all_metrics.append(final_metrics)
 
             # Keep the paper's operating cost as a reported diagnostic, while
             # platform-wide ranking follows the user-selected CRP-Time objective.
-            primary = float(
-                final_metrics.get("objective_value", best_cost)
-            )
+            primary = float(final_metrics["objective_value"])
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = list(best_solution)
@@ -659,7 +680,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 metrics=final_metrics,
                 progress=(seed_idx + 1) / n_seeds,
                 snapshot=env_final.get_state_snapshot() if hasattr(env_final, "get_state_snapshot") else None,
-                extra={"operating_cost": best_cost},
+                extra={"operating_cost": operating_cost},
             )
 
         if all_metrics:
@@ -668,66 +689,47 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0)
 
     # ---------------------------------------------------------------- #
-    # Helper: construct a full action sequence using the heuristic     #
+    # Helper: construct a full solution using the heuristic            #
     # ---------------------------------------------------------------- #
 
     def _construct_solution(
         self,
-        env,
+        initial: _SearchState,
         cost_model: OperatingCostModel,
         delta: int,
         max_nodes: int,
         num_exp: int,
         mu: int,
-    ) -> Tuple[List[int], float]:
+    ) -> Tuple[List[Move], float]:
         """
-        Run the 3-step construction on a fresh (or reset) env and return
-        the list of destination actions + an estimated operating cost.
+        Run the 3-step construction from the initial state and return phi
+        (all moves from the root) + the old step-2 relocation cost.
         """
-        n_bays = env.config.num_bays
-        n_rows = env.config.num_rows
-        nT = env.config.max_tiers
-        nS = n_bays * n_rows
-
-        # Build current stacks from env
-        def _current_stacks():
-            st = [[] for _ in range(nS)]
-            for (bay, row), stk in env.yard.stacks.items():
-                flat = (bay - 1) * n_rows + (row - 1)
-                for c in stk.containers:
-                    st[flat].append(int(c.priority))
-            return st
-
-        init_stacks = _current_stacks()
-        initial = _SearchState(init_stacks, nT)
-
         partials = _limited_a_star(initial, cost_model, delta, max_nodes)
         if not partials:
             partials = [initial]
 
-        best_actions: List[int] = []
+        best_phi: List[Move] = []
         best_cost = float("inf")
 
         for _ in range(num_exp):
             pstate = partials[_ % len(partials)].copy()
-            actions: List[int] = []
             cstate = pstate.copy()
             total_c = 0.0
 
             while cstate.priorities:
                 seq, sc, cstate = _expand_partial(cstate, cost_model, mu)
-                actions.extend(seq)
                 total_c += sc
                 if not seq:
                     break
 
-            cleaned = _remove_temporary_moves(actions, init_stacks, nT, cost_model)
+            cleaned = _remove_temporary_moves(cstate.phi, initial.stacks, initial.nT, cost_model)
 
             if total_c < best_cost:
                 best_cost = total_c
-                best_actions = cleaned
+                best_phi = cleaned
 
-        return best_actions, best_cost
+        return best_phi, best_cost
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

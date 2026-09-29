@@ -13,8 +13,18 @@ corresponding original algorithm paper.
 
 from __future__ import annotations
 
+import queue
+import tempfile
+import threading
 import unittest
+from pathlib import Path
+from unittest import mock
 
+from core.base_algorithm import AlgorithmConfig
+from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
+from problems.CRP_Time import CRP_Time
+
+from .algorithm import LopezPlata2019Heuristic
 from .operating_cost import Bay, CostModel, f
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
@@ -97,6 +107,93 @@ class TestOperatingCost(unittest.TestCase):
     def test_stack_above_n_T(self):
         with self.assertRaises(ValueError):
             Bay(FIG2, CostModel(n_T=2))
+
+
+TS, TPP = 1.2, 30.0
+
+
+def _config(path, max_tiers=None):
+    cfg = problem_config_for_caserta_dat(
+        Path(path), {"time_model": "f2", "stack_s_per_stack": TS, "pickup_place_s": TPP})
+    if max_tiers:
+        cfg.max_tiers = max_tiers
+    return cfg
+
+
+def _run(cfg):
+    algo = LopezPlata2019Heuristic(AlgorithmConfig())
+    q = queue.Queue()
+    algo.train(lambda: CRP_Time(config=cfg), q, threading.Event())
+    return algo, q.get_nowait()
+
+
+def _f2_by_hand(phi):
+    """Voß-Schwarze f2 per move, stacks counted from the truck: retrieval from s: 2*ts*s + tpp,
+    relocation s -> s': 2*ts*|s - s'| + tpp."""
+    return sum(2 * TS * (s if d == 0 else abs(s - d)) + TPP for s, d in phi)
+
+
+def _replay(cfg, actions):
+    """Replay env actions with the env's own auto-retrieval; return the executed moves as (s, s')."""
+    env = CRP_Time(config=cfg)
+    assert env.validate_actions(actions)["feasible"], env.get_last_validation_errors()
+    return [(m.from_pos[0], 0 if m.to_pos is None else m.to_pos[0]) for m in env._plan.movements]
+
+
+class TestCompletePlan(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.fig2 = Path(cls.tmp.name) / "fig2.dat"
+        cls.fig2.write_text("\n".join(["6 13"] + [" ".join(map(str, [len(s)] + s)) for s in FIG2]) + "\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_fig2_complete(self):
+        """A complete plan that validate_plan accepts; operating_cost is f of one of the paper's plans."""
+        cfg = _config(self.fig2, max_tiers=4)
+        algo, rec = _run(cfg)
+        moves = _replay(cfg, algo.get_best_solution())
+        self.assertEqual(sum(d == 0 for _, d in moves), 13)
+        self.assertIn(rec.extra["operating_cost"], (531, 513))
+        paper_plan = MIN_MOVES if rec.extra["operating_cost"] == 531 else MIN_COST
+        self.assertEqual(moves, paper_plan)
+
+    def test_fig2_stack_mapping(self):
+        """Paper stack s is bay s, at distance s from the truck: f2 equals a hand recomputation."""
+        cfg = _config(self.fig2, max_tiers=4)
+        algo, rec = _run(cfg)
+        paper_plan = MIN_MOVES if rec.extra["operating_cost"] == 531 else MIN_COST
+        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_by_hand(paper_plan))
+
+    def test_containers_on_top_at_start(self):
+        """data3-3-5: blocks 1-4 are on top at the start; their retrievals are in the plan and in f2."""
+        path = DEFAULT_CASERTA_DIR / "data3-3-5.dat"
+        _, _, stacks = parse_caserta_dat(path)
+        self.assertIn(1, [s[-1] for s in stacks])
+        cfg = _config(path)
+        algo, rec = _run(cfg)
+        moves = _replay(cfg, algo.get_best_solution())
+        self.assertEqual([d for _, d in moves[:4]], [0, 0, 0, 0])
+        self.assertEqual(sum(d == 0 for _, d in moves), 9)
+        self.assertEqual(rec.metrics["relocations"], sum(d != 0 for _, d in moves))
+        self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_by_hand(moves))
+        self.assertAlmostEqual(rec.extra["operating_cost"],
+                               f(stacks, moves, CostModel(n_T=cfg.max_tiers)))
+
+    def test_truncated_phi_raises(self):
+        cfg = _config(self.fig2, max_tiers=4)
+        orig = LopezPlata2019Heuristic._construct_solution
+        for cut in (lambda phi: phi[:-1], lambda phi: phi[1:]):
+            def patched(self, *args, cut=cut):
+                phi, cost = orig(self, *args)
+                return cut(phi), cost
+            with self.subTest(cut=cut), mock.patch.object(LopezPlata2019Heuristic, "_construct_solution", patched):
+                with self.assertRaises(RuntimeError):
+                    _run(cfg)
 
 
 if __name__ == "__main__":
