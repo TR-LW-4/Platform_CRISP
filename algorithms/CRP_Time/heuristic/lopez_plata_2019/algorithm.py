@@ -33,6 +33,7 @@ from .measures import beta, greedy, p
 from .operating_cost import Bay, CostModel, Move
 from .step1 import partial_solutions
 from .step2 import algorithm2_loop
+from .step3 import postprocess
 
 
 # ================================================================ #
@@ -57,15 +58,6 @@ def _plan_from_phi(stacks: List[List[int]], phi: List[Move], cost: CostModel,
         if s2:
             actions.append(s2 - 1)
     return f_phi, plan, actions
-
-
-# ================================================================ #
-#  Post-processing: remove temporary moves                          #
-# ================================================================ #
-
-def _remove_temporary_moves(phi: List[Move]) -> List[Move]:
-    """Placeholder for step 3 of the paper (Sec. 6.3, Alg. 2 line 15); returns phi unchanged."""
-    return list(phi)
 
 
 # ================================================================ #
@@ -213,10 +205,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             if leaf is not None and leaf.g < f_best:
                 phi_best, f_best = leaf.phi, leaf.g
             phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C)
-            phi_best = _remove_temporary_moves(phi_best)
 
-            # The plan is phi_best itself; the problem validates it and reports its metrics.
+            # ----- Step 3 (Sec. 6.3, Alg. 2 line 15): repair temporary movements. The plan is
+            # phi_best itself; the problem validates it and reports its metrics -----
             try:
+                phi_best, f_best = postprocess(init_stacks, phi_best, cost)
                 operating_cost, plan, best_solution = _plan_from_phi(init_stacks, phi_best, cost, n_rows)
             except ValueError as err:
                 raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err

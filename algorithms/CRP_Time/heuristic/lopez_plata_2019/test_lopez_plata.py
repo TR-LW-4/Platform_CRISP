@@ -32,6 +32,7 @@ from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
 from .step1 import RunningSelection, algorithm1, partial_solutions, select
 from .step2 import alphas, children, draw, expand, q_m, roulette, sequences
+from .step3 import improve_once, postprocess, refit, temporary_moves
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
 FIG2 = [[9, 1, 8], [11, 3, 2], [5, 4], [13, 6], [12, 10, 7], []]
@@ -480,6 +481,107 @@ RHO_TEST = 5   # step-2 iterations in the unit tests that run train(); the defau
 # Fig. 4 (p. 444), read by Thom from the page image: n_S = 6, n_T = 4, n_C = 13, c* = 1; the move shown is
 # block 5 from stack 1 onto stack 3.
 FIG4 = [[9, 1, 5], [11, 3, 2], [8, 4], [13, 6], [12, 10, 7], []]
+
+
+FIG5_ORIGINAL = [(1, 3), (1, 0), (2, 0), (2, 0), (3, 1), (3, 0)]   # Fig. 5 (p. 445), on the layout of Fig. 4
+FIG5_FIX = [(1, 2), (1, 0), (2, 1), (2, 0), (2, 0), (3, 0)]
+
+
+def _random_restricted(rng, n_S, n_T, n_blocks):
+    """A random layout and a random complete restricted plan (random destination for every c+)."""
+    prios = list(range(1, n_blocks + 1))
+    rng.shuffle(prios)
+    stacks = [[] for _ in range(n_S)]
+    for c in prios:
+        stacks[rng.choice([i for i in range(n_S) if len(stacks[i]) < n_T])].append(c)
+    bay, phi = Bay(stacks, CostModel(n_T=n_T, **W_LOADED)), []
+    while bay.target is not None:
+        s = bay.target_stack()
+        if bay.stacks[s - 1][-1] == bay.target:
+            move = (s, 0)
+        else:
+            move = (s, rng.choice([d for d in range(1, n_S + 1) if d != s and len(bay.stacks[d - 1]) < n_T]))
+        bay.apply(move)
+        phi.append(move)
+    return stacks, phi
+
+
+class TestStep3(unittest.TestCase):
+
+    def test_fig5(self):
+        """Fig. 5 (p. 445), weights (b), crane from (0, 1). Original: 5 1->3 (25), R1 (29), R2 (30), R3 (33),
+        5 3->1 (29), R4 (34) = 180. Fix: 5 1->2 (21), R1 (27), 5 2->1 (23), R2 (28), R3 (33), R4 (36) = 168;
+        same end configuration and crane position (hand calculation by Thom, checked independently).
+        The move of 5 onto stack 3 is temporary; under O13 (d) only target 2 is accepted (on 4, 5, 6 block 5
+        is not forced to move before its original second move), and the postprocessing yields the fix."""
+        for phi, steps in ((FIG5_ORIGINAL, [25, 29, 30, 33, 29, 34]), (FIG5_FIX, [21, 27, 23, 28, 33, 36])):
+            bay = Bay(FIG4, LOADED)
+            self.assertEqual([bay.apply(m) for m in phi], steps)
+        self.assertEqual(temporary_moves(FIG4, FIG5_ORIGINAL, LOADED), [(0, 4)])
+        self.assertEqual(refit(FIG4, FIG5_ORIGINAL, LOADED, 0, 4, 2), (FIG5_FIX, 168))
+        for target in (4, 5, 6):
+            self.assertIsNone(refit(FIG4, FIG5_ORIGINAL, LOADED, 0, 4, target))
+        self.assertEqual(postprocess(FIG4, FIG5_ORIGINAL, LOADED), (FIG5_FIX, 168))
+        self.assertEqual(postprocess(FIG4, FIG5_FIX, LOADED), (FIG5_FIX, 168))
+
+    def test_covered_block_is_not_temporary(self):
+        """Condition (ii): 5 goes onto stack 3, then 6 is put on top of it before 5 moves again, so that
+        pair is not temporary; the later pair of 6 (onto 3, then onto 4) is."""
+        stacks = [[1, 5], [2, 6], [3], []]
+        phi = [(1, 3), (1, 0), (2, 3), (2, 0), (3, 4), (3, 1), (3, 0), (1, 0), (4, 0)]
+        cost = CostModel(n_T=4, **W_LOADED)
+        self.assertEqual(f(stacks, phi, cost), f(stacks, phi, cost))   # the plan is feasible
+        self.assertEqual(temporary_moves(stacks, phi, cost), [(2, 4)])
+
+    def test_late_forcing_is_rejected(self):
+        """O13 (d): block 5 goes onto stack 1 and back onto stack 3 (the pair (0, 2)). With target 2 it would
+        only be forced to move after its original second move (when 4 is due, not when 2 is), so the
+        repair is rejected, although the rest of the plan would stay feasible (n_T = 3)."""
+        stacks = [[3, 2], [4], [1, 5]]
+        phi = [(3, 1), (3, 0), (1, 3), (1, 0), (1, 0), (2, 0), (3, 0)]
+        cost = CostModel(n_T=3, **W_LOADED)
+        self.assertEqual(temporary_moves(stacks, phi, cost), [(0, 2)])
+        self.assertIsNone(refit(stacks, phi, cost, 0, 2, 2))
+
+    def test_improve_once_choice(self):
+        """On random plans, one improvement step repairs the first temporary movement that some target
+        improves strictly, with the target of lowest f (ties to the lowest index), and nothing else."""
+        rng, checked = random.Random(11), 0
+        for _ in range(300):
+            n_S, n_T = rng.randint(3, 5), rng.randint(3, 4)
+            stacks, phi = _random_restricted(rng, n_S, n_T, rng.randint(n_S, n_S * n_T - n_T + 1))
+            cost = CostModel(n_T=n_T, **W_LOADED)
+            f_phi = f(stacks, phi, cost)
+            expected = None
+            for i, j in temporary_moves(stacks, phi, cost):
+                fits = [refit(stacks, phi, cost, i, j, t) for t in range(1, n_S + 1) if t not in phi[i]]
+                fits = [x for x in fits if x and x[1] < f_phi]
+                if fits:
+                    expected = min(fits, key=lambda x: x[1])
+                    break
+            self.assertEqual(improve_once(stacks, phi, cost, f_phi), expected)
+            checked += expected is not None
+        self.assertGreater(checked, 20)
+
+    def test_random_plans(self):
+        """On 400 random restricted plans: f never increases, the length stays the same, the result is a
+        complete restricted plan (replayed through Bay), and some plans do improve."""
+        rng, improved = random.Random(2026), 0
+        for _ in range(400):
+            n_S, n_T = rng.randint(3, 5), rng.randint(3, 4)
+            stacks, phi = _random_restricted(rng, n_S, n_T, rng.randint(n_S, n_S * n_T - n_T + 1))
+            cost = CostModel(n_T=n_T, **W_LOADED)
+            before = f(stacks, phi, cost)
+            new_phi, after = postprocess(stacks, phi, cost)
+            self.assertLessEqual(after, before)
+            self.assertEqual(len(new_phi), len(phi))
+            bay = Bay(stacks, cost)
+            for move in new_phi:
+                bay.apply(move)
+            self.assertIsNone(bay.target)
+            self.assertAlmostEqual(bay.g, after)
+            improved += after < before
+        self.assertGreater(improved, 20)
 
 
 def _brute_sequences(node, kappa, tau, n_C):
