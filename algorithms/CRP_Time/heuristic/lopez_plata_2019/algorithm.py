@@ -21,7 +21,7 @@ paper listed in the Reference section.
 from __future__ import annotations
 
 import multiprocessing as mp
-from dataclasses import dataclass
+import random
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -29,56 +29,10 @@ import numpy as np
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.plan import Movement, RelocationPlan
 
-from .measures import beta, greedy, p, q
-from .operating_cost import Bay, CostModel, Move, f
+from .measures import beta, greedy, p
+from .operating_cost import Bay, CostModel, Move
 from .step1 import partial_solutions
-
-
-# ================================================================ #
-#  Operating cost model (paper style)                               #
-# ================================================================ #
-
-@dataclass
-class OperatingCostModel:
-    """
-    Linear operating cost for crane moves (López-Plata et al. 2019).
-
-    Unloaded move cost from (s1, t1) to (s2, t2):
-        m = (nT + t1)*α1 + d(s1,s2)*β1 + (nT + t2)*α1
-
-    Loaded move cost:
-        m' = (nT + t1)*α2 + d(s1,s2)*β2 + (nT + t2)*α2
-
-    Retrieval point is modelled as stack 0, tier 1.
-    """
-    alpha1: float = 1.0   # unloaded vertical
-    beta1: float = 1.0    # unloaded horizontal
-    alpha2: float = 2.0   # loaded vertical
-    beta2: float = 2.0    # loaded horizontal
-    security_margin: int = 2  # extra tiers when raising the spreader
-
-    def unloaded_cost(self, nT: int, t1: int, t2: int, dist: float) -> float:
-        h = nT + self.security_margin
-        return (h + t1) * self.alpha1 + dist * self.beta1 + (h + t2) * self.alpha1
-
-    def loaded_cost(self, nT: int, t1: int, t2: int, dist: float) -> float:
-        h = nT + self.security_margin
-        return (h + t1) * self.alpha2 + dist * self.beta2 + (h + t2) * self.alpha2
-
-    def retrieval_cost(self, nT: int, t: int) -> float:
-        """Cost to retrieve from tier t (loaded) to retrieval point (0,1)."""
-        return self.loaded_cost(nT, t, 1, 0.0)  # dist 0 for dummy stack 0
-
-    def crane_to_pickup_unloaded(self, nT: int, from_top: int, to_t: int) -> float:
-        """Cost to move unloaded crane from top of current stack down to a tier."""
-        h = nT + self.security_margin
-        # From top (h) to the slot tier to_t (the paper uses the slot tier directly)
-        return (h + from_top) * self.alpha1 + 0.0 * self.beta1 + (h + to_t) * self.alpha1
-
-
-def stack_distance(s1: int, s2: int) -> float:
-    """Simple linear stack distance (paper default in experiments)."""
-    return abs(s1 - s2)
+from .step2 import algorithm2_loop
 
 
 # ================================================================ #
@@ -106,66 +60,11 @@ def _plan_from_phi(stacks: List[List[int]], phi: List[Move], cost: CostModel,
 
 
 # ================================================================ #
-#  Old step 2 (replaced in step 4), working on Bay nodes            #
-# ================================================================ #
-
-def _retrieve_on_top(bay: Bay) -> None:
-    """Retrieve c* while it is on top of its stack."""
-    while bay.target is not None:
-        s = bay.target_stack()
-        if bay.stacks[s - 1][-1] != bay.target:
-            return
-        bay.apply((s, 0))
-
-
-def _relocation_quality(bay: Bay, src: int, dst: int, cost_model: OperatingCostModel, n_C: int,
-                        w_move: float = 1.0, w_b: float = 1.0) -> float:
-    """Old step-2 score of relocating the top of src to dst (stacks 1-based): the old move cost,
-    normalised by a large move, plus w_b times q of the resulting configuration (measures.q)."""
-    nT = bay.cost.n_T
-    move_c = cost_model.loaded_cost(nT, len(bay.stacks[src - 1]), len(bay.stacks[dst - 1]) + 1,
-                                    stack_distance(src, dst))
-    tmp = bay.copy()
-    tmp.apply((src, dst))
-    max_move = cost_model.loaded_cost(nT, nT, nT, max(1, len(bay.stacks) - 1))
-    return w_move * move_c / max_move + w_b * q(tmp, n_C)
-
-
-def _expand_partial(bay: Bay, cost_model: OperatingCostModel, mu: int,
-                    n_C: int) -> Tuple[List[int], float, Bay]:
-    """Old step 2: mu steps, each retrieving c* or relocating c+ to the stack with the lowest
-    _relocation_quality and then retrieving what became accessible. Returns the destinations,
-    their old relocation cost and the resulting node."""
-    current = bay.copy()
-    nT = current.cost.n_T
-    sequence_cost, dests = 0.0, []
-    for _ in range(mu):
-        if current.target is None:
-            break
-        s = current.target_stack()
-        if current.stacks[s - 1][-1] == current.target:
-            current.apply((s, 0))
-            continue
-        cands = [(_relocation_quality(current, s, d, cost_model, n_C), d)
-                 for d in range(1, len(current.stacks) + 1)
-                 if d != s and len(current.stacks[d - 1]) < nT]
-        if not cands:
-            break
-        _, d = min(cands)
-        sequence_cost += cost_model.loaded_cost(nT, len(current.stacks[s - 1]), len(current.stacks[d - 1]) + 1,
-                                                stack_distance(s, d))
-        current.apply((s, d))
-        dests.append(d)
-        _retrieve_on_top(current)
-    return dests, sequence_cost, current
-
-
-# ================================================================ #
 #  Post-processing: remove temporary moves                          #
 # ================================================================ #
 
 def _remove_temporary_moves(phi: List[Move]) -> List[Move]:
-    """Placeholder for step 3 of the paper (Sec. 6.3); returns phi unchanged."""
+    """Placeholder for step 3 of the paper (Sec. 6.3, Alg. 2 line 15); returns phi unchanged."""
     return list(phi)
 
 
@@ -180,8 +79,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     Parameters via config.extra:
         theta (float): percentage in eq. 29 for the depth beta of step 1 (default 40).
         max_partial_nodes (int): lambda, nodes per subset N_g and N_q (default 500).
-        num_expansions (int): how many times to repeat the old expansion phase (default 5).
-        mu (int): steps per call of the old expansion (default 2).
+        node_budget (int): nodes visited by step 1 over all iterations (default 10**7, L18).
+        rho (int): iterations of step 2 (default 300).
+        kappa (int): retrievals per Expansion (default 2).
+        mu (int): sequences in the roulette wheel (default 5).
+        tau (int): branching factor of Expansion (default 3).
     """
 
     name = "López-Plata et al. (2019) Operating-Cost Heuristic"
@@ -219,13 +121,21 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "type": "int", "default": 50, "min": 5, "max": 500,
                 "label": "Max promising partial nodes",
             },
-            "num_expansions": {
-                "type": "int", "default": 5, "min": 1, "max": 50,
-                "label": "Number of expansion repetitions",
+            "rho": {
+                "type": "int", "default": 300, "min": 1, "max": 10_000,
+                "label": "Step-2 iterations (ρ)",
+            },
+            "kappa": {
+                "type": "int", "default": 2, "min": 1, "max": 20,
+                "label": "Retrievals per expansion (κ)",
             },
             "mu": {
-                "type": "int", "default": 2, "min": 1, "max": 10,
-                "label": "Blocks per expansion (μ)",
+                "type": "int", "default": 5, "min": 1, "max": 100,
+                "label": "Sequences in the roulette wheel (µ)",
+            },
+            "tau": {
+                "type": "int", "default": 3, "min": 1, "max": 20,
+                "label": "Branching factor of the expansion (τ)",
             },
             "node_budget": {
                 "type": "int", "default": 10_000_000, "min": 1, "max": 1_000_000_000,
@@ -257,16 +167,10 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         theta = float(cfg.extra.get("theta", 40))
         lam = int(cfg.extra.get("max_partial_nodes", 500))
         node_budget = int(cfg.extra.get("node_budget", 10 ** 7))
-        num_exp = int(cfg.extra.get("num_expansions", 5))
-        mu = int(cfg.extra.get("mu", 2))
-
-        # Old step-2 cost model, used only by the old expansion until step 4.
-        cost_model = OperatingCostModel(
-            alpha1=float(cfg.extra.get("alpha1", 1.0)),
-            beta1=float(cfg.extra.get("beta1", 1.0)),
-            alpha2=float(cfg.extra.get("alpha2", 2.0)),
-            beta2=float(cfg.extra.get("beta2", 2.0)),
-        )
+        rho = int(cfg.extra.get("rho", 300))
+        kappa = int(cfg.extra.get("kappa", 2))
+        mu = int(cfg.extra.get("mu", 5))
+        tau = int(cfg.extra.get("tau", 3))
 
         all_metrics: List[Dict] = []
 
@@ -275,7 +179,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 break
 
             seed = rng_seed + seed_idx
-            np.random.seed(seed)
+            rng = random.Random(seed)   # the only random component: the roulette of step 2
 
             env = problem_factory()
             # Containers on top at the start stay in the yard, so their retrievals are part of phi.
@@ -303,24 +207,17 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             depth = beta(len(greedy_phi), n_C, theta)
             partials, leaf, _, step1 = partial_solutions(root, ub, depth, lam, n_C, node_budget)
 
-            # phi_best starts as the greedy solution (O20); the best leaf of step 1 is a candidate (O05).
-            candidates = [greedy_phi] + ([leaf.phi] if leaf else [])
-            if partials:
-                best_cost = float("inf")
-                for _exp in range(num_exp):
-                    phi_for_this, op_cost_for_this = self._construct_solution(
-                        partials, cost_model, num_exp, mu, n_C)
-                    # Selection among the expansions still on the old step-2 relocation cost (C15).
-                    if op_cost_for_this < best_cost:
-                        best_cost = op_cost_for_this
-                        expanded = phi_for_this
-                candidates.append(expanded)
+            # ----- Step 2 (Sec. 6.2, Alg. 2 lines 3-14): phi_best starts as the greedy solution (O20),
+            # or the best step-1 leaf if cheaper (O05); rho iterations of Expansion from N -----
+            phi_best, f_best = greedy_phi, ub
+            if leaf is not None and leaf.g < f_best:
+                phi_best, f_best = leaf.phi, leaf.g
+            phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C)
+            phi_best = _remove_temporary_moves(phi_best)
 
-            # phi_best has the lowest f (Alg. 2, line 10; ties keep the earlier candidate). The plan is
-            # phi_best itself; the problem validates it and reports its metrics.
+            # The plan is phi_best itself; the problem validates it and reports its metrics.
             try:
-                best_phi = min(candidates, key=lambda phi: f(init_stacks, phi, cost))
-                operating_cost, plan, best_solution = _plan_from_phi(init_stacks, best_phi, cost, n_rows)
+                operating_cost, plan, best_solution = _plan_from_phi(init_stacks, phi_best, cost, n_rows)
             except ValueError as err:
                 raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err
             env_final = problem_factory()
@@ -368,42 +265,13 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0)
 
     # ---------------------------------------------------------------- #
-    # Helper: construct a full solution using the heuristic            #
+    # Step 2                                                           #
     # ---------------------------------------------------------------- #
 
-    def _construct_solution(
-        self,
-        partials: List[Bay],
-        cost_model: OperatingCostModel,
-        num_exp: int,
-        mu: int,
-        n_C: int,
-    ) -> Tuple[List[Move], float]:
-        """
-        Run the old expansion (replaced in step 4) from the partial solutions of step 1, round
-        robin, and return phi (all moves from the root) + the old step-2 relocation cost.
-        """
-        best_phi: List[Move] = []
-        best_cost = float("inf")
-
-        for i in range(num_exp):
-            cstate = partials[i % len(partials)].copy()
-            _retrieve_on_top(cstate)   # the old expansion stops on a round without relocation
-            total_c = 0.0
-
-            while cstate.target is not None:
-                seq, sc, cstate = _expand_partial(cstate, cost_model, mu, n_C)
-                total_c += sc
-                if not seq:
-                    break
-
-            cleaned = _remove_temporary_moves(cstate.phi)
-
-            if total_c < best_cost:
-                best_cost = total_c
-                best_phi = cleaned
-
-        return best_phi, best_cost
+    @staticmethod
+    def _step2(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
+               rho: int, kappa: int, tau: int, mu: int, n_C: int) -> Tuple[List[Move], float]:
+        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C)
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

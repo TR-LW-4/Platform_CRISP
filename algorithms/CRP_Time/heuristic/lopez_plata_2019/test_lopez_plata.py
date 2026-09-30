@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import queue
+import random
 import tempfile
 import threading
 import unittest
@@ -30,6 +31,7 @@ from .algorithm import LopezPlata2019Heuristic
 from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
 from .step1 import RunningSelection, algorithm1, partial_solutions, select
+from .step2 import alphas, children, draw, expand, q_m, roulette, sequences
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
 FIG2 = [[9, 1, 8], [11, 3, 2], [5, 4], [13, 6], [12, 10, 7], []]
@@ -350,7 +352,8 @@ class TestStep1(unittest.TestCase):
             self.assertEqual("".join(names[id(n)] for n in select(nodes, lam, 2)), expected, lam)
 
     def test_deterministic(self):
-        """Step 1 and the whole run give the same result twice and for another seed."""
+        """Step 1 gives the same result twice; so does the whole run with the same seed (another seed
+        may differ through the roulette of step 2, see TestStep2)."""
         stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
         cost = CostModel(n_T=5, **W_LOADED)
         runs = []
@@ -362,8 +365,8 @@ class TestStep1(unittest.TestCase):
         self.assertEqual(runs[0], runs[1])
         cfg = _config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")
         plans = []
-        for seed in (0, 7):
-            algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=seed))
+        for _ in range(2):
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=7, extra={"rho": RHO_TEST}))
             algo.train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
             plans.append(algo.get_best_solution())
         self.assertEqual(plans[0], plans[1])
@@ -451,7 +454,7 @@ class TestIterativeDeepening(unittest.TestCase):
         beta_eff <= beta, and without a hit beta_eff = beta and theta = 40 lies in the interval."""
         cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-2.dat")
         for budget, hit in ((10 ** 7, False), (20_000, True)):
-            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"node_budget": budget}))
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"node_budget": budget, "rho": 2}))
             q_ = queue.Queue()
             algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
             m = q_.get_nowait().metrics
@@ -472,6 +475,167 @@ class TestIterativeDeepening(unittest.TestCase):
 
 
 TS, TPP = 1.2, 30.0
+RHO_TEST = 5   # step-2 iterations in the unit tests that run train(); the default is 300
+
+# Hand example for alpha (a stand-in, NOT the layout of Fig. 4, which is not in the validation log):
+# block 5 on block 1 in stack 1 goes to stack 3 onto block 4; n_S = 4, n_T = 4 (n_T + epsilon = 6), n_C = 5.
+ALPHA_BAY = [[1, 5], [2, 3], [4], []]
+
+
+def _brute_sequences(node, kappa, tau, n_C):
+    """Every restricted continuation (any destination) up to min(kappa, blocks left) retrievals, kept only
+    if each relocation goes to one of the tau children of its node; with its sum of alpha."""
+    goal = min(kappa, sum(len(st) for st in node.stacks))
+    out = []
+
+    def walk(bay, retrieved, total):
+        if retrieved == goal:
+            out.append((tuple(bay.phi), total))
+            return
+        s = bay.target_stack()
+        if bay.stacks[s - 1][-1] == bay.target:
+            child = bay.copy()
+            child.apply((s, 0))
+            walk(child, retrieved + 1, total)
+            return
+        allowed = {d for _, d in children(bay, tau, n_C)}
+        alpha = {d: a for a, d in alphas(bay, n_C)}
+        for d in range(1, len(bay.stacks) + 1):
+            if d != s and len(bay.stacks[d - 1]) < bay.cost.n_T and d in allowed:
+                child = bay.copy()
+                child.apply((s, d))
+                walk(child, retrieved, total + alpha[d])
+
+    walk(node.copy(), 0, 0.0)
+    return out
+
+
+class TestStep2(unittest.TestCase):
+
+    def test_alpha_by_hand(self):
+        """1. Eq. 27-28 on ALPHA_BAY, W_LOADED, each term separately (mq masks). q_m (eq. 27):
+        to 2: m'(1,2,2,3) + m(2,3,1,1) = (8+2+6) + (3+1+5) = 25; to 3: (8+4+8) + (4+2+5) = 31;
+        to 4: (8+6+10) + (5+3+5) = 37 = maxMov. For c = 5 on d after the move:
+        q_b: 1 on 2 ([2,3] holds earlier blocks), 1 on 3 ([4]), 0 on 4 (empty);
+        q_c / n_C: |5-2|/5, |5-4|/5, and on the empty stack 4 (c alone) (5 - 1)/5; q_r / maxDist: d/4."""
+        bay = Bay(ALPHA_BAY, LOADED)
+        self.assertEqual([q_m(bay, 1, d) for d in (2, 3, 4)], [25, 31, 37])
+        terms = {name: dict((d, a) for a, d in alphas(bay, 5, mask))
+                 for name, mask in (("m", (1, 0, 0, 0)), ("b", (0, 1, 0, 0)), ("c", (0, 0, 1, 0)), ("r", (0, 0, 0, 1)))}
+        self.assertEqual(terms["m"], {2: 25 / 37, 3: 31 / 37, 4: 1.0})
+        self.assertEqual(terms["b"], {2: 1, 3: 1, 4: 0})
+        self.assertEqual(terms["c"], {2: 3 / 5, 3: 1 / 5, 4: 4 / 5})
+        self.assertEqual(terms["r"], {2: 2 / 4, 3: 3 / 4, 4: 4 / 4})
+        total = dict((d, a) for a, d in alphas(bay, 5))
+        for d, want in ((2, 25 / 37 + 2 + 3 / 5 + 0.5 * 2 / 4), (3, 31 / 37 + 2 + 1 / 5 + 0.5 * 3 / 4), (4, 1 + 0 + 4 / 5 + 0.5)):
+            self.assertAlmostEqual(total[d], want)
+
+    def test_alpha_full_stacks_and_q_b(self):
+        """1. [1, 5], [2, 7], [3, 14, 15], [4, 6, 8, 9], [10, 11, 12, 13], n_T = 4: stacks 4 and 5 are full.
+        Candidates 2 and 3: q_m = (8+2+6) + (3+1+5) = 25 and (8+4+4) + (2+2+5) = 25, so maxMov = 25; the full
+        stack 5 would give 16 + 3*4 = 28 and must not enter maxMov. q_b = 1 on both: blocks 2 and 3 below
+        are earlier than 5, although the tops 7 and 15 are later."""
+        bay = Bay([[1, 5], [2, 7], [3, 14, 15], [4, 6, 8, 9], [10, 11, 12, 13]], LOADED)
+        self.assertEqual(dict((d, a) for a, d in alphas(bay, 15, (1, 0, 0, 0))), {2: 1.0, 3: 1.0})
+        self.assertEqual(dict((d, a) for a, d in alphas(bay, 15, (0, 1, 0, 0))), {2: 1, 3: 1})
+
+    def test_tau_children(self):
+        """2. The tau lowest alpha, ties to the lowest stack index. ALPHA_BAY: alpha 3.53 (2), 3.41 (3),
+        2.30 (4). Tie: [3], [1, 6], [5], [2, 4, 7, 8] (stack 4 full), n_C = 8: 6 goes to 1 or 3, q_m = 28
+        both (maxMov term 1), q_b = 1 both; alpha = 1 + 2 + 3/8 + 0.5 * 1/4 = 3.5 on stack 1 and
+        1 + 2 + 1/8 + 0.5 * 3/4 = 3.5 on stack 3."""
+        bay = Bay(ALPHA_BAY, LOADED)
+        self.assertEqual([d for _, d in children(bay, 2, 5)], [4, 3])
+        self.assertEqual([d for _, d in children(bay, 3, 5)], [4, 3, 2])
+        tie = Bay([[3], [1, 6], [5], [2, 4, 7, 8]], LOADED)
+        self.assertEqual(children(tie, 3, 8), [(3.5, 1), (3.5, 3)])
+        self.assertEqual(children(tie, 1, 8), [(3.5, 1)])
+
+    def test_sequences(self):
+        """3. Every sequence ends right after min(kappa, blocks left) retrievals; at most tau different
+        next moves after any prefix; the set equals a brute-force enumeration filtered on the tau children."""
+        cases = [(Bay(FIG2, LOADED), 13), (Bay(parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2],
+                                               CostModel(n_T=5, **W_LOADED)), 12)]
+        end = Bay(FIG2, LOADED)
+        for mv in MIN_MOVES[:-2]:
+            end.apply(mv)                               # two blocks left: 12 and 13
+        cases.append((end, 13))
+        for node, n_C in cases:
+            for kappa, tau in ((1, 1), (2, 2), (2, 3), (3, 3)):
+                seqs = sequences(node, kappa, tau, n_C)
+                goal = min(kappa, sum(len(st) for st in node.stacks))
+                start = len(node.phi)
+                got = [(tuple(b.phi), a) for b, a in seqs]
+                for phi, _ in got:
+                    added = phi[start:]
+                    self.assertEqual(sum(d == 0 for _, d in added), goal)
+                    self.assertEqual(added[-1][1], 0)
+                branching = {}
+                for phi, _ in got:
+                    for k in range(start, len(phi)):
+                        branching.setdefault(phi[:k], set()).add(phi[k])
+                self.assertLessEqual(max(len(v) for v in branching.values()), tau)
+                brute = _brute_sequences(node, kappa, tau, n_C)
+                self.assertEqual(sorted(got), sorted(brute))
+
+    def test_roulette(self):
+        """4. Probabilities proportional to 1 / (sum of alpha): sums 1, 2, 4 give 4/7, 2/7, 1/7; 30 000
+        draws with a fixed seed match within 0.01. Only the mu best sequences are ever drawn."""
+        self.assertEqual([round(x, 12) for x in roulette([1, 2, 4])], [round(4 / 7, 12), round(2 / 7, 12), round(1 / 7, 12)])
+        rng = random.Random(1)
+        counts = {"a": 0, "b": 0, "c": 0}
+        for _ in range(30_000):
+            counts[draw([("a", 1.0), ("b", 2.0), ("c", 4.0)], rng)] += 1
+        for key, want in (("a", 4 / 7), ("b", 2 / 7), ("c", 1 / 7)):
+            self.assertAlmostEqual(counts[key] / 30_000, want, delta=0.01)
+        self.assertEqual(draw([("only", 0.0)], rng), "only")
+        root = Bay(FIG2, LOADED)
+        seqs = sorted(sequences(root, 2, 3, 13), key=lambda s: s[1])
+        self.assertGreater(len(seqs), 2)
+        allowed = {tuple(b.phi) for b, _ in seqs[:2]}
+        seen = {tuple(expand(root, rng, 2, 3, 2, 13).phi) for _ in range(300)}
+        self.assertEqual(seen, allowed)
+
+    def test_seeds(self):
+        """5. The same seed gives the same completions; another seed gives different ones (V04)."""
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
+        cost = CostModel(n_T=5, **W_LOADED)
+        root = Bay(stacks, cost)
+        phi, ub = greedy(root)
+        nodes, _, _, _ = partial_solutions(root, ub, beta(len(phi), 12), 500, 12, 10 ** 7)
+
+        def completions(seed):
+            rng, out = random.Random(seed), []
+            for node in nodes[:20]:
+                while node.target is not None:
+                    node = expand(node, rng, 2, 3, 5, 12)
+                out.append((tuple(node.phi), node.g))
+            return out
+
+        self.assertEqual(completions(0), completions(0))
+        self.assertNotEqual(completions(0), completions(1))
+
+    def test_whole_run(self):
+        """6. Fig. 2 and the 40 Caserta 3x3 instances: complete, accepted by validate_plan (train raises
+        otherwise), and f(phi_best) <= f(greedy)."""
+        cases = [(self.fig2_path(), FIG2, 4)] + [
+            (DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat", parse_caserta_dat(DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat")[2], 5)
+            for i in range(1, 41)]
+        for path, stacks, n_T in cases:
+            cfg = _config(path, max_tiers=n_T)
+            algo, rec = _run(cfg)
+            moves = _replay(cfg, algo.get_best_solution())
+            self.assertEqual(sum(d == 0 for _, d in moves), sum(len(s) for s in stacks))
+            greedy_f = greedy(Bay(stacks, CostModel(n_T=n_T, **W_LOADED)))[1]
+            self.assertLessEqual(rec.extra["operating_cost"], greedy_f + 1e-9)
+
+    def fig2_path(self):
+        if not hasattr(self, "_tmp"):
+            self._tmp = tempfile.TemporaryDirectory()
+            self.addCleanup(self._tmp.cleanup)
+        path = Path(self._tmp.name) / "fig2.dat"
+        path.write_text("\n".join(["6 13"] + [" ".join(map(str, [len(s)] + s)) for s in FIG2]) + "\n")
+        return path
 
 
 def _config(path, max_tiers=None):
@@ -482,8 +646,8 @@ def _config(path, max_tiers=None):
     return cfg
 
 
-def _run(cfg):
-    algo = LopezPlata2019Heuristic(AlgorithmConfig())
+def _run(cfg, seed=0):
+    algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=seed, extra={"rho": RHO_TEST}))
     q = queue.Queue()
     algo.train(lambda: CRP_Time(config=cfg), q, threading.Event())
     return algo, q.get_nowait()
@@ -550,12 +714,12 @@ class TestCompletePlan(unittest.TestCase):
 
     def test_truncated_phi_raises(self):
         cfg = _config(self.fig2, max_tiers=4)
-        orig = LopezPlata2019Heuristic._construct_solution
+        orig = LopezPlata2019Heuristic._step2
         for cut in (lambda phi: phi[:-1], lambda phi: phi[1:]):
-            def patched(self, *args, cut=cut):
-                phi, cost = orig(self, *args)
-                return cut(phi), cost
-            with self.subTest(cut=cut), mock.patch.object(LopezPlata2019Heuristic, "_construct_solution", patched):
+            def patched(*args, cut=cut):
+                phi, f_best = orig(*args)
+                return cut(phi), f_best
+            with self.subTest(cut=cut), mock.patch.object(LopezPlata2019Heuristic, "_step2", staticmethod(patched)):
                 with self.assertRaises(RuntimeError):
                     _run(cfg)
 
