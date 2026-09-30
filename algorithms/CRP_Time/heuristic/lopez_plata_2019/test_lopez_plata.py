@@ -477,9 +477,9 @@ class TestIterativeDeepening(unittest.TestCase):
 TS, TPP = 1.2, 30.0
 RHO_TEST = 5   # step-2 iterations in the unit tests that run train(); the default is 300
 
-# Hand example for alpha (a stand-in, NOT the layout of Fig. 4, which is not in the validation log):
-# block 5 on block 1 in stack 1 goes to stack 3 onto block 4; n_S = 4, n_T = 4 (n_T + epsilon = 6), n_C = 5.
-ALPHA_BAY = [[1, 5], [2, 3], [4], []]
+# Fig. 4 (p. 444), read by Thom from the page image: n_S = 6, n_T = 4, n_C = 13, c* = 1; the move shown is
+# block 5 from stack 1 onto stack 3.
+FIG4 = [[9, 1, 5], [11, 3, 2], [8, 4], [13, 6], [12, 10, 7], []]
 
 
 def _brute_sequences(node, kappa, tau, n_C):
@@ -513,22 +513,23 @@ def _brute_sequences(node, kappa, tau, n_C):
 class TestStep2(unittest.TestCase):
 
     def test_alpha_by_hand(self):
-        """1. Eq. 27-28 on ALPHA_BAY, W_LOADED, each term separately (mq masks). q_m (eq. 27):
-        to 2: m'(1,2,2,3) + m(2,3,1,1) = (8+2+6) + (3+1+5) = 25; to 3: (8+4+8) + (4+2+5) = 31;
-        to 4: (8+6+10) + (5+3+5) = 37 = maxMov. For c = 5 on d after the move:
-        q_b: 1 on 2 ([2,3] holds earlier blocks), 1 on 3 ([4]), 0 on 4 (empty);
-        q_c / n_C: |5-2|/5, |5-4|/5, and on the empty stack 4 (c alone) (5 - 1)/5; q_r / maxDist: d/4."""
-        bay = Bay(ALPHA_BAY, LOADED)
-        self.assertEqual([q_m(bay, 1, d) for d in (2, 3, 4)], [25, 31, 37])
-        terms = {name: dict((d, a) for a, d in alphas(bay, 5, mask))
+        """1. Eq. 27-28 on Fig. 4 (p. 444): block 5 on stack 1 (c* = 1), n_T = 4, epsilon = 2, W_LOADED, n_C = 13,
+        maxDist = n_S = 6, each term separately (mq masks). q_m = m'(1,3,d,t') + m(d,t',1,2) = 10 + 3|d-1| + 3(6-t'):
+        19 (to 2, t' = 4), 25 (to 3, t' = 3, the move of Fig. 4), 28 (to 4, t' = 3), 28 (to 5, t' = 4), 40 (to 6, t' = 1);
+        maxMov = 40. q_b: 1 on 2 and 3 (blocks 2 and 4 below are earlier), 0 on 4, 5, 6. q_c: |5-2| = 3, |5-4| = 1,
+        0 on 4 and 5 (5 is the earliest there), 4 on the empty stack 6 (alone: r(c) - r(c*) = 5 - 1).
+        alpha: 4481/1560, 307/104, 31/30, 67/60, 47/26 (hand calculation by Thom, checked independently)."""
+        bay = Bay(FIG4, LOADED)
+        self.assertEqual([q_m(bay, 1, d) for d in range(2, 7)], [19, 25, 28, 28, 40])
+        terms = {name: dict((d, a) for a, d in alphas(bay, 13, mask))
                  for name, mask in (("m", (1, 0, 0, 0)), ("b", (0, 1, 0, 0)), ("c", (0, 0, 1, 0)), ("r", (0, 0, 0, 1)))}
-        self.assertEqual(terms["m"], {2: 25 / 37, 3: 31 / 37, 4: 1.0})
-        self.assertEqual(terms["b"], {2: 1, 3: 1, 4: 0})
-        self.assertEqual(terms["c"], {2: 3 / 5, 3: 1 / 5, 4: 4 / 5})
-        self.assertEqual(terms["r"], {2: 2 / 4, 3: 3 / 4, 4: 4 / 4})
-        total = dict((d, a) for a, d in alphas(bay, 5))
-        for d, want in ((2, 25 / 37 + 2 + 3 / 5 + 0.5 * 2 / 4), (3, 31 / 37 + 2 + 1 / 5 + 0.5 * 3 / 4), (4, 1 + 0 + 4 / 5 + 0.5)):
-            self.assertAlmostEqual(total[d], want)
+        self.assertEqual(terms["m"], {2: 19 / 40, 3: 25 / 40, 4: 28 / 40, 5: 28 / 40, 6: 1.0})
+        self.assertEqual(terms["b"], {2: 1, 3: 1, 4: 0, 5: 0, 6: 0})
+        self.assertEqual(terms["c"], {2: 3 / 13, 3: 1 / 13, 4: 0.0, 5: 0.0, 6: 4 / 13})
+        self.assertEqual(terms["r"], {d: d / 6 for d in range(2, 7)})
+        total = dict((d, a) for a, d in alphas(bay, 13))
+        for d, (num, den) in {2: (4481, 1560), 3: (307, 104), 4: (31, 30), 5: (67, 60), 6: (47, 26)}.items():
+            self.assertAlmostEqual(total[d], num / den, places=12)
 
     def test_alpha_full_stacks_and_q_b(self):
         """1. [1, 5], [2, 7], [3, 14, 15], [4, 6, 8, 9], [10, 11, 12, 13], n_T = 4: stacks 4 and 5 are full.
@@ -540,13 +541,14 @@ class TestStep2(unittest.TestCase):
         self.assertEqual(dict((d, a) for a, d in alphas(bay, 15, (0, 1, 0, 0))), {2: 1, 3: 1})
 
     def test_tau_children(self):
-        """2. The tau lowest alpha, ties to the lowest stack index. ALPHA_BAY: alpha 3.53 (2), 3.41 (3),
-        2.30 (4). Tie: [3], [1, 6], [5], [2, 4, 7, 8] (stack 4 full), n_C = 8: 6 goes to 1 or 3, q_m = 28
+        """2. The tau lowest alpha, ties to the lowest stack index. Fig. 4: alpha 2.87 (2), 2.95 (3), 1.03 (4),
+        1.12 (5), 1.81 (6), so tau = 3 gives stacks 4, 5, 6 (not the move drawn in Fig. 4). Tie: [3], [1, 6], [5], [2, 4, 7, 8] (stack 4 full), n_C = 8: 6 goes to 1 or 3, q_m = 28
         both (maxMov term 1), q_b = 1 both; alpha = 1 + 2 + 3/8 + 0.5 * 1/4 = 3.5 on stack 1 and
         1 + 2 + 1/8 + 0.5 * 3/4 = 3.5 on stack 3."""
-        bay = Bay(ALPHA_BAY, LOADED)
-        self.assertEqual([d for _, d in children(bay, 2, 5)], [4, 3])
-        self.assertEqual([d for _, d in children(bay, 3, 5)], [4, 3, 2])
+        bay = Bay(FIG4, LOADED)
+        self.assertEqual([d for _, d in children(bay, 1, 13)], [4])
+        self.assertEqual([d for _, d in children(bay, 3, 13)], [4, 5, 6])
+        self.assertEqual([d for _, d in children(bay, 5, 13)], [4, 5, 6, 2, 3])
         tie = Bay([[3], [1, 6], [5], [2, 4, 7, 8]], LOADED)
         self.assertEqual(children(tie, 3, 8), [(3.5, 1), (3.5, 3)])
         self.assertEqual(children(tie, 1, 8), [(3.5, 1)])
