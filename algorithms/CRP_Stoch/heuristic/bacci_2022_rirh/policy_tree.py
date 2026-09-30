@@ -41,7 +41,10 @@ computation implemented here traverses the tree in O(|nodes|) time.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from itertools import permutations
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
 
 from core.plan import Movement
 
@@ -92,7 +95,6 @@ class ChanceNode:
         return len(self.outcomes)
 
 
-# Type alias used by the callers (env.evaluate_policy(tree))
 PolicyTree = ChanceNode
 
 
@@ -203,3 +205,72 @@ def describe(root: Optional[ChanceNode], max_depth: int = 5) -> str:
 
     _walk_chance(root, 0, "")
     return "\n".join(lines)
+
+
+def evaluate_policy(
+    tree: Optional[ChanceNode],
+    batches: Sequence[Sequence[int]],
+    num_realizations: int,
+    num_sample_realizations: int = 0,
+    rng_seed: Optional[int] = None,
+) -> Dict[str, float]:
+    """Score a Bacci policy tree. Returns expected relocations and feasibility."""
+    er = float(expected_relocations(tree))
+    feasible = tree is not None and _tree_is_feasible(tree, batches)
+    out: Dict[str, float] = {
+        "expected_relocations": er,
+        "feasible": float(feasible),
+        "num_realizations": float(num_realizations),
+    }
+    if num_sample_realizations > 0 and tree is not None:
+        out["avg_relocations"] = float(
+            _average_relocations_mc(
+                tree,
+                batches,
+                num_samples=int(num_sample_realizations),
+                rng_seed=rng_seed,
+            )
+        )
+    return out
+
+
+def _tree_is_feasible(
+    tree: ChanceNode,
+    batches: Sequence[Sequence[int]],
+) -> bool:
+    """Every realization must have a branch at every chance node."""
+
+    def _walk(cn: Optional[ChanceNode], depth: int) -> bool:
+        if cn is None:
+            return depth == len(batches)
+        if depth >= len(batches):
+            return not cn.outcomes
+        batch = batches[depth]
+        expected_keys = {tuple(p) for p in permutations(batch)}
+        if not expected_keys.issubset(set(cn.outcomes.keys())):
+            return False
+        for key in expected_keys:
+            if not _walk(cn.outcomes[key].next_chance, depth + 1):
+                return False
+        return True
+
+    return _walk(tree, 0)
+
+
+def _average_relocations_mc(
+    tree: ChanceNode,
+    batches: Sequence[Sequence[int]],
+    num_samples: int,
+    rng_seed: Optional[int] = None,
+) -> float:
+    """Monte-Carlo estimate of E[R] by sampling realizations."""
+    rng = np.random.RandomState(rng_seed if rng_seed is not None else 0)
+    total = 0
+    for _ in range(num_samples):
+        realization: List[int] = []
+        for batch in batches:
+            perm = list(batch)
+            rng.shuffle(perm)
+            realization.extend(perm)
+        total += total_relocations_along(tree, realization)
+    return total / max(num_samples, 1)

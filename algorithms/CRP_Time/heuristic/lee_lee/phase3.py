@@ -15,7 +15,8 @@ import multiprocessing as mp
 import random
 from typing import Callable, List, Optional, Tuple
 
-from core.plan import RelocationPlan, simulate_plan
+from core.plan import RelocationPlan
+from .simulate import simulate_plan
 from core.objectives import KinematicsModel, compute_crane_time
 from .phase2 import build_2hop_plan, swap_intermediate
 

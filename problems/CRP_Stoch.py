@@ -12,20 +12,10 @@ platform or its code should acknowledge "Platform_CRISP".
 
 from __future__ import annotations
 
-import copy
+import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import numpy as np
-
-from core.base_problem import ProblemConfig
 from core.plan import Movement, RelocationPlan
-from core.stoch import (
-    ChanceNode,
-    DecisionNode,
-    expected_relocations,
-    make_batches,
-    priority_to_batch_map,
-)
 from problems.CRP_R import CRP_R
 
 
@@ -43,12 +33,9 @@ class CRP_Stoch(CRP_R):
     - ``batch_sizes``: List[int], optional
         Explicit per-batch sizes; overrides ``batch_size``.  Must sum
         to ``num_containers``.
-    - ``max_enumerated_realizations``: int, default 720
-        Safety cap for full enumeration (6! = 720).  Larger batches are
-        handled by Monte-Carlo sampling via ``num_sample_realizations``.
     - ``num_sample_realizations``: int, default 0
-        When > 0, ``evaluate_policy`` also reports a MC-averaged
-        ``avg_relocations`` metric.
+        Read by Bacci's RIRH / Expected MinMax.  When > 0 those
+        algorithms also report a Monte-Carlo ``avg_relocations``.
     """
 
     name = "CRP-Stoch"
@@ -76,10 +63,6 @@ class CRP_Stoch(CRP_R):
         # Batch structure — populated in _build_episode()
         self._batches: List[List[int]] = []
         self._priority_to_batch: Dict[int, int] = {}
-        # Cached results from the last evaluate_policy() call.
-        self._last_expected_reloc: Optional[float] = None
-        self._last_avg_reloc: Optional[float] = None
-        self._last_feasible: Optional[bool] = None
 
     def _hook_after_relocate(
         self,
@@ -101,9 +84,8 @@ class CRP_Stoch(CRP_R):
         Standard CRP-R layout + partition of {1..N} into ordered batches.
         The single-realization retrieval sequence keeps using the fixed
         1…N priorities (this is why ``batch_size=1`` gives an exact
-        CRP-R match).  Algorithms that reason over multiple realizations
-        should introspect ``self._batches`` and drive a PolicyTree via
-        :meth:`evaluate_policy`.
+        CRP-R match).  Algorithms that reason over several realizations
+        read ``get_batches()``.
         """
         super()._build_episode()
 
@@ -114,12 +96,12 @@ class CRP_Stoch(CRP_R):
         if batch_size < 1:
             batch_size = 1
 
-        self._batches = make_batches(
+        self._batches = _make_batches(
             n_containers=n,
             batch_size=batch_size,
             explicit_sizes=explicit,
         )
-        self._priority_to_batch = priority_to_batch_map(self._batches)
+        self._priority_to_batch = _priority_to_batch_map(self._batches)
 
     # ---------------------------------------------------------------- #
     # Read-only helpers exposed to algorithms                            #
@@ -138,8 +120,6 @@ class CRP_Stoch(CRP_R):
 
     def num_realizations(self) -> int:
         """Total |Ω_B| = product of |B_k|! across batches."""
-        import math
-
         r = 1
         for b in self._batches:
             r *= math.factorial(len(b))
@@ -161,80 +141,20 @@ class CRP_Stoch(CRP_R):
 
     def get_metrics(self) -> Dict[str, float]:
         m = super().get_metrics()
-        # Add SCRP-specific keys; fall back to the single-realization
-        # relocation count when a policy tree hasn't been evaluated yet.
-        expected = (
-            float(self._last_expected_reloc)
-            if self._last_expected_reloc is not None
-            else float(self._total_relocations)
-        )
-        avg = (
-            float(self._last_avg_reloc)
-            if self._last_avg_reloc is not None
-            else float(self._total_relocations)
-        )
+        # Step-driven runs only see one realization.  Algorithms that
+        # estimate E[R] themselves return that number in their own
+        # metrics dict.
+        realized = float(self._total_relocations)
         m.update(
             {
-                "expected_relocations": expected,
-                "avg_relocations": avg,
+                "expected_relocations": realized,
+                "avg_relocations": realized,
                 "num_batches": float(self.num_batches()),
                 "num_realizations": float(self.num_realizations()),
-                # Keep crane_time slot for algorithms/GUI that expect it
-                # (0.0 unless caller explicitly evaluates a plan for time).
                 "crane_time": 0.0,
             }
         )
         return m
-
-    # ---------------------------------------------------------------- #
-    # Policy-tree evaluation                                            #
-    # ---------------------------------------------------------------- #
-
-    def evaluate_policy(
-        self,
-        tree: Optional[ChanceNode],
-        num_sample_realizations: int = 0,
-        rng_seed: Optional[int] = None,
-    ) -> Dict[str, float]:
-        """
-        Evaluate a SCRP policy tree.
-
-        Parameters
-        ----------
-        tree : PolicyTree (== root ``ChanceNode``) or ``None``.
-        num_sample_realizations : optional Monte-Carlo sample size for
-            the ``avg_relocations`` sanity metric (0 = skip).
-        rng_seed : reproducibility seed for MC sampling.
-
-        Returns
-        -------
-        Dict with keys: ``expected_relocations`` (primary), ``feasible``,
-        ``num_realizations``, and optionally ``avg_relocations`` when MC
-        sampling is requested.
-        """
-        er = float(expected_relocations(tree))
-        feasible = tree is not None and _tree_is_feasible(tree, self._batches)
-
-        self._last_expected_reloc = er
-        self._last_feasible = feasible
-
-        out: Dict[str, float] = {
-            "expected_relocations": er,
-            "feasible": float(feasible),
-            "num_realizations": float(self.num_realizations()),
-        }
-
-        if num_sample_realizations > 0 and tree is not None:
-            avg = _average_relocations_mc(
-                tree,
-                self._batches,
-                num_samples=int(num_sample_realizations),
-                rng_seed=rng_seed,
-            )
-            self._last_avg_reloc = avg
-            out["avg_relocations"] = float(avg)
-
-        return out
 
     # ---------------------------------------------------------------- #
     # Config schema (adds SCRP knobs on top of CRP-R schema)             #
@@ -264,8 +184,8 @@ class CRP_Stoch(CRP_R):
                     "max": 100_000,
                     "label": "Monte-Carlo samples for avg E[R]",
                     "help": (
-                        "When > 0, evaluate_policy() additionally reports "
-                        "a Monte-Carlo sampled average of relocations "
+                        "When > 0, Bacci RIRH and Expected MinMax also "
+                        "report a Monte-Carlo average of relocations "
                         "over that many realizations."
                     ),
                 },
@@ -274,58 +194,47 @@ class CRP_Stoch(CRP_R):
         return schema
 
 
-# ────────────────────────────────────────────────────────────────────
-#  Helpers (private)
-# ────────────────────────────────────────────────────────────────────
+def _make_batches(
+    n_containers: int,
+    batch_size: int,
+    explicit_sizes: Optional[Sequence[int]] = None,
+) -> List[List[int]]:
+    """Partition priorities {1, ..., N} into ordered batches.
 
-
-def _tree_is_feasible(
-    tree: ChanceNode,
-    batches: Sequence[Sequence[int]],
-) -> bool:
+    ``batch_size=3`` and ``N=7`` yields ``[[1, 2, 3], [4, 5, 6], [7]]``.
+    A smaller batch index must be retrieved before a larger one.  Order
+    inside a batch is not fixed here.
     """
-    A policy tree is feasible iff every possible realization has a
-    matching outcome branch in every ChanceNode along its path.
-    """
-    from itertools import permutations
+    if n_containers <= 0:
+        return []
+    if explicit_sizes is not None:
+        sizes = [int(s) for s in explicit_sizes]
+        if any(s <= 0 for s in sizes):
+            raise ValueError(f"explicit_sizes must be positive: {sizes}")
+        if sum(sizes) != n_containers:
+            raise ValueError(
+                f"explicit_sizes sum {sum(sizes)} != n_containers {n_containers}"
+            )
+    else:
+        b = max(1, int(batch_size))
+        n_batches = math.ceil(n_containers / b)
+        sizes = [b] * n_batches
+        total = sum(sizes)
+        if total > n_containers:
+            sizes[-1] -= total - n_containers
 
-    def _walk(cn: Optional[ChanceNode], depth: int) -> bool:
-        if cn is None:
-            return depth == len(batches)
-        if depth >= len(batches):
-            return not cn.outcomes  # extra chance nodes = malformed
-        b = batches[depth]
-        expected_keys = {tuple(p) for p in permutations(b)}
-        if not expected_keys.issubset(set(cn.outcomes.keys())):
-            return False
-        # Recurse: each DecisionNode's next_chance must be feasible for depth+1
-        for key in expected_keys:
-            dn = cn.outcomes[key]
-            if not _walk(dn.next_chance, depth + 1):
-                return False
-        return True
-
-    return _walk(tree, 0)
+    batches: List[List[int]] = []
+    priority = 1
+    for size in sizes:
+        batches.append(list(range(priority, priority + size)))
+        priority += size
+    return batches
 
 
-def _average_relocations_mc(
-    tree: ChanceNode,
-    batches: Sequence[Sequence[int]],
-    num_samples: int,
-    rng_seed: Optional[int] = None,
-) -> float:
-    """Monte-Carlo estimate of E[R] by sampling realizations."""
-    from core.stoch.policy_tree import total_relocations_along
-
-    rng = np.random.RandomState(rng_seed if rng_seed is not None else 0)
-    total = 0
-    good = 0
-    for _ in range(num_samples):
-        realization: List[int] = []
-        for b in batches:
-            perm = list(b)
-            rng.shuffle(perm)
-            realization.extend(perm)
-        total += total_relocations_along(tree, realization)
-        good += 1
-    return total / max(good, 1)
+def _priority_to_batch_map(batches: Sequence[Sequence[int]]) -> Dict[int, int]:
+    """Return {priority: batch_index} (0-indexed batch)."""
+    out: Dict[int, int] = {}
+    for batch_idx, priorities in enumerate(batches):
+        for priority in priorities:
+            out[int(priority)] = batch_idx
+    return out

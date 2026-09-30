@@ -21,8 +21,8 @@ from core.registry import (
     get_algorithm_info,
     get_problem_class,
 )
-from core.benchmark_summary import summarize_result_files
-from core.result_store import (
+from core.results.aggregate import summarize_result_files
+from core.results.store import (
     completed_layout_paths,
     moves_from_records,
     result_path_for,

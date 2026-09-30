@@ -16,7 +16,7 @@ from itertools import permutations
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from core.plan import Movement
-from core.stoch import ChanceNode, DecisionNode
+from .policy_tree import ChanceNode, DecisionNode
 
 
 # ────────────────────────────────────────────────────────────────────

@@ -8,8 +8,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from core.benchmark_summary import summarize_result_files, summarize_run_dicts
-from core.result_store import load_run
+from core.results.aggregate import (
+    SKIP_METRIC_KEYS,
+    summarize_result_files,
+    summarize_run_dicts,
+)
+from core.results.store import load_run
 
 _RESULTS_ROOT = Path(__file__).resolve().parents[2] / "results"
 
@@ -38,7 +42,6 @@ def render_summary_html(
 ) -> str:
     classes = list(summary.get("classes") or [])
     metric_keys: List[str] = []
-    from core.benchmark_summary import SKIP_METRIC_KEYS
 
     preferred = ["relocations", "crane_time", "time", "moves", "shifters"]
     seen = set()

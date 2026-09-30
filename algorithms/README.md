@@ -77,8 +77,6 @@ search); those classes set `category = "Heuristic"`.
   both CRP-U and CRP-D).
 * **`_shared/`** holds cross-algorithm helpers (currently Gurobi
   utilities). It is not a home for registered algorithms.
-* **`core/gp/`** (not inside `algorithms/`) hosts the platform-level
-  GP engine. Any GP paper should import from `core.gp.*`.
 * **Registry** (`core.registry`) auto-discovers classes via
   `pkgutil.walk_packages`; the `name` class attribute deduplicates
   imports that come in through both a physical path and a symlink.

@@ -47,7 +47,7 @@ def _ensure_platform_on_path() -> Path:
 
 _PLATFORM_ROOT = _ensure_platform_on_path()
 
-from core.stoch.galle_2017_source import (  # noqa: E402
+from algorithms.CRP_Stoch.exact.galle_2017_pbfs.source import (  # noqa: E402
     HEURISTIC_IDS,
     blocking_lower_bound,
     pbfsa,

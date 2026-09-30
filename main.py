@@ -230,7 +230,7 @@ def cmd_layout_run(
     from core.registry import get_algorithm_class, get_problem_class
     from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
     from core.benchmarks.caserta import problem_config_for_caserta_dat
-    from core.result_store import moves_from_records, save_run
+    from core.results.store import moves_from_records, save_run
     from core.benchmarks.zhu import problem_config_for_zhu_txt
 
     root = Path(__file__).resolve().parent
@@ -332,7 +332,7 @@ def cmd_results(limit: int, verbose: bool):
     from pathlib import Path
 
     from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
-    from core.result_store import list_saved_runs, load_run
+    from core.results.store import list_saved_runs, load_run
 
     runs = list_saved_runs()[: max(1, limit)]
     if not runs:

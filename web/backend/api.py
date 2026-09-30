@@ -18,13 +18,13 @@ from core.registry import (
     get_problem_class,
     get_problem_info,
 )
-from core.compare_summary import (
+from core.results.compare import (
     compare_algorithms,
     delete_algorithm_folder,
     delete_result_file,
     list_result_folders,
 )
-from core.result_store import list_saved_runs, load_run
+from core.results.store import list_saved_runs, load_run
 from web.backend.benchmarks import (
     SOURCE_RANDOM,
     available_for_problem,
@@ -405,7 +405,7 @@ def bench_summary_job(job_id: str):
         raise HTTPException(404, "Job not found (in-memory only; try From results on disk)")
     summary = job.batch_summary
     if not summary and job.result_files:
-        from core.benchmark_summary import summarize_result_files
+        from core.results.aggregate import summarize_result_files
 
         summary = summarize_result_files(job.result_files)
     if not summary:

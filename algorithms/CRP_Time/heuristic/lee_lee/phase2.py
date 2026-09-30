@@ -16,7 +16,8 @@ import multiprocessing as mp
 import random
 from typing import List, Optional, Tuple
 
-from core.plan import Movement, RelocationPlan, simulate_plan
+from core.plan import Movement, RelocationPlan
+from .simulate import simulate_plan
 from core.objectives import lower_bound_relocations
 
 
