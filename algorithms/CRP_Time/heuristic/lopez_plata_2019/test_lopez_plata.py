@@ -29,7 +29,7 @@ from problems.CRP_Time import CRP_Time
 from .algorithm import LopezPlata2019Heuristic
 from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
-from .step1 import algorithm1, select
+from .step1 import RunningSelection, algorithm1, partial_solutions, select
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
 FIG2 = [[9, 1, 8], [11, 3, 2], [5, 4], [13, 6], [12, 10, 7], []]
@@ -367,6 +367,108 @@ class TestStep1(unittest.TestCase):
             algo.train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
             plans.append(algo.get_best_solution())
         self.assertEqual(plans[0], plans[1])
+
+
+def _plain(stacks, cost, depth, lam=500):
+    """Step 1 without a budget: algorithm1 to depth `depth` with the running selection."""
+    n_C = sum(len(s) for s in stacks)
+    sel, stats = RunningSelection(lam, n_C), {}
+    _, best, ub = algorithm1(Bay(stacks, cost), greedy(Bay(stacks, cost))[1], depth, sel, stats)
+    return _summary(sel.result(), best, ub, n_C), stats["visited"], sel.count
+
+
+def _summary(nodes, best, ub, n_C):
+    return [(tuple(n.phi), n.g, q(n, n_C)) for n in nodes], best and tuple(best.phi), ub
+
+
+def _budgeted(stacks, cost, node_budget, lam=500):
+    n_C = sum(len(s) for s in stacks)
+    root = Bay(stacks, cost)
+    phi, ub = greedy(root)
+    depth = beta(len(phi), n_C)
+    nodes, best, final_ub, info = partial_solutions(root, ub, depth, lam, n_C, node_budget)
+    return _summary(nodes, best, final_ub, n_C), info, depth
+
+
+class TestIterativeDeepening(unittest.TestCase):
+    """Step 1 under a node budget (L18)."""
+
+    def _cases(self):
+        cases = [(FIG2, CostModel(n_T=4, **W_LOADED))]
+        for size, ids in (("3-3", range(1, 11)), ("3-4", (1, 2)), ("3-5", (1, 3))):
+            for i in ids:
+                stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / f"data{size}-{i}.dat")[2]
+                cases.append((stacks, CostModel(n_T=int(size[0]) + 2, **W_LOADED)))
+        return cases
+
+    def test_no_hit_equals_plain(self):
+        """(a) Budget not hit: N (nodes, order, g, q), best leaf and ub equal the plain run to beta."""
+        for stacks, cost in self._cases():
+            got, info, depth = _budgeted(stacks, cost, 10 ** 7)
+            want, visited, n_beta = _plain(stacks, cost, depth)
+            self.assertFalse(info["budget_hit"])
+            self.assertEqual((info["beta_eff"], info["visited_last"], info["n_beta"]), (depth, visited, n_beta))
+            self.assertEqual(got, want)
+
+    def test_no_hit_with_leaves(self):
+        """(a) Fig. 2 to depth 15: leaves (14 and 15 moves) lower ub inside the deepest iterations; every
+        iteration must still start from f(greedy), so the result equals the plain run to depth 15."""
+        cost = CostModel(n_T=4, **W_LOADED)
+        root = Bay(FIG2, cost)
+        _, ub = greedy(root)
+        nodes, best, final_ub, info = partial_solutions(root, ub, 15, 500, 13, 10 ** 7)
+        sel = RunningSelection(500, 13)
+        _, want_best, want_ub = algorithm1(Bay(FIG2, cost), ub, 15, sel)
+        self.assertEqual(_summary(nodes, best, final_ub, 13), _summary(sel.result(), want_best, want_ub, 13))
+        self.assertLess(final_ub, ub)
+        self.assertEqual(info["beta_eff"], 15)
+
+    def test_hit_equals_plain_at_beta_eff(self):
+        """(b) Budget hit: the result equals the plain run to beta_eff, and exactly node_budget nodes are
+        visited. data3-5-2 has beta = 15; about 255 000 nodes complete depths 1-14, depth 15 needs 359 019 more."""
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-2.dat")[2]
+        cost = CostModel(n_T=5, **W_LOADED)
+        for budget in (300_000, 20_000, 50, 1):
+            got, info, depth = _budgeted(stacks, cost, budget)
+            self.assertTrue(info["budget_hit"])
+            self.assertLess(info["beta_eff"], depth)
+            self.assertEqual(info["visited_total"], budget)
+            want, visited, n_beta = _plain(stacks, cost, info["beta_eff"])
+            self.assertEqual(got, want)
+            if info["beta_eff"]:
+                self.assertEqual((info["visited_last"], info["n_beta"]), (visited, n_beta))
+        self.assertEqual(_budgeted(stacks, cost, 300_000)[1]["beta_eff"], 14)
+
+    def test_deterministic(self):
+        """(c) Same result and the same visited-node counts twice, with and without hitting the budget."""
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-2.dat")[2]
+        cost = CostModel(n_T=5, **W_LOADED)
+        for budget in (10 ** 7, 20_000):
+            self.assertEqual(_budgeted(stacks, cost, budget), _budgeted(stacks, cost, budget))
+
+    def test_metrics(self):
+        """(d) The run reports beta, beta_eff, the theta_eff interval, budget_hit and the node counts;
+        beta_eff <= beta, and without a hit beta_eff = beta and theta = 40 lies in the interval."""
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-2.dat")
+        for budget, hit in ((10 ** 7, False), (20_000, True)):
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"node_budget": budget}))
+            q_ = queue.Queue()
+            algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
+            m = q_.get_nowait().metrics
+            for key in ("beta", "beta_eff", "theta_eff_min", "theta_eff_max", "budget_hit",
+                        "visited_total", "visited_last", "n_beta"):
+                self.assertIn(key, m)
+            self.assertEqual(bool(m["budget_hit"]), hit)
+            self.assertLessEqual(m["beta_eff"], m["beta"])
+            self.assertLessEqual(m["visited_last"], m["visited_total"])
+            self.assertLessEqual(m["visited_total"], budget)
+            self.assertLessEqual(m["theta_eff_min"], m["theta_eff_max"])
+            if hit:
+                self.assertLess(m["beta_eff"], m["beta"])
+                self.assertLessEqual(m["theta_eff_max"], 40)
+            else:
+                self.assertEqual(m["beta_eff"], m["beta"])
+                self.assertTrue(m["theta_eff_min"] <= 40 < m["theta_eff_max"])
 
 
 TS, TPP = 1.2, 30.0

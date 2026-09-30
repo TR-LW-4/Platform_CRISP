@@ -29,9 +29,9 @@ import numpy as np
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.plan import Movement, RelocationPlan
 
-from .measures import beta, greedy, q
+from .measures import beta, greedy, p, q
 from .operating_cost import Bay, CostModel, Move, f
-from .step1 import RunningSelection, algorithm1
+from .step1 import partial_solutions
 
 
 # ================================================================ #
@@ -227,6 +227,12 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "type": "int", "default": 2, "min": 1, "max": 10,
                 "label": "Blocks per expansion (μ)",
             },
+            "node_budget": {
+                "type": "int", "default": 10_000_000, "min": 1, "max": 1_000_000_000,
+                "label": "Step-1 node budget",
+                "help": "Nodes visited by step 1 over all iterative-deepening iterations; "
+                        "not in the paper (L18).",
+            },
             "alpha1": {"type": "float", "default": 1.0, "label": "Unloaded vertical weight"},
             "beta1":  {"type": "float", "default": 1.0, "label": "Unloaded horizontal weight"},
             "alpha2": {"type": "float", "default": 2.0, "label": "Loaded vertical weight"},
@@ -250,6 +256,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
         theta = float(cfg.extra.get("theta", 40))
         lam = int(cfg.extra.get("max_partial_nodes", 500))
+        node_budget = int(cfg.extra.get("node_budget", 10 ** 7))
         num_exp = int(cfg.extra.get("num_expansions", 5))
         mu = int(cfg.extra.get("mu", 2))
 
@@ -291,11 +298,10 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             n_C = sum(len(st) for st in init_stacks)
 
             # ----- Step 1 (Sec. 6.1): the greedy (Sec. 7.1) gives ub and |phi| for beta (eq. 29),
-            # Algorithm 1 runs to depth beta, and N = N_g + N_q -----
+            # Algorithm 1 runs to depth beta within the node budget (L18), and N = N_g + N_q -----
             greedy_phi, ub = greedy(root)
-            selection = RunningSelection(lam, n_C)
-            _, leaf, _ = algorithm1(root, ub, beta(len(greedy_phi), n_C, theta), selection)
-            partials = selection.result()
+            depth = beta(len(greedy_phi), n_C, theta)
+            partials, leaf, _, step1 = partial_solutions(root, ub, depth, lam, n_C, node_budget)
 
             # phi_best starts as the greedy solution (O20); the best leaf of step 1 is a candidate (O05).
             candidates = [greedy_phi] + ([leaf.phi] if leaf else [])
@@ -324,6 +330,19 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
             final_metrics = env_final.get_metrics()
             final_metrics["operating_cost"] = operating_cost
+            # Step 1 under the budget: beta = floor(theta * scale) (eq. 29), so beta_eff holds for
+            # every theta in [beta_eff / scale, (beta_eff + 1) / scale).
+            scale = float(len(greedy_phi) * p(n_C) / 100)
+            final_metrics.update({
+                "beta": float(depth),
+                "beta_eff": float(step1["beta_eff"]),
+                "theta_eff_min": step1["beta_eff"] / scale,
+                "theta_eff_max": (step1["beta_eff"] + 1) / scale,
+                "budget_hit": float(step1["budget_hit"]),
+                "visited_total": float(step1["visited_total"]),
+                "visited_last": float(step1["visited_last"]),
+                "n_beta": float(step1["n_beta"]),
+            })
             all_metrics.append(final_metrics)
 
             # Keep the paper's operating cost as a reported diagnostic, while
