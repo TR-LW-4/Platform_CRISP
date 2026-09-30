@@ -7,7 +7,7 @@ Nodes are Bay objects carrying phi' and g (operating_cost.py); stacks are number
 from __future__ import annotations
 
 import random
-from typing import List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from .operating_cost import Bay, Move
 
@@ -87,13 +87,25 @@ def draw(ranked: List[Tuple[object, float]], rng: random.Random) -> object:
 
 
 def expand(node: Bay, rng: random.Random, kappa: int, tau: int, mu: int, n_C: int,
-           mq: Sequence[float] = MQ) -> Bay:
+           mq: Sequence[float] = MQ, cache: Optional[Dict[tuple, list]] = None) -> Bay:
     """Expansion (p. 444): of the sequences from node, the mu with the lowest sum of alpha (O09a,
-    ties in generation order) enter a roulette wheel; the drawn end node is the new partial solution."""
-    best = sorted(sequences(node, kappa, tau, n_C, mq), key=lambda seq: seq[1])[:mu]
-    if not best:
-        raise ValueError("Expansion: no feasible sequence")
-    return draw(best, rng)
+    ties in generation order) enter a roulette wheel; the drawn moves are applied to node.
+    The sequences and their sums of alpha depend on the configuration only (alpha does not use the
+    crane position), so with a cache they are computed once per configuration of a run."""
+    key = tuple(map(tuple, node.stacks))
+    best = cache.get(key) if cache is not None else None
+    if best is None:
+        start = len(node.phi)
+        best = [(tuple(end.phi[start:]), a)
+                for end, a in sorted(sequences(node, kappa, tau, n_C, mq), key=lambda seq: seq[1])[:mu]]
+        if not best:
+            raise ValueError("Expansion: no feasible sequence")
+        if cache is not None:
+            cache[key] = best
+    end = node.copy()
+    for move in draw(best, rng):
+        end.apply(move)
+    return end
 
 
 def algorithm2_loop(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
@@ -102,11 +114,12 @@ def algorithm2_loop(partials: List[Bay], phi_best: List[Move], f_best: float, rn
     """Algorithm 2, lines 3-14: rho iterations (O15), each starting from the same N; every node is
     expanded on its own until it is complete, and a complete solution replaces phi_best only if its
     f is strictly lower (line 10)."""
+    cache: Dict[tuple, list] = {}
     for _ in range(rho):
         for node in partials:
             done = node
             while done.target is not None:
-                done = expand(done, rng, kappa, tau, mu, n_C, mq)
+                done = expand(done, rng, kappa, tau, mu, n_C, mq, cache)
             if done.g < f_best:
                 phi_best, f_best = list(done.phi), done.g
     return phi_best, f_best
