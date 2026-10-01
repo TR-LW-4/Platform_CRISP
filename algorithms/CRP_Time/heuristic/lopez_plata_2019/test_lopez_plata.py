@@ -1075,6 +1075,7 @@ class TestPlatform(unittest.TestCase):
         from core.algorithm_meta import validate_meta
         cls = LopezPlata2019Heuristic
         self.assertEqual(validate_meta(cls), [])
+        self.assertEqual(cls.name, "López-Plata et al. (2019) A*-Based Heuristic")
         self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["crane_time"], "faithful", "single-bay"))
         for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27"):
             self.assertIn(word, cls.description)
@@ -1120,6 +1121,14 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "tau": 4, "mu": 2})
         self.assertEqual(seen["draw"], random.Random(9).random())
+
+    def test_catalog_name(self):
+        """The web catalogue lists the algorithm under its name, for CRP-Time, with crane time as objective."""
+        from web.backend.api import _catalog
+        entry = [a for a in _catalog()["algorithms"] if a["name"].startswith("López-Plata")]
+        self.assertEqual([(a["name"], a["objectives"]) for a in entry],
+                         [("López-Plata et al. (2019) A*-Based Heuristic", ["crane_time"])])
+        self.assertIn("CRP-Time", entry[0]["compatible_problems"])
 
     def test_ui_rejects_removed_fields(self):
         from web.backend.api import _config_values
