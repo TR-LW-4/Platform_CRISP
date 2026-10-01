@@ -127,7 +127,7 @@ class CRP_R(BaseProblem):
         if path_str:
             from pathlib import Path
 
-            from core.caserta_benchmark import apply_caserta_file_to_yard
+            from core.benchmarks.caserta import apply_caserta_file_to_yard
 
             trace_layout(f"CRP_R._build_episode: read **1** layout file from disk (each reset ⇒ one file): {path_str}")
             p = Path(path_str)

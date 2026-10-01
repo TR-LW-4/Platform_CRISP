@@ -6,7 +6,7 @@ any problem directory and the algorithms for that family live inside it.
 How the problem families relate (same axes as the root README):
 
 ```
-任务 / 目标     Time | MO | Prem | Stow | Stoch
+任务 / 目标     Time | MO | Stow | Stoch
 翻箱规则        R vs U                         (distinct CRP only)
 优先级          R/U = distinct；D = duplicate  (D: extra restricted_relocation)
 几何            num_bays                       (config, not a family)
@@ -49,12 +49,6 @@ algorithms/
 ├── CRP_Online/                  # progressively revealed fixed-order CRP
 │   └── heuristic/
 │
-├── CRP_Prem/                    # pre-marshalling
-│   ├── heuristic/
-│   ├── exact/search/
-│   ├── exact/solver/
-│   └── evolutionary/
-│
 ├── CRP_Stow/                    # BRLP / POCRP / POCRP-RC
 │   ├── heuristic/
 │   └── exact/
@@ -64,7 +58,7 @@ algorithms/
     └── exact/
 ```
 
-`tree/` (CRP-R / CRP-U) versus `exact/search` (CRP-D / Prem / …) are
+`tree/` (CRP-R / CRP-U) versus `exact/search` (CRP-D / …) are
 historical folder names for the same idea: search-based methods. Runtime
 behaviour comes from each class's `category`, not from the folder name.
 `tree/` also holds heuristic tree searches (beam search, compound-move
@@ -83,8 +77,6 @@ search); those classes set `category = "Heuristic"`.
   both CRP-U and CRP-D).
 * **`_shared/`** holds cross-algorithm helpers (currently Gurobi
   utilities). It is not a home for registered algorithms.
-* **`core/gp/`** (not inside `algorithms/`) hosts the platform-level
-  GP engine. Any GP paper should import from `core.gp.*`.
 * **Registry** (`core.registry`) auto-discovers classes via
   `pkgutil.walk_packages`; the `name` class attribute deduplicates
   imports that come in through both a physical path and a symlink.

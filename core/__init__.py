@@ -8,7 +8,7 @@ from .container import Container, ContainerSize, ContainerType, make_containers
 from .yard import Yard, Stack, Move
 from .base_problem import BaseProblem, ProblemConfig
 from .base_algorithm import BaseAlgorithm, AlgorithmConfig, TrainingSession
-from .plan import Movement, RelocationPlan, SimResult, simulate_plan, ConflictType
+from .plan import Movement, RelocationPlan
 from .objectives import KinematicsModel, compute_crane_time, lower_bound_relocations
 
 __all__ = [
@@ -20,7 +20,7 @@ __all__ = [
     "BaseProblem", "ProblemConfig",
     "BaseAlgorithm", "AlgorithmConfig", "TrainingSession",
     # plan primitives
-    "Movement", "RelocationPlan", "SimResult", "simulate_plan", "ConflictType",
+    "Movement", "RelocationPlan",
     # objectives / kinematics
     "KinematicsModel", "compute_crane_time", "lower_bound_relocations",
 ]

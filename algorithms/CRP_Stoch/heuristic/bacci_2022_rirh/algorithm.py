@@ -26,6 +26,7 @@ from typing import Callable, Dict, List, Optional
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.layout_trace import trace_layout
 
+from .policy_tree import ChanceNode, evaluate_policy
 from .rirh_policy import build_em_policy_tree, build_rirh_policy_tree
 
 
@@ -39,7 +40,7 @@ def _run_once(env, builder) -> Dict[str, float]:
     Build a policy tree with ``builder`` on ``env`` and evaluate it.
 
     ``env`` is expected to be a fresh (already ``reset``) ``CRP_Stoch``
-    instance.  Returns the metrics dict from ``evaluate_policy``.
+    instance.  Returns the metrics dict from the local policy scorer.
     """
     stacks = env.yard_snapshot_priorities()
     batches = env.get_batches()
@@ -56,8 +57,10 @@ def _run_once(env, builder) -> Dict[str, float]:
     build_time = time.perf_counter() - t0
 
     mc_samples = int(env.config.extra.get("num_sample_realizations", 0) or 0)
-    metrics = env.evaluate_policy(
+    metrics = evaluate_policy(
         tree,
+        batches,
+        num_realizations=env.num_realizations(),
         num_sample_realizations=mc_samples,
         rng_seed=int(env.config.seed),
     )
@@ -68,8 +71,6 @@ def _run_once(env, builder) -> Dict[str, float]:
 
 def _count_leaves(tree) -> int:
     """Count leaf DecisionNodes (accounting for shared-object reuse)."""
-    from core.stoch import ChanceNode, DecisionNode
-
     if tree is None or not tree.outcomes:
         return 0
     seen = set()

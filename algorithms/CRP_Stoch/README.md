@@ -17,38 +17,29 @@ as implemented in `problems/CRP_Stoch.py`.
 
 ## Layout
 
-Shared infrastructure lives under `core/stoch/` (same convention as
-`core/stoch/policy_tree.py` and `core/stoch/batch_layout.py`); each
-paper gets its own `author_year_shortname/` folder under `heuristic/`
-or `exact/`, consistent with every other problem in this repository
-(e.g. `algorithms/CRP_R/heuristic/caserta_2009_lah/`).
+Batch construction lives in `problems/CRP_Stoch.py`. Each algorithm
+folder is self-contained: it does not import another algorithm folder.
+EG, ERI, and PBFS each keep their own copy of the Galle SCRP port
+they need (`source/`). Bacci keeps the policy tree and its scorer.
 
 ```
-core/stoch/
-├── policy_tree.py
-├── batch_layout.py
-└── galle_2017_source/            # Port of /data/liuw2/StochasticCRP-master
-    ├── bay_utils.py               # readInputFile / GenerateIncompleteConfig /
-    │                               # Pre_Processing / UnvielContainers*
-    ├── bounds.py                  # BlockingLowerBound / RollingLowerBound /
-    │                               # boundsDifference
-    ├── heuristics.py              # EG / EM / ERI / L / Rand retrieval policies
-    ├── astar.py                   # deterministic CRP tail solver
-    └── tree_search.py             # PBFS_Online / PBFSA (exact if error_gap=0)
-
 algorithms/CRP_Stoch/
 ├── heuristic/
 │   ├── bacci_2022_rirh/          # Bacci, Mattia & Ventura, Soft Comp 2022
+│   │   ├── policy_tree.py        # Chance/Decision nodes + E[R]
 │   │   ├── rirh_policy.py        # MinMax + RIRH (Alg. 3) + EM (Alg. 1)
-│   │   └── algorithm.py          # RIRH + ExpectedMinMax BaseAlgorithms
-│   ├── galle_2017_eg/            # Galle et al. SCRP repository (new heuristic)
-│   │   └── algorithm.py          # ExpectedGroupAssignment (EG)
-│   └── ku_arthanari_2016_eri/    # Ku & Arthanari, EJOR 2016
-│       └── algorithm.py          # ExpectedReshufflingIndex (ERI)
+│   │   └── algorithm.py          # RIRH + ExpectedMinMax
+│   ├── galle_2017_eg/            # Galle et al. Expected Group
+│   │   ├── algorithm.py
+│   │   └── source/               # local copy: bay, bounds, EG runner
+│   └── ku_arthanari_2016_eri/    # Ku & Arthanari ERI (Galle's port of the rule)
+│       ├── algorithm.py
+│       └── source/               # local copy: bay, bounds, ERI runner
 └── exact/
-    └── galle_2017_pbfs/          # Galle et al. SCRP repository (exact search)
-        ├── algorithm.py          # PBFSBatchExact + PBFSAApprox + PBFSOnlineExact
-        └── run_experiment1.py    # Ku/Arthanari files + PBFSA(error_gap=0) loop
+    └── galle_2017_pbfs/          # Galle et al. PBFS / PBFSA
+        ├── algorithm.py
+        ├── run_experiment1.py
+        └── source/               # local copy: bay, bounds, heuristics, A*, search
 ```
 
 ## Registered algorithms
@@ -70,12 +61,10 @@ The source repository (`/data/liuw2/StochasticCRP-master`) also ships
 have native or primary homes elsewhere in this platform
 (`bacci_2022_rirh`'s `ExpectedMinMax`, and the primary
 `CRP_Online/heuristic/zehendner_2017_level/` implementation for
-Zehendner's online baselines). They were **not** re-embedded here as
-separate "[ported]" classes to avoid duplicate GUI entries; the shared
-`core.stoch.galle_2017_source.heuristics` module still contains the
-ported `EM`/`L`/`Rand` retrieval functions for internal reuse (e.g. as
-upper-bound heuristics inside `astar.py` / `tree_search.py`), they are
-just not exposed as separate top-level algorithms.
+Zehendner's online baselines). They were **not** registered again as
+separate classes. PBFS's own `source/heuristics.py` still contains
+`EM` / `L` / `Rand` for upper bounds inside its A* / tree search and
+for `run_experiment1.py --heuristics`.
 
 ## Galle Experiment 1 (Ku / Arthanari files)
 
@@ -111,7 +100,7 @@ MATLAB).  Bounds and `opt` are always computed.
   Algorithm` currently does).  Setting `batch_size = 1` makes the SCRP
   environment behave *exactly* as CRP-R (single realization, `E[R]`
   reduces to the deterministic reshuffle count).
-- No CRP-R / CRP-U / CRP-Time / CRP-D / CRP-Stow / CRP-Prem algorithm
+- No CRP-R / CRP-U / CRP-Time / CRP-D / CRP-Stow algorithm
   file was modified.
 
 ## References

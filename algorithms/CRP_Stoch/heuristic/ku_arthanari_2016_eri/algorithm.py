@@ -25,7 +25,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.stoch.galle_2017_source import (
+from .source import (
     HEURISTIC_IDS,
     env_to_source_bay,
     run_heuristic_batch,

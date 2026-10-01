@@ -122,7 +122,7 @@ class CRP_D(BaseProblem):
         self._load_zhu_dup_file(Path(path_str))
 
     def _load_zhu_dup_file(self, path: Path) -> None:
-        from core.zhu_dup_benchmark import apply_dup_file_to_yard
+        from core.benchmarks.zhu_duplicate import apply_dup_file_to_yard
 
         trace_layout(f"CRP_D._build_episode: ZhuDup file {path.resolve()}")
         self.containers = apply_dup_file_to_yard(self.yard, self.config, path)

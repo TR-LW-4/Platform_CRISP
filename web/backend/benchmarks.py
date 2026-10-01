@@ -5,21 +5,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from core.caserta_benchmark import (
+from core.benchmarks.caserta import (
     CASERTA_HEIGHT_WHITELIST,
     DEFAULT_CASERTA_DIR,
     collect_paths_from_hw_queue,
     index_ws_by_height,
     problem_config_for_caserta_dat,
 )
-from core.zhu_benchmark import (
+from core.benchmarks.zhu import (
     DEFAULT_ZHU_DIR,
     ZHU_HEIGHT_WHITELIST,
     collect_paths_from_zhu_queue,
     index_sn_pairs_by_height,
     problem_config_for_zhu_txt,
 )
-from core.zhu_dup_benchmark import (
+from core.benchmarks.zhu_duplicate import (
     DEFAULT_ZHU_DUP_DIR,
     ZHU_DUP_ALPHAS,
     ZHU_DUP_HEIGHT_WHITELIST,

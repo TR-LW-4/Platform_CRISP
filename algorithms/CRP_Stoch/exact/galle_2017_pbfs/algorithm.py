@@ -25,7 +25,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.stoch.galle_2017_source import (
+from .source import (
     blocking_lower_bound,
     env_to_source_bay,
     pbfs_online,

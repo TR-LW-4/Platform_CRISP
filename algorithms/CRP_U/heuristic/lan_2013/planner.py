@@ -13,10 +13,15 @@ from __future__ import annotations
 
 import copy
 import os
+import sys
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from core.layout_trace import trace_lan
 from core.plan import Movement, RelocationPlan
+
+
+def _trace_lan(msg: str) -> None:
+    if os.environ.get("CRISP_TRACE_LAN"):
+        print(f"[CRISP_TRACE_LAN] {msg}", file=sys.stderr, flush=True)
 
 
 def _yard_compact(sim) -> str:
@@ -211,10 +216,10 @@ def build_lan_plan(
         if not trace_on:
             return
         seq[0] += 1
-        trace_lan(f"#{seq[0]} {msg} | stacks={_yard_compact(sim)}")
+        _trace_lan(f"#{seq[0]} {msg} | stacks={_yard_compact(sim)}")
 
     if trace_on:
-        trace_lan(
+        _trace_lan(
             f"build_lan_plan start N={N} max_tiers={max_tiers} "
             f"n_containers={len(containers)} | {_yard_compact(sim)}"
         )
@@ -239,7 +244,7 @@ def build_lan_plan(
         s_star = (target_stk.bay, target_stk.row)
 
         if trace_on:
-            trace_lan(
+            _trace_lan(
                 f"--- outer-loop target_pri={target.priority} "
                 f"s*={s_star} remaining_cnt={len(remaining)}"
             )
@@ -316,7 +321,7 @@ def build_lan_plan(
             move_count += 1
 
     if trace_on:
-        trace_lan(
+        _trace_lan(
             f"build_lan_plan done n_trace_steps={seq[0]} "
             f"plan_moves={plan.num_moves()} remaining={remaining!r}"
         )
