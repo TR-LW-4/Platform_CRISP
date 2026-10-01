@@ -906,6 +906,147 @@ class TestCraneTime(unittest.TestCase):
             TimeModel.from_spec(_spec("f2", 4, **{**CRISP_TIME, "stack_s_per_stack": 0.0, "pickup_place_s": 0.0}))
 
 
+# Extreme parameter sets for the admissibility tests: horizontal travel dominating, vertical dominating.
+WIDE_TIME = dict(stack_s_per_stack=50.0, pickup_place_s=0.5, empty_vertical_s_per_tier=0.01,
+                 loaded_vertical_s_per_tier=0.02, outside_height=0.0)
+TALL_TIME = dict(stack_s_per_stack=0.01, pickup_place_s=0.0, empty_vertical_s_per_tier=40.0,
+                 loaded_vertical_s_per_tier=80.0, outside_height=3.0)
+COUNTER = [[], [1, 2], []]   # §4: the literal eq. 22 in f2 overestimates the remaining time here
+
+
+def _remaining_time(stacks, tm):
+    """Exact remaining time of every configuration reachable from stacks (crane time does not depend on
+    the crane position, so the configuration is the state). Unsolvable configurations get infinity."""
+    memo = {}
+
+    def V(st):
+        if st in memo:
+            return memo[st]
+        best = 0 if not any(st) else math.inf
+        if any(st):
+            target = min(c for x in st for c in x)
+            s = next(i for i, x in enumerate(st, 1) if target in x)
+            pick = len(st[s - 1])
+            options = [(0, 1)] if st[s - 1][-1] == target else [
+                (d, len(st[d - 1]) + 1) for d in range(1, len(st) + 1) if d != s and len(st[d - 1]) < tm.n_T]
+            for d, drop in options:
+                new = list(st)
+                new[s - 1] = st[s - 1][:-1]
+                if d:
+                    new[d - 1] = st[d - 1] + (st[s - 1][-1],)
+                best = min(best, tm.move(None, s, pick, d, drop) + V(tuple(new)))
+        memo[st] = best
+        return best
+
+    V(tuple(tuple(x) for x in stacks))
+    return memo
+
+
+def _literal_h(bay):
+    """Mutant: eq. 21-22 translated literally into crane time: retrieval from (s, t), plus for a non-located
+    block one relocation from (s, t) to tier n_T of the adjacent stack s - 1 (s + 1 if s = 1)."""
+    tm, total = bay.cost, 0
+    for s, stack in enumerate(bay.stacks, 1):
+        for t, bad in enumerate(non_located(stack), 1):
+            total += tm.move(None, s, t, 0, 1)
+            if bad:
+                total += tm.move(None, s, t, s + 1 if s == 1 else s - 1, tm.n_T)
+    return total
+
+
+class TestCraneTimeBound(unittest.TestCase):
+    """h under f2 / f2vert (§4, L27): a lower bound on the exact remaining time in every reachable state."""
+
+    def _cases(self):
+        rng = random.Random(11)
+        cases = [(FIG2, 4), (COUNTER, 4)] + [
+            (parse_caserta_dat(DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat")[2], 5) for i in range(1, 41)]
+        for _ in range(20):
+            n_S, n_T = rng.randint(2, 4), rng.randint(2, 4)
+            cases.append((_random_restricted(rng, n_S, n_T, rng.randint(1, (n_S - 1) * n_T))[0], n_T))
+        return cases
+
+    def test_admissible(self):
+        """T1 for crane time: h <= V exactly, both models, CRISP defaults and three other parameter sets."""
+        for params in (CRISP_TIME, OTHER_TIME, WIDE_TIME, TALL_TIME):
+            for model in ("f2", "f2_vertical"):
+                for stacks, n_T in self._cases():
+                    tm = TimeModel.from_spec(_spec(model, n_T, **params))
+                    for st, v in _remaining_time(stacks, tm).items():
+                        if not math.isinf(v):
+                            self.assertLessEqual(h(Bay([list(x) for x in st], tm)), v, (params, model, st))
+
+    def test_counterexample(self):
+        """[[], [1, 2], []] under f2 with the CRISP defaults: optimum 99.6 s (relocate 2 to stack 1, retrieve 1
+        and 2); the bound gives 99.6 as well, the literal eq. 22 gives 102.0 and is not admissible."""
+        tm = TimeModel.from_spec(_spec("f2", 4, **CRISP_TIME))
+        v = _remaining_time(COUNTER, tm)[tuple(tuple(x) for x in COUNTER)]
+        self.assertEqual((tm.seconds(v), tm.seconds(h(Bay(COUNTER, tm)))), (99.6, 99.6))
+        self.assertEqual(tm.seconds(_literal_h(Bay(COUNTER, tm))), 102.0)
+        self.assertGreater(_literal_h(Bay(COUNTER, tm)), v)
+
+    def test_by_hand(self):
+        """Fig. 2 (n_T = 4, h_max = 5), CRISP defaults; only block 8 is non-located. The blocks lie in stacks
+        1, 2, 3, 4, 5 with 3, 3, 2, 2, 3 blocks, so the sum of s over the blocks is 3 + 6 + 6 + 8 + 15 = 38.
+        f2: 2 ts * 38 = 91.2, plus tpp (13 + 1) = 420: 511.2. f2vert: 91.2 plus tr = 7.77 times
+        (13 (2 h_max - hout) - sum of t + 2) = 13 * 8.5 - 24 + 2 = 88.5, i.e. 687.645: 778.845."""
+        tm = TimeModel.from_spec(_spec("f2", 4, **CRISP_TIME))
+        self.assertEqual(Fraction(h(Bay(FIG2, tm)), tm.scale), Fraction("511.2"))
+        tm = TimeModel.from_spec(_spec("f2_vertical", 4, **CRISP_TIME))
+        self.assertEqual(Fraction(h(Bay(FIG2, tm)), tm.scale), Fraction("778.845"))
+
+    def test_incremental_h(self):
+        """Step 1 keeps h per node incrementally (C06). With integer terms, algorithm1 gives exactly what a
+        plain depth-first search gives that recomputes h of every child (same tests, same order)."""
+        def reference(root, ub, depth):
+            collected, best = [], None
+
+            def visit(bay):
+                nonlocal ub, best
+                if bay.target is None:
+                    return
+                if len(bay.phi) == depth:
+                    collected.append(tuple(bay.phi))
+                    return
+                s = bay.target_stack()
+                if bay.stacks[s - 1][-1] == bay.target:
+                    child = bay.copy()
+                    child.apply((s, 0))
+                    if child.target is None:
+                        if child.g < ub:
+                            ub, best = child.g, tuple(child.phi)
+                    else:
+                        visit(child)
+                    return
+                omega = []
+                for d in range(1, len(bay.stacks) + 1):
+                    if d != s and len(bay.stacks[d - 1]) < bay.cost.n_T:
+                        child = bay.copy()
+                        child.apply((s, d))
+                        if child.g + h(child) < ub:
+                            omega.append(child)
+                for child in sorted(omega, key=lambda c: c.g):
+                    visit(child)
+
+            visit(root.copy())
+            return collected, best, ub
+
+        for name in ("data3-4-1", "data3-5-2"):
+            stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / f"{name}.dat")[2]
+            n_C = sum(map(len, stacks))
+            for model in ("f2", "f2_vertical"):
+                tm = TimeModel.from_spec(_spec(model, max(map(len, stacks)) + 2, **CRISP_TIME))
+                root = Bay(stacks, tm)
+                phi, ub = greedy(root)
+                depth = beta(len(phi), n_C)
+                nodes, best, final_ub = algorithm1(root, ub, depth)
+                self.assertTrue(nodes)
+                self.assertEqual(([tuple(n.phi) for n in nodes], best and tuple(best.phi), final_ub),
+                                 reference(root, ub, depth), (name, model))
+                for node in nodes:
+                    self.assertEqual(node.g, f(stacks, node.phi, tm))
+
+
 class TestPlatform(unittest.TestCase):
     """Schema, metadata and the path from the UI fields to the steps."""
 
