@@ -1,7 +1,7 @@
 """
 LopezPlata2019Heuristic
 <2019> <heuristic> <time> <single-bay> <CRP-Time>
-A*-based heuristic for the restricted BRP with operating cost
+A*-based heuristic for the restricted BRP, converted to crane time (f2 / f2vert)
 theta       --- 40 ---       Percentage in eq. 29 for the depth beta of step 1
 lam         --- 500 ---      Nodes per subset N_g and N_q (lambda)
 node_budget --- 10000000 --- Nodes visited by step 1 (not in the paper, L18)
@@ -33,8 +33,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
+from core.objectives import ObjectiveSpec
 from core.plan import Movement, RelocationPlan
 
+from .crane_time import TimeModel
 from .measures import beta, greedy
 from .operating_cost import Bay, CostModel, Move
 from .step1 import partial_solutions
@@ -48,7 +50,7 @@ from .step3 import postprocess
 
 def _plan_from_phi(stacks: List[List[int]], phi: List[Move], cost: CostModel,
                    n_rows: int) -> Tuple[float, RelocationPlan, List[int]]:
-    """Replay phi through Bay (impossible moves raise ValueError). Return f(phi) (eq. 3),
+    """Replay phi through Bay (impossible moves raise ValueError). Return f(phi) under the cost model,
     the platform plan and the env actions (0-based destination of each relocation).
     Stack s is flat index s - 1, i.e. (bay, row) with bays counted from the retrieval point."""
     def pos(s: int) -> Tuple[int, int]:
@@ -82,26 +84,28 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         kappa (int): retrievals per Expansion (default 2).
         mu (int): sequences in the roulette wheel (default 5).
         tau (int): branching factor of Expansion (default 3).
-        eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 (default 1, 1, 2, 2, O01); not in the UI.
+        cost_model (str): "crane_time" (default: f2 or f2vert, the CRP-Time time model, §4) or
+            "operating_cost" (the paper's eq. 1-3, for the validation in the paper's setting); not in the UI.
+        eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 under "operating_cost" (default 1, 1, 2, 2, O01).
     """
 
     name = "López-Plata et al. (2019) Operating-Cost Heuristic"
     category = "Heuristic"
     description = (
         "[single-bay origin] A*-based heuristic for the restricted Blocks Relocation Problem "
-        "with operating cost (López-Plata et al., C&IE 2019). It minimises the paper's own "
-        "operating cost (eq. 1-3; weights 1 unloaded, 2 loaded); the selected crane time "
-        "(f2 or f2vert) and the relocations are measured on the final plan, not optimised. "
-        "Step 1: Algorithm 1 (A*) to depth beta (eq. 29) gives the partial solutions "
-        "N_g and N_q (lambda each). Step 2: rho iterations complete every partial solution "
-        "with Expansion (kappa retrievals, tau branches, roulette over the mu best sequences). "
-        "Step 3: repair of temporary movements (Sec. 6.3). Deviations: step 1 is bounded by a "
-        "node budget with iterative deepening (L18; beta_eff and budget_hit are reported per "
-        "run), and eq. 30 is used with its end values swapped as a presumed misprint (L19)."
+        "(López-Plata et al., C&IE 2019), converted from the paper's operating cost to crane "
+        "time: it minimises the selected time model, f2 or f2vert (rmgc_current is refused); "
+        "relocations are only measured. Step 1: Algorithm 1 (A*) to depth beta (eq. 29) gives "
+        "the partial solutions N_g and N_q (lambda each). Step 2: rho iterations complete every "
+        "partial solution with Expansion (kappa retrievals, tau branches, roulette over the mu "
+        "best sequences). Step 3: repair of temporary movements (Sec. 6.3). Deviations: the "
+        "lower bound h is an admissible crane-time bound in the form of eq. 21-22 (L27); step 1 "
+        "is bounded by a node budget with iterative deepening (L18; beta_eff and budget_hit are "
+        "reported per run); eq. 30 is used with its end values swapped as a presumed misprint (L19)."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"
-    objectives = ["fixed-rule"]
+    objectives = ["crane_time"]
     fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -177,6 +181,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         kappa = int(cfg.extra.get("kappa", 2))
         mu = int(cfg.extra.get("mu", 5))
         tau = int(cfg.extra.get("tau", 3))
+        operating = cfg.extra.get("cost_model", "crane_time") == "operating_cost"
         weights = {k: float(cfg.extra[k]) for k in ("eta1", "gamma1", "eta2", "gamma2") if k in cfg.extra}
 
         all_metrics: List[Dict] = []
@@ -204,7 +209,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 for c in stk.containers:   # bottom to top
                     init_stacks[flat].append(int(c.priority))
 
-            cost = CostModel(n_T=nT, **weights)
+            # §4: f2 / f2vert from the CRP-Time time model (exact integers, L29); the paper's operating
+            # cost only on request, for the validation in the paper's setting.
+            cost = CostModel(n_T=nT, **weights) if operating else TimeModel.from_spec(ObjectiveSpec.from_config(env.config))
             root = Bay(init_stacks, cost)
             n_C = sum(len(st) for st in init_stacks)
 
@@ -225,7 +232,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             # phi_best itself; the problem validates it and reports its metrics -----
             try:
                 phi_best, f_best = postprocess(init_stacks, phi_best, cost)
-                operating_cost, plan, best_solution = _plan_from_phi(init_stacks, phi_best, cost, n_rows)
+                f_plan, plan, best_solution = _plan_from_phi(init_stacks, phi_best, cost, n_rows)
             except ValueError as err:
                 raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err
             env_final = problem_factory()
@@ -234,7 +241,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                                    + "; ".join(env_final.get_last_validation_errors()))
 
             final_metrics = env_final.get_metrics()
-            final_metrics["operating_cost"] = operating_cost
+            if operating:
+                final_metrics["operating_cost"] = f_plan
+            elif abs(cost.seconds(f_plan) - final_metrics["crane_time"]) > 1e-6:
+                raise RuntimeError(f"López-Plata: own crane time {cost.seconds(f_plan)} differs from the "
+                                   f"platform's {final_metrics['crane_time']}")
             final_metrics["steps"] = float(plan.num_moves())   # relocations and retrievals
             final_metrics.update({
                 "beta": float(depth),
@@ -244,8 +255,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             })
             all_metrics.append(final_metrics)
 
-            # Keep the paper's operating cost as a reported diagnostic, while
-            # platform-wide ranking follows the user-selected CRP-Time objective.
             primary = float(final_metrics["objective_value"])
             if primary < self._best_metric:
                 self._best_metric = primary
@@ -258,7 +267,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 metrics=final_metrics,
                 progress=(seed_idx + 1) / n_seeds,
                 snapshot=env_final.get_state_snapshot() if hasattr(env_final, "get_state_snapshot") else None,
-                extra={"operating_cost": operating_cost},
+                extra={"operating_cost": f_plan} if operating else None,
             )
 
         if all_metrics:

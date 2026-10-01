@@ -455,16 +455,16 @@ class TestIterativeDeepening(unittest.TestCase):
 
     def test_metrics(self):
         """(d) The run reports beta, beta_eff, budget_hit and visited_total; beta_eff <= beta, with
-        equality without a hit."""
+        equality without a hit. operating_cost only under the operating-cost switch."""
         cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-2.dat")
         for budget, hit in ((10 ** 7, False), (20_000, True)):
             algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"node_budget": budget, "rho": 2}))
             q_ = queue.Queue()
             algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
             m = q_.get_nowait().metrics
-            for key in ("operating_cost", "beta", "beta_eff", "budget_hit", "visited_total"):
+            for key in ("beta", "beta_eff", "budget_hit", "visited_total"):
                 self.assertIn(key, m)
-            for key in ("theta_eff_min", "theta_eff_max", "visited_last", "n_beta"):
+            for key in ("operating_cost", "theta_eff_min", "theta_eff_max", "visited_last", "n_beta"):
                 self.assertNotIn(key, m)
             self.assertEqual(bool(m["budget_hit"]), hit)
             self.assertLessEqual(m["visited_total"], budget)
@@ -719,8 +719,8 @@ class TestStep2(unittest.TestCase):
         self.assertNotEqual(completions(0), completions(1))
 
     def test_whole_run(self):
-        """6. Fig. 2 and the 40 Caserta 3x3 instances: complete, accepted by validate_plan (train raises
-        otherwise), and f(phi_best) <= f(greedy)."""
+        """6. Fig. 2 and the 40 Caserta 3x3 instances under f2: complete, accepted by validate_plan (train
+        raises otherwise), and f2(phi_best) <= f2(greedy)."""
         cases = [(self.fig2_path(), FIG2, 4)] + [
             (DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat", parse_caserta_dat(DEFAULT_CASERTA_DIR / f"data3-3-{i}.dat")[2], 5)
             for i in range(1, 41)]
@@ -729,8 +729,8 @@ class TestStep2(unittest.TestCase):
             algo, rec = _run(cfg)
             moves = _replay(cfg, algo.get_best_solution())
             self.assertEqual(sum(d == 0 for _, d in moves), sum(len(s) for s in stacks))
-            greedy_f = greedy(Bay(stacks, CostModel(n_T=n_T, **W_LOADED)))[1]
-            self.assertLessEqual(rec.extra["operating_cost"], greedy_f + 1e-9)
+            tm = TimeModel.from_spec(ObjectiveSpec.from_config(cfg))
+            self.assertLessEqual(rec.metrics["crane_time_f2"], tm.seconds(greedy(Bay(stacks, tm))[1]) + 1e-9)
 
     def fig2_path(self):
         if not hasattr(self, "_tmp"):
@@ -749,8 +749,8 @@ def _config(path, max_tiers=None):
     return cfg
 
 
-def _run(cfg, seed=0):
-    algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=seed, extra={"rho": RHO_TEST}))
+def _run(cfg, seed=0, **extra):
+    algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=seed, extra={"rho": RHO_TEST, **extra}))
     q = queue.Queue()
     algo.train(lambda: CRP_Time(config=cfg), q, threading.Event())
     return algo, q.get_nowait()
@@ -786,12 +786,24 @@ class TestCompletePlan(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_fig2_complete(self):
-        """A complete plan that validate_plan accepts; operating_cost is f of that plan on a fresh Bay."""
+        """A complete plan that validate_plan accepts. Under f2 and f2vert the reported crane time is the
+        algorithm's own f of that plan, and no operating_cost is reported; under the operating-cost switch,
+        operating_cost is eq. 3 of the plan on a fresh Bay."""
+        for model in ("f2", "f2_vertical"):
+            cfg = _config(self.fig2, max_tiers=4)
+            cfg.extra["time_model"] = model
+            algo, rec = _run(cfg)
+            moves = _replay(cfg, algo.get_best_solution())
+            self.assertEqual(sum(d == 0 for _, d in moves), 13)
+            tm = TimeModel.from_spec(ObjectiveSpec.from_config(cfg))
+            self.assertAlmostEqual(rec.metrics["objective_value"], tm.seconds(f(FIG2, moves, tm)), delta=1e-9)
+            self.assertNotIn("operating_cost", rec.metrics)
+            self.assertFalse(rec.extra)
         cfg = _config(self.fig2, max_tiers=4)
-        algo, rec = _run(cfg)
+        algo, rec = _run(cfg, cost_model="operating_cost")
         moves = _replay(cfg, algo.get_best_solution())
-        self.assertEqual(sum(d == 0 for _, d in moves), 13)
         self.assertAlmostEqual(rec.extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4, **W_LOADED)))
+        self.assertEqual(rec.metrics["operating_cost"], rec.extra["operating_cost"])
 
     def test_fig2_stack_mapping(self):
         """Paper stack s is bay s, at distance s from the truck: f2 equals the formula on the executed plan."""
@@ -812,8 +824,6 @@ class TestCompletePlan(unittest.TestCase):
         self.assertEqual(sum(d == 0 for _, d in moves), 9)
         self.assertEqual(rec.metrics["relocations"], sum(d != 0 for _, d in moves))
         self.assertAlmostEqual(rec.metrics["crane_time_f2"], _f2_formula(moves))
-        self.assertAlmostEqual(rec.extra["operating_cost"],
-                               f(stacks, moves, CostModel(n_T=cfg.max_tiers, **W_LOADED)))
 
     def test_steps_counts_all_moves(self):
         """steps = relocations + retrievals, as Azari and Jovanovic report it (data3-3-1: 6 + 9 = 15)."""
@@ -1065,8 +1075,8 @@ class TestPlatform(unittest.TestCase):
         from core.algorithm_meta import validate_meta
         cls = LopezPlata2019Heuristic
         self.assertEqual(validate_meta(cls), [])
-        self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["fixed-rule"], "faithful", "single-bay"))
-        for word in ("restricted", "operating cost", "L18", "L19"):
+        self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["crane_time"], "faithful", "single-bay"))
+        for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27"):
             self.assertIn(word, cls.description)
         import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
         for author in ("López-Plata", "Expósito-Izquierdo", "Lalla-Ruiz", "Melián-Batista", "Moreno-Vega"):
@@ -1098,7 +1108,8 @@ class TestPlatform(unittest.TestCase):
     def test_ui_defaults_reach_the_steps(self):
         seen = self._captured({})
         stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
-        depth = beta(len(greedy(Bay(stacks, CostModel(n_T=5)))[0]), 12, 40)
+        tm = TimeModel.from_spec(ObjectiveSpec.from_config(_config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")))
+        depth = beta(len(greedy(Bay(stacks, tm))[0]), 12, 40)
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": depth, **{k: v for k, v in self.PAPER.items() if k != "theta"}})
         self.assertEqual(seen["draw"], random.Random(0).random())
@@ -1117,25 +1128,31 @@ class TestPlatform(unittest.TestCase):
                 _config_values(LopezPlata2019Heuristic.config_schema(), {key: 1})
 
     def test_weights_reach_the_cost_model(self):
-        """The code weights (not in the UI) are passed to CostModel: operating_cost is f under the weights
-        given, and a weight <= 0 is refused."""
+        """Under the operating-cost switch (not in the UI) the code weights are passed to CostModel:
+        operating_cost is f under the weights given, and a weight <= 0 is refused."""
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         path = Path(tmp.name) / "fig2.dat"
         path.write_text("\n".join(["6 13"] + [" ".join(map(str, [len(s)] + s)) for s in FIG2]) + "\n")
         cfg = _config(path, max_tiers=4)
         for w in (W_PRINTED, W_LOADED):
-            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, **w}))
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, "cost_model": "operating_cost", **w}))
             q_ = queue.Queue()
             algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
             moves = _replay(cfg, algo.get_best_solution())
             self.assertAlmostEqual(q_.get_nowait().extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4, **w)))
         with self.assertRaises(AssertionError):
             CostModel(n_T=4, eta1=1, gamma1=0, eta2=2, gamma2=2)
-        algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, "eta2": 0}))
+        algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, "cost_model": "operating_cost", "eta2": 0}))
         with self.assertRaises(AssertionError):
             algo.train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
 
+
+    def test_rmgc_refused(self):
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-3-1.dat")
+        cfg.extra["time_model"] = "rmgc_current"
+        with self.assertRaisesRegex(ValueError, "rmgc_current"):
+            _run(cfg)
 
 if __name__ == "__main__":
     unittest.main()
