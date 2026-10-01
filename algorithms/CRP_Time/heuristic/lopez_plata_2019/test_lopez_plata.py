@@ -451,28 +451,24 @@ class TestIterativeDeepening(unittest.TestCase):
             self.assertEqual(_budgeted(stacks, cost, budget), _budgeted(stacks, cost, budget))
 
     def test_metrics(self):
-        """(d) The run reports beta, beta_eff, the theta_eff interval, budget_hit and the node counts;
-        beta_eff <= beta, and without a hit beta_eff = beta and theta = 40 lies in the interval."""
+        """(d) The run reports beta, beta_eff, budget_hit and visited_total; beta_eff <= beta, with
+        equality without a hit."""
         cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-2.dat")
         for budget, hit in ((10 ** 7, False), (20_000, True)):
             algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"node_budget": budget, "rho": 2}))
             q_ = queue.Queue()
             algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
             m = q_.get_nowait().metrics
-            for key in ("beta", "beta_eff", "theta_eff_min", "theta_eff_max", "budget_hit",
-                        "visited_total", "visited_last", "n_beta"):
+            for key in ("operating_cost", "beta", "beta_eff", "budget_hit", "visited_total"):
                 self.assertIn(key, m)
+            for key in ("theta_eff_min", "theta_eff_max", "visited_last", "n_beta"):
+                self.assertNotIn(key, m)
             self.assertEqual(bool(m["budget_hit"]), hit)
-            self.assertLessEqual(m["beta_eff"], m["beta"])
-            self.assertLessEqual(m["visited_last"], m["visited_total"])
             self.assertLessEqual(m["visited_total"], budget)
-            self.assertLessEqual(m["theta_eff_min"], m["theta_eff_max"])
             if hit:
                 self.assertLess(m["beta_eff"], m["beta"])
-                self.assertLessEqual(m["theta_eff_max"], 40)
             else:
                 self.assertEqual(m["beta_eff"], m["beta"])
-                self.assertTrue(m["theta_eff_min"] <= 40 < m["theta_eff_max"])
 
 
 TS, TPP = 1.2, 30.0
@@ -826,6 +822,97 @@ class TestCompletePlan(unittest.TestCase):
             with self.subTest(cut=cut), mock.patch.object(LopezPlata2019Heuristic, "_step2", staticmethod(patched)):
                 with self.assertRaises(RuntimeError):
                     _run(cfg)
+
+
+
+class TestPlatform(unittest.TestCase):
+    """Schema, metadata and the path from the UI fields to the steps."""
+
+    PAPER = {"theta": 40, "lam": 500, "node_budget": 10 ** 7, "rho": 300, "kappa": 2, "mu": 5, "tau": 3}
+
+    def test_schema(self):
+        schema = LopezPlata2019Heuristic.config_schema()
+        self.assertEqual({k: schema[k]["default"] for k in self.PAPER}, self.PAPER)
+        self.assertEqual(schema["theta"]["type"], "int")
+        self.assertEqual((schema["theta"]["min"], schema["theta"]["max"], schema["lam"]["max"]), (0, 100, 500))
+        for key in ("delta", "num_expansions", "max_partial_nodes", "alpha1", "beta1", "alpha2", "beta2",
+                    "eta1", "gamma1", "eta2", "gamma2"):
+            self.assertNotIn(key, schema)
+
+    def test_metadata(self):
+        from core.algorithm_meta import validate_meta
+        cls = LopezPlata2019Heuristic
+        self.assertEqual(validate_meta(cls), [])
+        self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["fixed-rule"], "faithful", "single-bay"))
+        for word in ("restricted", "operating cost", "L18", "L19"):
+            self.assertIn(word, cls.description)
+        import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
+        for author in ("López-Plata", "Expósito-Izquierdo", "Lalla-Ruiz", "Melián-Batista", "Moreno-Vega"):
+            self.assertIn(author, module.__doc__)
+
+    def _captured(self, values):
+        """Run train() with the configuration the web backend builds from `values` and record what reaches
+        step 1 and step 2 (step 2 itself is skipped)."""
+        from web.backend.api import _config_values
+        from web.backend.config import algorithm_config
+        import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
+        seen = {}
+
+        def step1(root, ub, depth, lam, n_C, node_budget):
+            seen.update(depth=depth, lam=lam, node_budget=node_budget, n_C=n_C)
+            return partial_solutions(root, ub, depth, lam, n_C, node_budget)
+
+        def step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C):
+            seen.update(rho=rho, kappa=kappa, tau=tau, mu=mu, draw=rng.random())
+            return phi_best, f_best
+
+        cfg_a = algorithm_config(_config_values(LopezPlata2019Heuristic.config_schema(), values))
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")
+        with mock.patch.object(module, "partial_solutions", step1), mock.patch.object(
+                LopezPlata2019Heuristic, "_step2", staticmethod(step2)):
+            LopezPlata2019Heuristic(cfg_a).train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
+        return seen
+
+    def test_ui_defaults_reach_the_steps(self):
+        seen = self._captured({})
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
+        depth = beta(len(greedy(Bay(stacks, CostModel(n_T=5)))[0]), 12, 40)
+        self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
+                         {"depth": depth, **{k: v for k, v in self.PAPER.items() if k != "theta"}})
+        self.assertEqual(seen["draw"], random.Random(0).random())
+
+    def test_ui_values_reach_the_steps(self):
+        seen = self._captured({"theta": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "mu": 2,
+                               "tau": 4, "seed": 9})
+        self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
+                         {"depth": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "tau": 4, "mu": 2})
+        self.assertEqual(seen["draw"], random.Random(9).random())
+
+    def test_ui_rejects_removed_fields(self):
+        from web.backend.api import _config_values
+        for key in ("delta", "max_partial_nodes", "alpha1", "eta1"):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                _config_values(LopezPlata2019Heuristic.config_schema(), {key: 1})
+
+    def test_weights_reach_the_cost_model(self):
+        """The code weights (not in the UI) are passed to CostModel: operating_cost is f under the weights
+        given, and a weight <= 0 is refused."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "fig2.dat"
+        path.write_text("\n".join(["6 13"] + [" ".join(map(str, [len(s)] + s)) for s in FIG2]) + "\n")
+        cfg = _config(path, max_tiers=4)
+        for w in (W_PRINTED, W_LOADED):
+            algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, **w}))
+            q_ = queue.Queue()
+            algo.train(lambda: CRP_Time(config=cfg), q_, threading.Event())
+            moves = _replay(cfg, algo.get_best_solution())
+            self.assertAlmostEqual(q_.get_nowait().extra["operating_cost"], f(FIG2, moves, CostModel(n_T=4, **w)))
+        with self.assertRaises(AssertionError):
+            CostModel(n_T=4, eta1=1, gamma1=0, eta2=2, gamma2=2)
+        algo = LopezPlata2019Heuristic(AlgorithmConfig(extra={"rho": RHO_TEST, "eta2": 0}))
+        with self.assertRaises(AssertionError):
+            algo.train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
 
 
 if __name__ == "__main__":

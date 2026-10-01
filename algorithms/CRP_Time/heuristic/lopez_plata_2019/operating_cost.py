@@ -28,6 +28,9 @@ class CostModel:
     eta2: float = 2.0
     gamma2: float = 2.0
 
+    def __post_init__(self):
+        assert min(self.eta1, self.gamma1, self.eta2, self.gamma2) > 0, "the weights of eq. 1-2 must be > 0"
+
     def _trip(self, s1: int, t1: int, s2: int, t2: int, eta: float, gamma: float) -> float:
         # Rise to n_T + epsilon, travel |s1 - s2| stacks, lower to t2.
         top = self.n_T + self.epsilon

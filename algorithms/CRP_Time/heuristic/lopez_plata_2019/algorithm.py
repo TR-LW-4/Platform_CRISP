@@ -1,12 +1,18 @@
 """
 LopezPlata2019Heuristic
 <2019> <heuristic> <time> <single-bay> <CRP-Time>
-Limited-depth A* heuristic for operating-cost BRP
-delta --- 3 --- Partial-search depth
-num_expansions --- 5 --- Expansion count in Step 2
+A*-based heuristic for the restricted BRP with operating cost
+theta       --- 40 ---       Percentage in eq. 29 for the depth beta of step 1
+lam         --- 500 ---      Nodes per subset N_g and N_q (lambda)
+node_budget --- 10000000 --- Nodes visited by step 1 (not in the paper, L18)
+rho         --- 300 ---      Iterations of step 2
+kappa       --- 2 ---        Retrievals per Expansion
+mu          --- 5 ---        Sequences in the roulette wheel
+tau         --- 3 ---        Branching factor of Expansion
 
 ------------------------------- Reference --------------------------------
-I. López-Plata, C. Expósito-Izquierdo, J.M. Moreno-Vega,
+I. López-Plata, C. Expósito-Izquierdo, E. Lalla-Ruiz, B. Melián-Batista,
+J.M. Moreno-Vega,
 "Minimizing the operating cost of block retrieval operations in stacking
  facilities",
 Computers & Industrial Engineering 136 (2019) 436–452.
@@ -29,7 +35,7 @@ import numpy as np
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.plan import Movement, RelocationPlan
 
-from .measures import beta, greedy, p
+from .measures import beta, greedy
 from .operating_cost import Bay, CostModel, Move
 from .step1 import partial_solutions
 from .step2 import algorithm2_loop
@@ -69,30 +75,33 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     Heuristic based on A* for minimizing operating cost (López-Plata et al., C&IE 2019).
 
     Parameters via config.extra:
-        theta (float): percentage in eq. 29 for the depth beta of step 1 (default 40).
-        max_partial_nodes (int): lambda, nodes per subset N_g and N_q (default 500).
+        theta (int): percentage in eq. 29 for the depth beta of step 1 (default 40).
+        lam (int): lambda, nodes per subset N_g and N_q (default 500).
         node_budget (int): nodes visited by step 1 over all iterations (default 10**7, L18).
         rho (int): iterations of step 2 (default 300).
         kappa (int): retrievals per Expansion (default 2).
         mu (int): sequences in the roulette wheel (default 5).
         tau (int): branching factor of Expansion (default 3).
+        eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 (default 1, 1, 2, 2, O01); not in the UI.
     """
 
     name = "López-Plata et al. (2019) Operating-Cost Heuristic"
     category = "Heuristic"
     description = (
-        "A* based heuristic for the Blocks Relocation Problem with Operating Costs (BRP-OC), "
-        "López-Plata et al. (C&IE 2019). "
-        "Uses the paper's own linear operating cost model (configurable α/β weights) as the primary objective. "
-        "Step 1: limited-depth A* to find promising partial solutions. "
-        "Step 2: expansion using composite quality (move cost + yard quality). "
-        "Step 3: post-processing to remove temporary moves. "
-        "Only available for CRP-Time. The algorithm is self-contained and does not depend on "
-        "other CRP-Time heuristics or the Lee-Lee kinematics model for its decisions."
+        "[single-bay origin] A*-based heuristic for the restricted Blocks Relocation Problem "
+        "with operating cost (López-Plata et al., C&IE 2019). It minimises the paper's own "
+        "operating cost (eq. 1-3; weights 1 unloaded, 2 loaded); the selected crane time "
+        "(f2 or f2vert) and the relocations are measured on the final plan, not optimised. "
+        "Step 1: Algorithm 1 (A*) to depth beta (eq. 29) gives the partial solutions "
+        "N_g and N_q (lambda each). Step 2: rho iterations complete every partial solution "
+        "with Expansion (kappa retrievals, tau branches, roulette over the mu best sequences). "
+        "Step 3: repair of temporary movements (Sec. 6.3). Deviations: step 1 is bounded by a "
+        "node budget with iterative deepening (L18; beta_eff and budget_hit are reported per "
+        "run), and eq. 30 is used with its end values swapped as a presumed misprint (L19)."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"
-    objectives = ["crane_time"]
+    objectives = ["fixed-rule"]
     fidelity = "faithful"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
@@ -105,29 +114,18 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "delta": {
-                "type": "int", "default": 3, "min": 1, "max": 10,
-                "label": "A* partial depth (δ)",
+            "seed": {**base["seed"], "help": "Seed of the roulette wheel of step 2, the only random component."},
+            "theta": {
+                "type": "int", "default": 40, "min": 0, "max": 100,
+                "label": "Depth percentage (θ)",
+                "help": "Percentage in eq. 29 for the depth β of step 1; eq. 30 with its end "
+                        "values swapped (L19). Paper: 40 (p. 448).",
             },
-            "max_partial_nodes": {
-                "type": "int", "default": 50, "min": 5, "max": 500,
-                "label": "Max promising partial nodes",
-            },
-            "rho": {
-                "type": "int", "default": 300, "min": 1, "max": 10_000,
-                "label": "Step-2 iterations (ρ)",
-            },
-            "kappa": {
-                "type": "int", "default": 2, "min": 1, "max": 20,
-                "label": "Retrievals per expansion (κ)",
-            },
-            "mu": {
-                "type": "int", "default": 5, "min": 1, "max": 100,
-                "label": "Sequences in the roulette wheel (µ)",
-            },
-            "tau": {
-                "type": "int", "default": 3, "min": 1, "max": 20,
-                "label": "Branching factor of the expansion (τ)",
+            "lam": {
+                "type": "int", "default": 500, "min": 1, "max": 500,
+                "label": "λ, nodes per subset N_g and N_q",
+                "help": "Partial solutions kept from step 1 per subset (lowest g, lowest q). "
+                        "Paper: 500 (p. 448).",
             },
             "node_budget": {
                 "type": "int", "default": 10_000_000, "min": 1, "max": 1_000_000_000,
@@ -135,10 +133,26 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "help": "Nodes visited by step 1 over all iterative-deepening iterations; "
                         "not in the paper (L18).",
             },
-            "alpha1": {"type": "float", "default": 1.0, "label": "Unloaded vertical weight"},
-            "beta1":  {"type": "float", "default": 1.0, "label": "Unloaded horizontal weight"},
-            "alpha2": {"type": "float", "default": 2.0, "label": "Loaded vertical weight"},
-            "beta2":  {"type": "float", "default": 2.0, "label": "Loaded horizontal weight"},
+            "rho": {
+                "type": "int", "default": 300, "min": 1, "max": 10_000,
+                "label": "Step-2 iterations (ρ)",
+                "help": "Times every partial solution is completed. Paper: 300 (p. 448).",
+            },
+            "kappa": {
+                "type": "int", "default": 2, "min": 1, "max": 20,
+                "label": "Retrievals per expansion (κ)",
+                "help": "Paper: 2 (p. 446).",
+            },
+            "mu": {
+                "type": "int", "default": 5, "min": 1, "max": 100,
+                "label": "Sequences in the roulette wheel (µ)",
+                "help": "Paper: 5 (p. 446).",
+            },
+            "tau": {
+                "type": "int", "default": 3, "min": 1, "max": 20,
+                "label": "Branching factor of the expansion (τ)",
+                "help": "Paper: 3 (p. 446).",
+            },
         })
         return base
 
@@ -156,13 +170,14 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         rng_seed = cfg.seed
         n_seeds = 1  # multi-seed eval removed; single run only
 
-        theta = float(cfg.extra.get("theta", 40))
-        lam = int(cfg.extra.get("max_partial_nodes", 500))
+        theta = int(cfg.extra.get("theta", 40))
+        lam = int(cfg.extra.get("lam", 500))
         node_budget = int(cfg.extra.get("node_budget", 10 ** 7))
         rho = int(cfg.extra.get("rho", 300))
         kappa = int(cfg.extra.get("kappa", 2))
         mu = int(cfg.extra.get("mu", 5))
         tau = int(cfg.extra.get("tau", 3))
+        weights = {k: float(cfg.extra[k]) for k in ("eta1", "gamma1", "eta2", "gamma2") if k in cfg.extra}
 
         all_metrics: List[Dict] = []
 
@@ -189,7 +204,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 for c in stk.containers:   # bottom to top
                     init_stacks[flat].append(int(c.priority))
 
-            cost = CostModel(n_T=nT)
+            cost = CostModel(n_T=nT, **weights)
             root = Bay(init_stacks, cost)
             n_C = sum(len(st) for st in init_stacks)
 
@@ -220,18 +235,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
             final_metrics = env_final.get_metrics()
             final_metrics["operating_cost"] = operating_cost
-            # Step 1 under the budget: beta = floor(theta * scale) (eq. 29), so beta_eff holds for
-            # every theta in [beta_eff / scale, (beta_eff + 1) / scale).
-            scale = float(len(greedy_phi) * p(n_C) / 100)
             final_metrics.update({
                 "beta": float(depth),
                 "beta_eff": float(step1["beta_eff"]),
-                "theta_eff_min": step1["beta_eff"] / scale,
-                "theta_eff_max": (step1["beta_eff"] + 1) / scale,
                 "budget_hit": float(step1["budget_hit"]),
                 "visited_total": float(step1["visited_total"]),
-                "visited_last": float(step1["visited_last"]),
-                "n_beta": float(step1["n_beta"]),
             })
             all_metrics.append(final_metrics)
 
