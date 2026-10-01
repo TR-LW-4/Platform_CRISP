@@ -62,7 +62,7 @@ Code: `algorithms/CRP_Time/heuristic/lee_lee/`
 |---|---|---|---|---|
 | Stack numbering, stack 0 = truck | 1140–1141 | `core/objectives.py:202-205`; Caserta loader pins one stack per bay and `num_rows = 1` (`core/benchmarks/caserta.py:198-200`, `:228`) | equal | unified 2D setting |
 | Movement triplet (c:a,b) | 1141 | `core/plan.py:34-51`; `to_pos=None` denotes the truck | equal | — |
-| Conflict types (stacking, over-height) | 1141 | `core/plan.py:28-31`, detected in `core/plan.py:139-184` | equal | — |
+| Conflict types (stacking, over-height) | 1141 | `core/plan.py:28-31`, detected in `core/plan.py:139-184` (since the merge of `main` in `4d69a5f`: `algorithms/CRP_Time/heuristic/lee_lee/simulate.py`) | equal | — |
 | Tolerate a conflict and keep executing | 1142 | All three conflict branches leave the yard unchanged (`core/plan.py:158-159`, `:174`, `:175-179`); callers read only `SimResult.feasible` (`phase2.py:155`, `phase3.py:88`) | deviation | differs from paper |
 | Restricted vs unrestricted | 1145 (Example 1 moves 6:4,2) | `phase1.py:76-87` relocates only containers above the current target; phases 2–3 rewrite existing paths and never add a new mover (`core/plan.py:88-94`) | deviation | differs from paper |
 | Phase 1: retrieve in order, else move blockers | 1141 | `phase1.py:45-97` | equal | — |
@@ -137,6 +137,8 @@ Observed on `data6-6-1.dat` under f2vert: phase 1 = 8408.82, phase 2 = 8500.92, 
 The fix: every phase's plan is a candidate. After each phase the best candidate so far is stored in `_best_plan` / `_best_solution`, so a run stopped early still returns the best plan up to that point. The final record carries that plan's metrics and its phase in `extra["best_phase"]`. `extra` is pushed but not saved by `save_run`; the phase can still be derived from the saved `history`. Phase 3 still starts from the phase-2 plan, as in the paper; the change affects only which plan is returned. The comparison no longer depends on `_best_metric`.
 
 The fix also dropped the mean over seeds of the phase-3 metrics that the final record used to carry. With `n_seeds = 1` (`algorithm.py:85`) that mean equalled the phase-3 metrics, and it would not describe a single plan if multiple seeds were re-enabled.
+
+**B3 — an over-height conflict raised instead of being recorded (returned with the merge of `main`). Fixed in `7e18960`.** `simulate_plan` called `Stack.push` on a full destination stack, which raises `ValueError` instead of recording the conflict, so phase 2 aborted on every candidate with an over-height move. This was fixed in `core/plan.py` in `1998df1` (undo the pop, as the missing-destination branch does). `f461e27` on `main` moved `simulate_plan` into `lee_lee/simulate.py`, from a version that predates `1998df1`, so the merge (`4d69a5f`) brought the bug back; `7e18960` re-applies the fix to the copy. Scratch check on a 1×2 yard with H = 2 and a relocation onto the full stack: before `7e18960` `ValueError`, after it `feasible = False`, 0 relocations and the over-height conflict recorded.
 
 ### 3.5 Platform observations (for Wei)
 
