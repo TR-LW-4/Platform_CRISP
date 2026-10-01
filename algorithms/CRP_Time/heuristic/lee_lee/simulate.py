@@ -92,8 +92,7 @@ def simulate_plan(
                     step, ConflictType.OVERHIGH,
                     f"Destination {move.to_pos} full ({dst_stack.height}/{max_tiers})",
                 ))
-                dst_stack.push(container)
-                n_reloc += 1
+                src_stack.push(container)
             else:
                 dst_stack.push(container)
                 n_reloc += 1
