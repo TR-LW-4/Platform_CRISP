@@ -235,6 +235,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
             final_metrics = env_final.get_metrics()
             final_metrics["operating_cost"] = operating_cost
+            final_metrics["steps"] = float(plan.num_moves())   # relocations and retrievals
             final_metrics.update({
                 "beta": float(depth),
                 "beta_eff": float(step1["beta_eff"]),

@@ -812,6 +812,14 @@ class TestCompletePlan(unittest.TestCase):
         self.assertAlmostEqual(rec.extra["operating_cost"],
                                f(stacks, moves, CostModel(n_T=cfg.max_tiers, **W_LOADED)))
 
+    def test_steps_counts_all_moves(self):
+        """steps = relocations + retrievals, as Azari and Jovanovic report it (data3-3-1: 6 + 9 = 15)."""
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-3-1.dat")
+        algo, rec = _run(cfg)
+        moves = _replay(cfg, algo.get_best_solution())
+        self.assertEqual(rec.metrics["steps"], len(moves))
+        self.assertEqual((rec.metrics["steps"], rec.metrics["total_moves"], rec.metrics["relocations"]), (15, 15, 6))
+
     def test_truncated_phi_raises(self):
         cfg = _config(self.fig2, max_tiers=4)
         orig = LopezPlata2019Heuristic._step2
