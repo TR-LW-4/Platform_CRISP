@@ -26,15 +26,8 @@ def non_located(stack: List[int]) -> List[bool]:
 
 @lru_cache(maxsize=None)
 def block_term(cost: CostModel, s: int, t: int, bad: bool) -> float:
-    """Term of the block at (s, t) in h (Sec. 5.1, p. 442).
-    EstRet (eq. 21): descend from n_T + epsilon to c, carry c to the retrieval point.
-    EstRel (eq. 22), if c is non-located: EstRet plus one relocation to the top tier n_T of the
-    adjacent stack towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1."""
-    descend = cost.m(s, cost.n_T + cost.epsilon, s, t)
-    term = descend + cost.m_loaded(s, t, 0, 1)
-    if bad:
-        term += descend + cost.m_loaded(s, t, s + 1 if s == 1 else s - 1, cost.n_T)
-    return term
+    """Term of the block at (s, t) in h, from the cost model (Sec. 5.1, p. 442)."""
+    return cost.h_term(s, t, bad)
 
 
 def h(bay: Bay) -> float:
@@ -72,7 +65,7 @@ def greedy(bay: Bay) -> Tuple[List[Move], float]:
                      if d != s and len(bay.stacks[d - 1]) < cost.n_T]
             if not dests:
                 raise ValueError(f"greedy: no stack free for the block above {bay.target}")
-            d = min(dests, key=lambda d: (cost.m_loaded(s, len(stack), d, len(bay.stacks[d - 1]) + 1), d))
+            d = min(dests, key=lambda d: (cost.greedy_key(s, len(stack), d, len(bay.stacks[d - 1]) + 1), d))
             move = (s, d)
         total += bay.apply(move)
         phi.append(move)

@@ -15,9 +15,8 @@ MQ = (1.0, 2.0, 1.0, 0.5)   # mq_m, mq_b, mq_c, mq_r (p. 446)
 
 
 def q_m(bay: Bay, s: int, d: int) -> float:
-    """Eq. 27: carry c+ from s to the new top of d, then return empty to the new top of s."""
-    n_s, n_d = len(bay.stacks[s - 1]), len(bay.stacks[d - 1])
-    return bay.cost.m_loaded(s, n_s, d, n_d + 1) + bay.cost.m(d, n_d + 1, s, n_s - 1)
+    """Eq. 27 from the cost model: relocating c+ from s to the top of d."""
+    return bay.cost.q_m(s, len(bay.stacks[s - 1]), d, len(bay.stacks[d - 1]))
 
 
 def alphas(bay: Bay, n_C: int, mq: Sequence[float] = MQ) -> List[Tuple[float, int]]:

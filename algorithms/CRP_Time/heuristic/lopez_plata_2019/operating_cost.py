@@ -44,6 +44,29 @@ class CostModel:
         """Eq. 2 (m'): loaded crane from (s1, t1) to (s2, t2)."""
         return self._trip(s1, t1, s2, t2, self.eta2, self.gamma2)
 
+    def move(self, crane: Tuple[int, int], s: int, pick: int, s2: int, drop: int) -> float:
+        """Term of eq. 3 for one move: the empty trip from the crane to the pickup plus the loaded trip."""
+        return self.m(*crane, s, pick) + self.m_loaded(s, pick, s2, drop)
+
+    def h_term(self, s: int, t: int, bad: bool) -> float:
+        """Term of the block at (s, t) in h (Sec. 5.1, p. 442).
+        EstRet (eq. 21): descend from n_T + epsilon to c, carry c to the retrieval point.
+        EstRel (eq. 22), if c is non-located: EstRet plus one relocation to the top tier n_T of the
+        adjacent stack towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1."""
+        descend = self.m(s, self.n_T + self.epsilon, s, t)
+        term = descend + self.m_loaded(s, t, 0, 1)
+        if bad:
+            term += descend + self.m_loaded(s, t, s + 1 if s == 1 else s - 1, self.n_T)
+        return term
+
+    def greedy_key(self, s: int, pick: int, d: int, drop: int) -> float:
+        """Criterion of the greedy (Sec. 7.1, R1): m' of the relocation."""
+        return self.m_loaded(s, pick, d, drop)
+
+    def q_m(self, s: int, n_s: int, d: int, n_d: int) -> float:
+        """Eq. 27: carry c+ from s to the new top of d, then return empty to the new top of s."""
+        return self.m_loaded(s, n_s, d, n_d + 1) + self.m(d, n_d + 1, s, n_s - 1)
+
 
 class Bay:
     """Configuration and crane position under the restricted rule (p. 437). As a search
@@ -85,7 +108,7 @@ class Bay:
         else:
             self.stacks[s2 - 1].append(block)
             drop = len(self.stacks[s2 - 1])  # tier after the move
-        cost = self.cost.m(*self.crane, s, pick) + self.cost.m_loaded(s, pick, s2, drop)
+        cost = self.cost.move(self.crane, s, pick, s2, drop)
         self.crane = (s2, drop)
         self.phi.append(move)
         self.g += cost
