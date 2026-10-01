@@ -206,6 +206,8 @@ In general, for a container relocated once from stack s to stack s′ and then r
 
 LB_v (eq. 45) has the same horizontal term, but its vertical part leaves room for it. For the same container, moved from tier t to tier t′, eq. 41 exceeds the vertical part of eq. 45 by 2 tr (Hmax − t′). With tr = 7.77 s > ts, that covers the extra ts unless t′ = Hmax.
 
+**Exhaustive check of the eq. 45 form (1 Oct 2026, from the López-Plata conversion, `lopez_plata_2019.md` V28).** Against the exact remaining f2vert time in all 5107 reachable states of the López-Plata Fig. 2 layout, the 40 Caserta 3×3 instances, a three-stack counterexample and 20 random layouts: LB_v ≤ the remaining time in every state with the CRISP defaults, with tpp = 0, and with vertical time dominating; it exceeds it in 1331 states when horizontal time dominates (ts = 50 s, tr = 0.03 s). So LB_v holds at the CRISP parameters on these states, but is not a valid bound in general.
+
 On the Caserta instances, the literal LB of the initial bay against the best solution found by the baseline (§4):
 
 | Objective | Instances | LB above the cost of a found solution | LB / best (min, mean, max) |
