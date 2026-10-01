@@ -82,7 +82,7 @@ class Bay:
         self.crane: Tuple[int, int] = (0, 1)  # dummy move (0, 0): start at the retrieval point
         self.target = min((c for s in self.stacks for c in s), default=None)  # c*
         self.phi: List[Move] = []
-        self.g = 0.0
+        self.g = 0
 
     def copy(self) -> "Bay":
         other = Bay.__new__(Bay)

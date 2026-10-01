@@ -14,6 +14,7 @@ corresponding original algorithm paper.
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 import queue
 import random
 import tempfile
@@ -24,10 +25,12 @@ from unittest import mock
 
 from core.base_algorithm import AlgorithmConfig
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
-from core.plan import RelocationPlan
+from core.objectives import ObjectiveSpec, movement_f2, movement_f2_vertical
+from core.plan import Movement, RelocationPlan
 from problems.CRP_Time import CRP_Time
 
 from .algorithm import LopezPlata2019Heuristic
+from .crane_time import TimeModel
 from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
 from .step1 import RunningSelection, algorithm1, partial_solutions, select
@@ -831,6 +834,76 @@ class TestCompletePlan(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     _run(cfg)
 
+
+
+# CRISP default crane-time parameters (core/objectives.py) and a set with other values, incl. tpp = 0.
+CRISP_TIME = dict(stack_s_per_stack=1.2, pickup_place_s=30.0, empty_vertical_s_per_tier=2.59,
+                  loaded_vertical_s_per_tier=5.18, outside_height=1.5)
+OTHER_TIME = dict(stack_s_per_stack=2.35, pickup_place_s=0.0, empty_vertical_s_per_tier=3.33,
+                  loaded_vertical_s_per_tier=1.07, outside_height=0.75)
+
+
+def _spec(model, n_T, **params):
+    return ObjectiveSpec(time_model=model, max_tiers=n_T, num_rows=1, **params)
+
+
+def _platform_moves(stacks, phi):
+    """phi as platform Movements with tiers: stack s is bay s, row 1; from_tier = height before the move,
+    to_tier = height after it."""
+    st, out = [list(x) for x in stacks], []
+    for s, d in phi:
+        pick, block = len(st[s - 1]), st[s - 1].pop()
+        if d == 0:
+            out.append(Movement(block, (s, 1), None, from_tier=pick))
+        else:
+            st[d - 1].append(block)
+            out.append(Movement(block, (s, 1), (d, 1), from_tier=pick, to_tier=len(st[d - 1])))
+    return out
+
+
+class TestCraneTime(unittest.TestCase):
+    """The crane-time cost model (§4): every move equals the platform's f2 / f2vert term."""
+
+    def _plans(self):
+        rng = random.Random(3)
+        yield FIG2, 4, MIN_MOVES
+        yield FIG2, 4, MIN_COST
+        for _ in range(40):
+            n_S, n_T = rng.randint(2, 5), rng.randint(2, 5)
+            stacks, phi = _random_restricted(rng, n_S, n_T, rng.randint(1, (n_S - 1) * n_T))
+            yield stacks, n_T, phi
+
+    def test_moves_equal_platform(self):
+        for params in (CRISP_TIME, OTHER_TIME):
+            for model, platform in (("f2", movement_f2), ("f2_vertical", movement_f2_vertical)):
+                for stacks, n_T, phi in self._plans():
+                    spec = _spec(model, n_T, **params)
+                    tm = TimeModel.from_spec(spec)
+                    bay = Bay(stacks, tm)
+                    for move, mv in zip(phi, _platform_moves(stacks, phi)):
+                        self.assertAlmostEqual(tm.seconds(bay.apply(move)), platform(mv, spec), delta=1e-9)
+                    self.assertIsInstance(bay.g, int)
+                    self.assertAlmostEqual(tm.seconds(f(stacks, phi, tm)),
+                                           sum(platform(mv, spec) for mv in _platform_moves(stacks, phi)), delta=1e-9)
+
+    def test_f2_formula(self):
+        """Independent of the platform: f2 per move is 2 ts d + tpp (_f2_formula), exactly."""
+        tm = TimeModel.from_spec(_spec("f2", 4, **CRISP_TIME))
+        for phi in (MIN_MOVES, MIN_COST):
+            self.assertEqual(Fraction(f(FIG2, phi, tm), tm.scale), Fraction(str(round(_f2_formula(phi), 9))))
+
+    def test_scale(self):
+        """ts = 6/5, tpp = 30, tr = 777/100, tr hout = 2331/200: everything in units of 1/200 s."""
+        tm = TimeModel.from_spec(_spec("f2_vertical", 5, **CRISP_TIME))
+        self.assertEqual((tm.scale, tm.ts, tm.tpp, tm.tr, tm.tr_hout), (200, 240, 6000, 1554, 2331))
+
+    def test_refused(self):
+        with self.assertRaises(ValueError):
+            TimeModel.from_spec(_spec("rmgc_current", 4, **CRISP_TIME))
+        with self.assertRaises(AssertionError):
+            TimeModel.from_spec(_spec("f2", 4, **{**CRISP_TIME, "stack_s_per_stack": -1.0}))
+        with self.assertRaises(AssertionError):
+            TimeModel.from_spec(_spec("f2", 4, **{**CRISP_TIME, "stack_s_per_stack": 0.0, "pickup_place_s": 0.0}))
 
 
 class TestPlatform(unittest.TestCase):

@@ -31,7 +31,7 @@ def block_term(cost: CostModel, s: int, t: int, bad: bool) -> float:
 
 
 def h(bay: Bay) -> float:
-    """Estimate of the remaining operating cost: block_term summed over the blocks present."""
+    """Estimate of the remaining cost under the cost model: block_term summed over the blocks present."""
     return sum(block_term(bay.cost, s, t, bad)
                for s, stack in enumerate(bay.stacks, 1) for t, bad in enumerate(non_located(stack), 1))
 
@@ -54,7 +54,7 @@ def greedy(bay: Bay) -> Tuple[List[Move], float]:
     stack with the lowest m' (eq. 2, drop tier n(s') + 1), ties to the lowest stack
     index (O19). Returns the moves and their cost (eq. 3)."""
     bay = bay.copy()
-    cost, phi, total = bay.cost, [], 0.0
+    cost, phi, total = bay.cost, [], 0
     while bay.target is not None:
         s = bay.target_stack()
         stack = bay.stacks[s - 1]
