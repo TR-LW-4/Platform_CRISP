@@ -9,6 +9,7 @@ rho         --- 300 ---      Iterations of step 2
 kappa       --- 2 ---        Retrievals per Expansion
 mu          --- 5 ---        Sequences in the roulette wheel
 tau         --- 3 ---        Branching factor of Expansion
+time_limit_sec --- 0 ---     Time limit per instance checked in step 2, 0 = none (not in the paper, L32)
 
 ------------------------------- Reference --------------------------------
 I. López-Plata, C. Expósito-Izquierdo, E. Lalla-Ruiz, B. Melián-Batista,
@@ -28,6 +29,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import random
+import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -84,6 +86,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         kappa (int): retrievals per Expansion (default 2).
         mu (int): sequences in the roulette wheel (default 5).
         tau (int): branching factor of Expansion (default 3).
+        time_limit_sec (float): wall-clock limit per instance in seconds, checked in step 2 (default 0 = none, L32).
         cost_model (str): "crane_time" (default: f2 or f2vert, the CRP-Time time model, §4) or
             "operating_cost" (the paper's eq. 1-3, for the validation in the paper's setting); not in the UI.
         eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 under "operating_cost" (default 1, 1, 2, 2, O01).
@@ -101,7 +104,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         "best sequences). Step 3: repair of temporary movements (Sec. 6.3). Deviations: the "
         "lower bound h is an admissible crane-time bound in the form of eq. 21-22 (L27); step 1 "
         "is bounded by a node budget with iterative deepening (L18; beta_eff and budget_hit are "
-        "reported per run); eq. 30 is used with its end values swapped as a presumed misprint (L19)."
+        "reported per run); eq. 30 is used with its end values swapped as a presumed misprint (L19); "
+        "an optional time limit stops step 2 after the partial solution being completed (L32, off "
+        "by default)."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"
@@ -157,6 +162,13 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "label": "Branching factor of the expansion (τ)",
                 "help": "Paper: 3 (p. 446).",
             },
+            "time_limit_sec": {
+                "type": "int", "default": 0, "min": 0, "max": 864_000,
+                "label": "Time limit per instance (s)",
+                "help": "0 = no limit, the paper's behaviour. Otherwise step 2 stops before the first and "
+                        "after every completed partial solution once the limit has passed; the greedy "
+                        "and step 1 are not interrupted. Not in the paper (L32).",
+            },
         })
         return base
 
@@ -181,6 +193,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         kappa = int(cfg.extra.get("kappa", 2))
         mu = int(cfg.extra.get("mu", 5))
         tau = int(cfg.extra.get("tau", 3))
+        time_limit = float(cfg.extra.get("time_limit_sec", 0))
         operating = cfg.extra.get("cost_model", "crane_time") == "operating_cost"
         weights = {k: float(cfg.extra[k]) for k in ("eta1", "gamma1", "eta2", "gamma2") if k in cfg.extra}
 
@@ -190,6 +203,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             if stop_event.is_set():
                 break
 
+            # L32: the limit counts from here, so it includes the greedy and step 1 (not interrupted)
+            deadline = time.monotonic() + time_limit if time_limit > 0 else None
             seed = rng_seed + seed_idx
             rng = random.Random(seed)   # the only random component: the roulette of step 2
 
@@ -226,7 +241,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             phi_best, f_best = greedy_phi, ub
             if leaf is not None and leaf.g < f_best:
                 phi_best, f_best = leaf.phi, leaf.g
-            phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C)
+            step2 = {"limit_hit": False, "rho_done": 0, "partials_last": 0}
+            phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C,
+                                           deadline, step2)
 
             # ----- Step 3 (Sec. 6.3, Alg. 2 line 15): repair temporary movements. The plan is
             # phi_best itself; the problem validates it and reports its metrics -----
@@ -252,6 +269,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "beta_eff": float(step1["beta_eff"]),
                 "budget_hit": float(step1["budget_hit"]),
                 "visited_total": float(step1["visited_total"]),
+                "time_limit_hit": float(step2["limit_hit"]),
+                "rho_done": float(step2["rho_done"]),
+                "partials_last": float(step2["partials_last"]),
             })
             all_metrics.append(final_metrics)
 
@@ -281,8 +301,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
 
     @staticmethod
     def _step2(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
-               rho: int, kappa: int, tau: int, mu: int, n_C: int) -> Tuple[List[Move], float]:
-        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C)
+               rho: int, kappa: int, tau: int, mu: int, n_C: int, deadline: Optional[float] = None,
+               stats: Optional[Dict[str, object]] = None) -> Tuple[List[Move], float]:
+        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline, stats)
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

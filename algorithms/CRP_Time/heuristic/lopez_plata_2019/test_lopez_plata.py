@@ -19,6 +19,7 @@ import queue
 import random
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -34,7 +35,8 @@ from .crane_time import TimeModel
 from .measures import beta, greedy, h, non_located, p, q
 from .operating_cost import Bay, CostModel, f
 from .step1 import RunningSelection, algorithm1, partial_solutions, select
-from .step2 import alphas, children, draw, expand, q_m, roulette, sequences
+from . import step2 as step2_module
+from .step2 import algorithm2_loop, alphas, children, draw, expand, q_m, roulette, sequences
 from .step3 import improve_once, postprocess, refit, temporary_moves
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
@@ -741,6 +743,97 @@ class TestStep2(unittest.TestCase):
         return path
 
 
+class _Clock:
+    """Stands in for the time module in step2: monotonic() returns 0 for the first `calls` calls, then 1."""
+
+    def __init__(self, calls):
+        self.calls, self.n = calls, 0
+
+    def monotonic(self):
+        self.n += 1
+        return 0.0 if self.n <= self.calls else 1.0
+
+
+class TestTimeLimit(unittest.TestCase):
+    """L32: the time limit of step 2, checked before the first and after every completed partial solution."""
+
+    @classmethod
+    def setUpClass(cls):
+        stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-1.dat")[2]
+        tm = TimeModel.from_spec(ObjectiveSpec.from_config(_config(DEFAULT_CASERTA_DIR / "data3-5-1.dat")))
+        root = Bay(stacks, tm)
+        cls.phi0, cls.f0 = greedy(root)
+        cls.nodes, leaf, _, _ = partial_solutions(root, cls.f0, beta(len(cls.phi0), 15), 500, 15, 10 ** 7)
+        cls.start = leaf.phi if leaf is not None and leaf.g < cls.f0 else cls.phi0   # phi_best before step 2
+
+    def loop(self, rho, **kw):
+        stats = {}
+        phi, f = algorithm2_loop(self.nodes, self.phi0, self.f0, random.Random(0), rho, 2, 3, 5, 15,
+                                 stats=stats, **kw)
+        return phi, f, stats
+
+    def first_completions(self, k):
+        """The best of the start solution and the first k completions of the unlimited loop, seed 0."""
+        rng, cache, phi_best, f_best, n = random.Random(0), {}, self.phi0, self.f0, 0
+        while n < k:
+            for node in self.nodes:
+                while node.target is not None:
+                    node = expand(node, rng, 2, 3, 5, 15, cache=cache)
+                if node.g < f_best:
+                    phi_best, f_best = list(node.phi), node.g
+                n += 1
+                if n == k:
+                    break
+        return phi_best, f_best
+
+    def test_no_limit(self):
+        """No deadline and a deadline far ahead give the result of the loop without the new arguments."""
+        reference = algorithm2_loop(self.nodes, self.phi0, self.f0, random.Random(0), 3, 2, 3, 5, 15)
+        for deadline in (None, time.monotonic() + 10 ** 6):
+            phi, f, stats = self.loop(3, deadline=deadline)
+            self.assertEqual((phi, f), reference)
+            self.assertEqual(stats, {"limit_hit": False, "rho_done": 3, "partials_last": len(self.nodes)})
+
+    def test_expired_before_step2(self):
+        """A deadline that has passed skips step 2: phi_best stays the start solution, no completions."""
+        phi, f, stats = self.loop(3, deadline=time.monotonic() - 1)
+        self.assertEqual((phi, f), (self.phi0, self.f0))
+        self.assertEqual(stats, {"limit_hit": True, "rho_done": 0, "partials_last": 0})
+
+    def test_cut_after_k_completions(self):
+        """With the deadline passing after the k-th completion, the result is the best of the first k
+        completions of the unlimited run with the same seed; the counts follow from k. On data3-5-1 the
+        3rd and 34th completions improve phi_best, so a check before the update would fail here."""
+        n = len(self.nodes)
+        self.assertGreater(n, 34)
+        for k in (3, 34):
+            self.assertLess(self.first_completions(k)[1], self.first_completions(k - 1)[1])
+        for k, expected in ((1, (0, 1)), (3, (0, 3)), (34, (0, 34)), (n, (1, n)), (n + 3, (1, 3))):
+            with mock.patch.object(step2_module, "time", _Clock(k)):
+                phi, f, stats = self.loop(5, deadline=0.5)
+            self.assertEqual((phi, f), self.first_completions(k))
+            self.assertEqual(stats, {"limit_hit": True, "rho_done": expected[0], "partials_last": expected[1]})
+
+    def test_train_metrics(self):
+        """train() reports the counts; with a limit that has passed before step 2, the plan is phi_best before
+        step 2 after step 3, complete and valid."""
+        import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-1.dat")
+        _, rec = _run(cfg)
+        self.assertEqual((rec.metrics["time_limit_hit"], rec.metrics["rho_done"], rec.metrics["partials_last"]),
+                         (0.0, float(RHO_TEST), float(len(self.nodes))))
+        # train() sets the deadline at 0 + 1; step 2 reads 1 at its first check
+        with mock.patch.object(module, "time", _Clock(10 ** 9)), mock.patch.object(step2_module, "time", _Clock(0)):
+            algo, rec = _run(cfg, time_limit_sec=1)
+        self.assertEqual((rec.metrics["time_limit_hit"], rec.metrics["rho_done"], rec.metrics["partials_last"]),
+                         (1.0, 0.0, 0.0))
+        moves = _replay(cfg, algo.get_best_solution())
+        self.assertEqual(sum(d == 0 for _, d in moves), 15)
+        tm = TimeModel.from_spec(ObjectiveSpec.from_config(cfg))
+        self.assertAlmostEqual(rec.metrics["crane_time_f2"], tm.seconds(postprocess(
+            parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-1.dat")[2], self.start, tm)[1]), places=9)
+
+
 def _config(path, max_tiers=None):
     cfg = problem_config_for_caserta_dat(
         Path(path), {"time_model": "f2", "stack_s_per_stack": TS, "pickup_place_s": TPP})
@@ -1065,6 +1158,7 @@ class TestPlatform(unittest.TestCase):
     def test_schema(self):
         schema = LopezPlata2019Heuristic.config_schema()
         self.assertEqual({k: schema[k]["default"] for k in self.PAPER}, self.PAPER)
+        self.assertEqual((schema["time_limit_sec"]["default"], schema["time_limit_sec"]["min"]), (0, 0))
         self.assertEqual(schema["theta"]["type"], "int")
         self.assertEqual((schema["theta"]["min"], schema["theta"]["max"], schema["lam"]["max"]), (0, 100, 500))
         for key in ("delta", "num_expansions", "max_partial_nodes", "alpha1", "beta1", "alpha2", "beta2",
@@ -1077,7 +1171,7 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual(validate_meta(cls), [])
         self.assertEqual(cls.name, "López-Plata et al. (2019) A*-Based Heuristic")
         self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["crane_time"], "faithful", "single-bay"))
-        for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27"):
+        for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27", "L32"):
             self.assertIn(word, cls.description)
         import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
         for author in ("López-Plata", "Expósito-Izquierdo", "Lalla-Ruiz", "Melián-Batista", "Moreno-Vega"):
@@ -1095,8 +1189,8 @@ class TestPlatform(unittest.TestCase):
             seen.update(depth=depth, lam=lam, node_budget=node_budget, n_C=n_C)
             return partial_solutions(root, ub, depth, lam, n_C, node_budget)
 
-        def step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C):
-            seen.update(rho=rho, kappa=kappa, tau=tau, mu=mu, draw=rng.random())
+        def step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline=None, stats=None):
+            seen.update(rho=rho, kappa=kappa, tau=tau, mu=mu, draw=rng.random(), deadline=deadline)
             return phi_best, f_best
 
         cfg_a = algorithm_config(_config_values(LopezPlata2019Heuristic.config_schema(), values))
@@ -1114,13 +1208,16 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": depth, **{k: v for k, v in self.PAPER.items() if k != "theta"}})
         self.assertEqual(seen["draw"], random.Random(0).random())
+        self.assertIsNone(seen["deadline"])   # time_limit_sec 0: no limit (L32)
 
     def test_ui_values_reach_the_steps(self):
+        t0 = time.monotonic()
         seen = self._captured({"theta": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "mu": 2,
-                               "tau": 4, "seed": 9})
+                               "tau": 4, "seed": 9, "time_limit_sec": 60})
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "tau": 4, "mu": 2})
         self.assertEqual(seen["draw"], random.Random(9).random())
+        self.assertTrue(t0 + 60 <= seen["deadline"] <= time.monotonic() + 60)
 
     def test_catalog_name(self):
         """The web catalogue lists the algorithm under its name, for CRP-Time, with crane time as objective."""
