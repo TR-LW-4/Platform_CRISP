@@ -45,6 +45,7 @@ FINAL_STATUSES = frozenset({"completed", "stopped", "failed"})
 @dataclass(frozen=True)
 class WorkerFinished:
     result_files: tuple = ()
+    runtime_s: Optional[float] = None  # wall clock of train() on a random layout
 
 
 @dataclass(frozen=True)
@@ -132,6 +133,7 @@ def _save_layout_run(
     problem_values: Dict[str, Any],
     algorithm_values: Dict[str, Any],
     records: Sequence[Any],
+    runtime_s: Optional[float] = None,
 ) -> Optional[str]:
     if not records:
         return None
@@ -157,6 +159,8 @@ def _save_layout_run(
             }
             for r in records
         ]
+    if runtime_s is not None:
+        metrics = {**metrics, "runtime_s": runtime_s}
     prob_save = {
         **problem_values,
         LAYOUT_FILE_EXTRA_KEY: str(layout_path),
@@ -219,8 +223,11 @@ def _worker_main(
             def factory():
                 return problem_cls(config=problem_cfg)
 
+            started = time.perf_counter()
             algorithm.train(factory, result_queue, stop_event)
-            result_queue.put(WorkerFinished(), timeout=2)
+            result_queue.put(
+                WorkerFinished(runtime_s=time.perf_counter() - started), timeout=2
+            )
             return
 
         result_files: List[str] = []
@@ -248,7 +255,9 @@ def _worker_main(
             def factory(_cfg=problem_cfg):
                 return problem_cls(config=_cfg)
 
+            started = time.perf_counter()
             algorithm.train(factory, proxy, stop_event)
+            runtime_s = time.perf_counter() - started
             # Interrupted instance is unfinished: drop the buffer and continue
             # later from this same layout file.
             if stop_event.is_set():
@@ -262,6 +271,7 @@ def _worker_main(
                 problem_values=problem_values,
                 algorithm_values=algorithm_values,
                 records=buffer,
+                runtime_s=runtime_s,
             )
             if saved:
                 result_files.append(saved)
@@ -303,6 +313,7 @@ class Job:
     result_file: Optional[str] = None
     result_files: List[str] = field(default_factory=list)
     batch_summary: Optional[Dict[str, Any]] = None
+    runtime_s: Optional[float] = None
     stop_requested: bool = False
     process: Optional[mp.Process] = field(default=None, repr=False)
     result_queue: Any = field(default=None, repr=False)
@@ -616,6 +627,7 @@ class JobManager:
                 elif isinstance(message, WorkerFinished):
                     saw_finished = True
                     finished_files = list(message.result_files)
+                    job.runtime_s = message.runtime_s
                 else:
                     with job.lock:
                         sequence = len(job.records) + 1
@@ -704,7 +716,11 @@ class JobManager:
                 seed=int(job.problem_config.get("seed", 0)),
                 prob_config=job.problem_config,
                 algo_config=job.algorithm_config,
-                metrics=final["metrics"],
+                metrics=(
+                    final["metrics"]
+                    if job.runtime_s is None
+                    else {**final["metrics"], "runtime_s": job.runtime_s}
+                ),
                 history=history,
                 moves=moves_from_records(job.records),
             )

@@ -34,6 +34,7 @@ _LOWER_IS_BETTER = frozenset({
     "shifters",
     "total_moves",
     "expected_relocations",
+    "runtime_s",
 })
 
 

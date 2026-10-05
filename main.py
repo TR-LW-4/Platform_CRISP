@@ -220,6 +220,15 @@ def _algorithm_config_from_schema(algo_cls, overrides: dict):
     return cfg
 
 
+def _timed_train(inst, factory, q, ev):
+    """Subprocess target of layout-run: train(), then ("runtime_s", wall clock of train()) on the queue."""
+    import time
+
+    started = time.perf_counter()
+    inst.train(factory, q, ev)
+    q.put(("runtime_s", time.perf_counter() - started))
+
+
 def cmd_layout_run(
     layout: str,
     problem: str,
@@ -294,7 +303,7 @@ def cmd_layout_run(
 
     q = mp.Queue()
     ev = mp.Event()
-    proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
+    proc = mp.Process(target=_timed_train, args=(inst, factory, q, ev), daemon=True)
     proc.start()
     # Drain while waiting: a child blocked on a full queue pipe cannot exit.
     records = []
@@ -320,6 +329,8 @@ def cmd_layout_run(
 
     while not q.empty():
         records.append(q.get_nowait())
+    runtime_s = next((r[1] for r in records if isinstance(r, tuple)), None)
+    records = [r for r in records if not isinstance(r, tuple)]
 
     if not records:
         print("No progress records returned (empty queue).")
@@ -334,6 +345,8 @@ def cmd_layout_run(
         f"best_metric={final.best_metric:.6f}  progress={final.progress:.4f}"
     )
     print(f"metrics: {final.metrics}")
+    if runtime_s is not None:
+        print(f"runtime_s: {runtime_s:.3f}")
     moves = getattr(final, "extra", None) or {}
     move_list = moves.get("moves") if isinstance(moves, dict) else None
     if move_list:
@@ -359,7 +372,11 @@ def cmd_layout_run(
             seed=abs(hash(p.name)) % 2_000_000_000,
             prob_config=prob_save,
             algo_config=algo_params,
-            metrics=final.metrics,
+            metrics=(
+                final.metrics
+                if runtime_s is None
+                else {**final.metrics, "runtime_s": runtime_s}
+            ),
             history=history,
             moves=moves_from_records(records),
         )
