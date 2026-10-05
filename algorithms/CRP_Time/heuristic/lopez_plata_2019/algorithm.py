@@ -241,9 +241,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             phi_best, f_best = greedy_phi, ub
             if leaf is not None and leaf.g < f_best:
                 phi_best, f_best = leaf.phi, leaf.g
-            step2 = {"limit_hit": False, "rho_done": 0, "partials_last": 0}
+            step2 = {"limit_hit": False, "stopped": False, "rho_done": 0, "partials_last": 0}
             phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C,
-                                           deadline, step2)
+                                           deadline, step2, stop_event)
+            if step2["stopped"]:
+                return   # stopped by the user: no result, as when the stop comes before the run
 
             # ----- Step 3 (Sec. 6.3, Alg. 2 line 15): repair temporary movements. The plan is
             # phi_best itself; the problem validates it and reports its metrics -----
@@ -302,8 +304,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     @staticmethod
     def _step2(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
                rho: int, kappa: int, tau: int, mu: int, n_C: int, deadline: Optional[float] = None,
-               stats: Optional[Dict[str, object]] = None) -> Tuple[List[Move], float]:
-        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline, stats)
+               stats: Optional[Dict[str, object]] = None, stop_event=None) -> Tuple[List[Move], float]:
+        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline, stats,
+                               stop_event)
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 import time
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .operating_cost import Bay, Move
 
@@ -111,18 +111,24 @@ def expand(node: Bay, rng: random.Random, kappa: int, tau: int, mu: int, n_C: in
 def algorithm2_loop(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
                     rho: int, kappa: int, tau: int, mu: int, n_C: int,
                     deadline: Optional[float] = None, stats: Optional[Dict[str, object]] = None,
-                    mq: Sequence[float] = MQ) -> Tuple[List[Move], float]:
+                    stop_event: Optional[Any] = None, mq: Sequence[float] = MQ) -> Tuple[List[Move], float]:
     """Algorithm 2, lines 3-14: rho iterations (O15), each starting from the same N; every node is
     expanded on its own until it is complete, and a complete solution replaces phi_best only if its
     f is strictly lower (line 10).
     Time limit (L32, not in the paper): with a deadline (time.monotonic()), the loop stops before the
     first node and after every completed node once the deadline has passed; phi_best then holds the
-    best of the start solution and all completions so far. stats, if given, receives limit_hit,
-    rho_done (complete iterations) and partials_last (completions in the last iteration started)."""
+    best of the start solution and all completions so far. A stop_event (anything with is_set()) is
+    checked at the same places. stats, if given, receives limit_hit, stopped, rho_done (complete
+    iterations) and partials_last (completions in the last iteration started)."""
     info = stats if stats is not None else {}
-    info.update(limit_hit=False, rho_done=0, partials_last=0)
-    if deadline is not None and time.monotonic() >= deadline:
-        info["limit_hit"] = True
+    info.update(limit_hit=False, stopped=False, rho_done=0, partials_last=0)
+
+    def halt() -> bool:
+        info["stopped"] = stop_event is not None and stop_event.is_set()
+        info["limit_hit"] = deadline is not None and time.monotonic() >= deadline
+        return info["stopped"] or info["limit_hit"]
+
+    if halt():
         return phi_best, f_best
     cache: Dict[tuple, list] = {}
     for r in range(rho):
@@ -132,8 +138,8 @@ def algorithm2_loop(partials: List[Bay], phi_best: List[Move], f_best: float, rn
                 done = expand(done, rng, kappa, tau, mu, n_C, mq, cache)
             if done.g < f_best:
                 phi_best, f_best = list(done.phi), done.g
-            if deadline is not None and time.monotonic() >= deadline:
-                info.update(limit_hit=True, rho_done=r + (k == len(partials)), partials_last=k)
+            if halt():
+                info.update(rho_done=r + (k == len(partials)), partials_last=k)
                 return phi_best, f_best
         info.update(rho_done=r + 1, partials_last=len(partials))
     return phi_best, f_best

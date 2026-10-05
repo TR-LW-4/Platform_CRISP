@@ -792,13 +792,14 @@ class TestTimeLimit(unittest.TestCase):
         for deadline in (None, time.monotonic() + 10 ** 6):
             phi, f, stats = self.loop(3, deadline=deadline)
             self.assertEqual((phi, f), reference)
-            self.assertEqual(stats, {"limit_hit": False, "rho_done": 3, "partials_last": len(self.nodes)})
+            self.assertEqual(stats, {"limit_hit": False, "stopped": False, "rho_done": 3,
+                                     "partials_last": len(self.nodes)})
 
     def test_expired_before_step2(self):
         """A deadline that has passed skips step 2: phi_best stays the start solution, no completions."""
         phi, f, stats = self.loop(3, deadline=time.monotonic() - 1)
         self.assertEqual((phi, f), (self.phi0, self.f0))
-        self.assertEqual(stats, {"limit_hit": True, "rho_done": 0, "partials_last": 0})
+        self.assertEqual(stats, {"limit_hit": True, "stopped": False, "rho_done": 0, "partials_last": 0})
 
     def test_cut_after_k_completions(self):
         """With the deadline passing after the k-th completion, the result is the best of the first k
@@ -812,7 +813,8 @@ class TestTimeLimit(unittest.TestCase):
             with mock.patch.object(step2_module, "time", _Clock(k)):
                 phi, f, stats = self.loop(5, deadline=0.5)
             self.assertEqual((phi, f), self.first_completions(k))
-            self.assertEqual(stats, {"limit_hit": True, "rho_done": expected[0], "partials_last": expected[1]})
+            self.assertEqual(stats, {"limit_hit": True, "stopped": False, "rho_done": expected[0],
+                                     "partials_last": expected[1]})
 
     def test_train_metrics(self):
         """train() reports the counts; with a limit that has passed before step 2, the plan is phi_best before
@@ -832,6 +834,40 @@ class TestTimeLimit(unittest.TestCase):
         tm = TimeModel.from_spec(ObjectiveSpec.from_config(cfg))
         self.assertAlmostEqual(rec.metrics["crane_time_f2"], tm.seconds(postprocess(
             parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-1.dat")[2], self.start, tm)[1]), places=9)
+
+    def test_stop_event(self):
+        """The stop event is checked at the same places as the limit: set before step 2, nothing is completed;
+        set after k completions, the loop stops there as with the limit."""
+        stop = threading.Event()
+        stop.set()
+        phi, f, stats = self.loop(3, stop_event=stop)
+        self.assertEqual((phi, f), (self.phi0, self.f0))
+        self.assertEqual(stats, {"limit_hit": False, "stopped": True, "rho_done": 0, "partials_last": 0})
+        with mock.patch.object(step2_module, "time", _Clock(34)):
+            expected = self.loop(5, deadline=0.5)[:2]
+        phi, f, stats = self.loop(5, stop_event=_Stop(34))
+        self.assertEqual((phi, f), expected)
+        self.assertEqual(stats, {"limit_hit": False, "stopped": True, "rho_done": 0, "partials_last": 34})
+
+    def test_train_stopped_in_step2(self):
+        """A stop during step 2 ends train() without a result, as a stop before the run does."""
+        cfg = _config(DEFAULT_CASERTA_DIR / "data3-5-1.dat")
+        algo = LopezPlata2019Heuristic(AlgorithmConfig(seed=0, extra={"rho": RHO_TEST}))
+        q = queue.Queue()
+        algo.train(lambda: CRP_Time(config=cfg), q, _Stop(1))   # 1st check: the start of train(); 2nd: step 2
+        self.assertTrue(q.empty())
+        self.assertIsNone(algo.get_best_solution())
+
+
+class _Stop:
+    """A stop event that is set from the (calls + 1)-th call of is_set() on."""
+
+    def __init__(self, calls):
+        self.calls, self.n = calls, 0
+
+    def is_set(self):
+        self.n += 1
+        return self.n > self.calls
 
 
 def _config(path, max_tiers=None):
@@ -1189,7 +1225,8 @@ class TestPlatform(unittest.TestCase):
             seen.update(depth=depth, lam=lam, node_budget=node_budget, n_C=n_C)
             return partial_solutions(root, ub, depth, lam, n_C, node_budget)
 
-        def step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline=None, stats=None):
+        def step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline=None, stats=None,
+                  stop_event=None):
             seen.update(rho=rho, kappa=kappa, tau=tau, mu=mu, draw=rng.random(), deadline=deadline)
             return phi_best, f_best
 
