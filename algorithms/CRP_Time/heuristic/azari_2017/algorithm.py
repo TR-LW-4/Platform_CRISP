@@ -452,7 +452,7 @@ class _CSUMSolver:
 
 class Azari2017CSUM(BaseAlgorithm):
 
-    name = "Azari–Eskandari–Nourmohammadi (2017) CSUM"
+    name = "Azari et al. (2017) CSUM"
     category = "Heuristic"
     description = (
         "[single-bay origin] CSUM heuristic for CRP-Time (Scientia Iranica 2017). "
