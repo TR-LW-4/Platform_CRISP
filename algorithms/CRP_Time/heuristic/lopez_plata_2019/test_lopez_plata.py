@@ -1205,7 +1205,9 @@ class TestPlatform(unittest.TestCase):
         from core.algorithm_meta import validate_meta
         cls = LopezPlata2019Heuristic
         self.assertEqual(validate_meta(cls), [])
-        self.assertEqual(cls.name, "López-Plata et al. (2019) A*-Based Heuristic")
+        self.assertEqual(cls.name, "López-Plata et al. (2019) A∗-Based Heuristic")   # ∗ = U+2217 (Sec. 6)
+        from core.results.store import _safe_token
+        self.assertFalse(set('<>:"\\|?*') & set(_safe_token(cls.name)), "result folder invalid on Windows")
         self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["crane_time"], "faithful", "single-bay"))
         for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27", "L32"):
             self.assertIn(word, cls.description)
@@ -1261,7 +1263,7 @@ class TestPlatform(unittest.TestCase):
         from web.backend.api import _catalog
         entry = [a for a in _catalog()["algorithms"] if a["name"].startswith("López-Plata")]
         self.assertEqual([(a["name"], a["objectives"]) for a in entry],
-                         [("López-Plata et al. (2019) A*-Based Heuristic", ["crane_time"])])
+                         [("López-Plata et al. (2019) A∗-Based Heuristic", ["crane_time"])])
         self.assertIn("CRP-Time", entry[0]["compatible_problems"])
 
     def test_ui_rejects_removed_fields(self):

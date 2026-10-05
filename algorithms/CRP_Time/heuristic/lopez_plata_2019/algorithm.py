@@ -92,7 +92,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 under "operating_cost" (default 1, 1, 2, 2, O01).
     """
 
-    name = "López-Plata et al. (2019) A*-Based Heuristic"
+    name = "López-Plata et al. (2019) A∗-Based Heuristic"
     category = "Heuristic"
     description = (
         "[single-bay origin] A*-based heuristic for the restricted Blocks Relocation Problem "
