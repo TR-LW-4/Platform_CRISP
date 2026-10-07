@@ -589,3 +589,5 @@ Labels (validation workflow, step 3): (a) required by the unified 2D setting, (b
 - **V36 (5 Oct 2026)** — runtime under f2 on 5×7-1 (233–240 s, last improvement of φ_best in ρ iteration 9 of 300, after 141 s) and 6×10-1 (stopped by the 2 h guard in ρ iteration 4; 28–42 min per iteration). Time limit in step 2 proposed as L32.
 
 - **V37 (5 Oct 2026)** — time limit (L32, `cff9b16`) and stop (`3a1d196`) in step 2: without a limit identical to `8fe724f`; 6×10-1 with 600 / 900 s: f2 4492.8 (+2.2 % on iteration 1 complete), plans feasible. UI check: the name from `224dce5` ("A*") broke saving results on Windows (every job "failed"); renamed to "A∗" (U+2217, `4836513`), after which all jobs completed with the values of V33 and the CLI.
+
+- **V38 (7 Oct 2026)** — UI clean-up: `max_iterations` and `report_interval` (never read) left the schema and `[single-bay origin]` and the equation numbers left the description and the θ help, and 3×5-1–3 and 3×7-10, -18, -36 (all under 10 s, far below the 600 s limit) rerun from the new schemas reproduce the overnight result files exactly (metrics, moves, file name).

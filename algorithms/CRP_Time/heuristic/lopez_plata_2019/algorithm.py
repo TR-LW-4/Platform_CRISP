@@ -95,18 +95,19 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     name = "López-Plata et al. (2019) A∗-Based Heuristic"
     category = "Heuristic"
     description = (
-        "[single-bay origin] A*-based heuristic for the restricted Blocks Relocation Problem "
+        "A*-based heuristic for the restricted Blocks Relocation Problem "
         "(López-Plata et al., C&IE 2019), converted from the paper's operating cost to crane "
         "time: it minimises the selected time model, f2 or f2vert (rmgc_current is refused); "
-        "relocations are only measured. Step 1: Algorithm 1 (A*) to depth beta (eq. 29) gives "
-        "the partial solutions N_g and N_q (lambda each). Step 2: rho iterations complete every "
-        "partial solution with Expansion (kappa retrievals, tau branches, roulette over the mu "
-        "best sequences). Step 3: repair of temporary movements (Sec. 6.3). Deviations: the "
-        "lower bound h is an admissible crane-time bound in the form of eq. 21-22 (L27); step 1 "
-        "is bounded by a node budget with iterative deepening (L18; beta_eff and budget_hit are "
-        "reported per run); eq. 30 is used with its end values swapped as a presumed misprint (L19); "
-        "an optional time limit stops step 2 after the partial solution being completed (L32, off "
-        "by default)."
+        "relocations are only measured. Step 1: Algorithm 1 (A*) to depth beta, a share of the "
+        "length of a greedy solution, gives the partial solutions N_g and N_q (lambda each). "
+        "Step 2: rho iterations complete every partial solution with Expansion (kappa retrievals, "
+        "tau branches, roulette over the mu best sequences). Step 3: repair of temporary movements "
+        "(Sec. 6.3). Deviations: the lower bound h is an admissible crane-time bound that, like the "
+        "paper's estimate, counts one retrieval per block and one relocation per badly placed "
+        "block (L27); step 1 is bounded by a node budget with iterative deepening (L18; beta_eff "
+        "and budget_hit are reported per run); the factor that scales beta with the number of "
+        "blocks is used with its end values swapped as a presumed misprint (L19); an optional "
+        "time limit stops step 2 after the partial solution being completed (L32, off by default)."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"
@@ -127,8 +128,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             "theta": {
                 "type": "int", "default": 40, "min": 0, "max": 100,
                 "label": "Depth percentage (θ)",
-                "help": "Percentage in eq. 29 for the depth β of step 1; eq. 30 with its end "
-                        "values swapped (L19). Paper: 40 (p. 448).",
+                "help": "Depth β of step 1 as a percentage of the greedy solution's length, times a "
+                        "factor that falls from 1.5 (up to 9 blocks) to 0.5 (25 blocks or more); the "
+                        "paper prints these end values the other way round (L19). Paper: 40 (p. 448).",
             },
             "lam": {
                 "type": "int", "default": 500, "min": 1, "max": 500,
@@ -170,6 +172,9 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                         "and step 1 are not interrupted. Not in the paper (L32).",
             },
         })
+        # Not read by this method.
+        for key in ("max_iterations", "report_interval"):
+            base.pop(key)
         return base
 
     # ---------------------------------------------------------------- #
