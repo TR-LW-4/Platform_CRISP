@@ -543,3 +543,5 @@ On all 120 instances per time model where both versions finish, the results are 
 - Fallback: a run on data5-5-1 in which the CSUM clock has already expired when CSUM starts returns the GBH solution (48 movements, f2 = 1725.60). Through `train()`, the warning appears on stderr and both progress records carry `extra={'csum_solution_found': False}`.
 - CLI, `layout-run` on data5-5-1: f2 1770.00 (24 relocations, 49 movements; the GBH solution has 48 movements and f2 = 1725.60), f2vert 4158.50 (25 relocations); both exit with code 0.
 - Web backend (`scratchpad/azari_web_check.py`): jobs on a random layout complete under f2 and f2vert; nothing is written to `results/`.
+
+**UI clean-up (7 Oct 2026).** `max_iterations` and `report_interval` (never read) left the schema, `[single-bay origin]` left the description and the seed help now says the seed has no effect (seeds 0 and 7 give identical plans), and 3×5-1–3 and 3×7-1–3 (all under 0.05 s, below both time limits) rerun from the new schemas reproduce the overnight result files exactly (metrics, moves, file name).

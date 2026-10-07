@@ -455,7 +455,7 @@ class Azari2017CSUM(BaseAlgorithm):
     name = "Azari et al. (2017) CSUM"
     category = "Heuristic"
     description = (
-        "[single-bay origin] CSUM heuristic for CRP-Time (Scientia Iranica 2017). "
+        "CSUM heuristic for CRP-Time (Scientia Iranica 2017). "
         "Pipeline: GBH initial solution -> A/B partition by relocation count -> "
         "CSUM tree search minimizing crane working time (TCW). "
         "A-set containers follow GBH branching; B-set containers follow "
@@ -560,6 +560,16 @@ class Azari2017CSUM(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         base = super().config_schema()
+        # Not read by this method.
+        for key in ("max_iterations", "report_interval"):
+            base.pop(key)
+        base["seed"] = {
+            **base["seed"],
+            "help": (
+                "No effect: GBH and CSUM have no random component, and the "
+                "layout is read from the Caserta file."
+            ),
+        }
         base.update({
             "gbh_time_limit_s": {
                 "type": "float", "default": 3.0, "min": 0.1, "max": 120.0,
