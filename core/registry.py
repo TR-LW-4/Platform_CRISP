@@ -103,6 +103,9 @@ def get_problem_info() -> List[Dict]:
             "description": getattr(cls, "description", ""),
             "tags":        getattr(cls, "tags", []),
             "metric_names": getattr(cls, "metric_names", ["relocations"]),
+            # Optional display restriction; empty means the global defaults.
+            "display_metrics": getattr(cls, "display_metrics", []),
+            "metric_labels": getattr(cls, "metric_labels", {}),
         })
     return sorted(out, key=lambda d: d["name"])
 

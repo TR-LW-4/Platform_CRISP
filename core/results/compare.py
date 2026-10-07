@@ -227,6 +227,9 @@ def compare_algorithms(
                     "s": row.get("s"),
                     "n_dim": row.get("n_dim"),
                 }
+                for key in ("objective_group", "display_label"):
+                    if key in row:
+                        class_meta[label][key] = row[key]
     class_order = sorted(class_meta.keys(), key=lambda lab: class_sort_key(class_meta[lab]))
 
     lower_better = metric in _LOWER_IS_BETTER

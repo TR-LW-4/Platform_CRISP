@@ -189,13 +189,29 @@ def _mean_std(values: Sequence[float]) -> Tuple[float, float]:
     return mean, math.sqrt(var)
 
 
-def _objective_group_label(data: Mapping[str, Any]) -> str:
-    """Readable CRP-Time objective identity for safe result aggregation."""
+_TIME_MODEL_DISPLAY = {"f2": "f2", "f2_vertical": "f2vert", "rmgc_current": "rmgc"}
+
+
+def _objective_values(data: Mapping[str, Any]) -> Mapping[str, Any]:
     config = data.get("prob_config") or data.get("problem_config") or {}
     if not isinstance(config, Mapping):
-        return ""
+        return {}
     raw_extra = config.get("extra")
-    values = raw_extra if isinstance(raw_extra, Mapping) else config
+    return raw_extra if isinstance(raw_extra, Mapping) else config
+
+
+def _crane_time_model_display(data: Mapping[str, Any]) -> str:
+    """Short time-model name of a crane-time run ("f2", "f2vert"); empty otherwise."""
+    values = _objective_values(data)
+    if values.get("objective_mode") != "crane_time":
+        return ""
+    model = str(values.get("time_model", "f2"))
+    return _TIME_MODEL_DISPLAY.get(model, model)
+
+
+def _objective_group_label(data: Mapping[str, Any]) -> str:
+    """Readable CRP-Time objective identity for safe result aggregation."""
+    values = _objective_values(data)
     mode = values.get("objective_mode")
     if mode is None:
         return ""
@@ -246,6 +262,9 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
           "source": "caserta",
           "label": "3×3",
           "h": 3, "w": 3,
+          # crane-time runs only: grouping identity and a readable label
+          "objective_group": "f2#abcdef",
+          "display_label": "3×3 · f2",
           "n": 40,
           "metrics": {
             "relocations": {"mean": ..., "std": ...},
@@ -287,6 +306,10 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
                 "label": display_label,
                 **dims,
             }
+            model = _crane_time_model_display(data)
+            if model:
+                buckets[key]["objective_group"] = objective_group
+                buckets[key]["display_label"] = f"{label} · {model}"
         metrics = data.get("metrics") or {}
         if not isinstance(metrics, Mapping):
             continue
