@@ -44,6 +44,8 @@ class CRP_MO(CRP_Time):
         "n_nondominated",
         "hypervolume",
     ]
+    display_metrics: List[str] = []   # not CRP-Time's restriction
+    metric_labels: Dict[str, str] = {}
 
     def evaluate_vector(self, solution: List[int]) -> Tuple[float, float]:
         """Return ``(relocations, crane_time)`` for one action sequence."""
@@ -63,7 +65,7 @@ class CRP_MO(CRP_Time):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        schema = super().config_schema()
+        schema = cls._crane_time_schema()
         for key in ("objective_mode", "relocation_weight", "time_weight"):
             schema.pop(key, None)
         return schema

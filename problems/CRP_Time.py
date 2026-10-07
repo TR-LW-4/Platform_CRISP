@@ -44,6 +44,19 @@ class CRP_Time(CRP_R):
         "crane_time_rmgc",
         "steps",
     ]
+    # UI display only; the evaluator still reports every metric above.
+    display_metrics = [
+        "crane_time_f2",
+        "crane_time_vertical",
+        "relocations",
+        "runtime_s",
+    ]
+    metric_labels = {
+        "crane_time_f2": "f2 (s)",
+        "crane_time_vertical": "f2vert (s)",
+        "relocations": "Relocations",
+        "runtime_s": "Runtime (s)",
+    }
 
     def _hooks_clear_episode(self) -> None:
         self._plan = RelocationPlan()
@@ -129,6 +142,25 @@ class CRP_Time(CRP_R):
 
     @classmethod
     def config_schema(cls) -> Dict:
+        # The RMGC parameters (gantry_s_per_bay ... spreader_s) stay, hidden:
+        # they are part of the result-file and Compare-group hashes.
+        # num_cranes and crane_speed are in neither.
+        schema = cls._crane_time_schema()
+        for key in ("num_cranes", "crane_speed"):
+            schema.pop(key)
+        schema["time_model"] = {
+            **schema["time_model"],
+            "options": ["f2", "f2_vertical"],
+            "help": (
+                "Voß–Schwarze (2019) f2 (constant pick-up/place-down time) "
+                "or f2vert (tier-dependent)."
+            ),
+        }
+        return schema
+
+    @classmethod
+    def _crane_time_schema(cls) -> Dict:
+        """Schema shared with CRP-MO, including the legacy RMGC model."""
         schema = super().config_schema()
         for key in (
             "gantry_s_per_bay",
