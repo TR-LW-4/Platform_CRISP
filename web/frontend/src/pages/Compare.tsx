@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import {
   downloadBlob,
@@ -6,7 +6,9 @@ import {
   exportStem,
   tableToPngBlob,
   toLatex,
+  type CompareDisplay,
 } from '../compareExport'
+import { classLabels, displayMetricsOf, metricLabel } from '../metricDisplay'
 import type { Catalog, CompareFolder, CompareTable } from '../types'
 
 interface CompareProps {
@@ -20,15 +22,22 @@ function fmt(value: number | null | undefined, digits = 3) {
   return value.toFixed(digits)
 }
 
-function toCsv(table: CompareTable): string {
-  const header = ['Class', ...table.algorithms.flatMap((a) => [
-    `${a} mean`,
-    `${a} std`,
-    `${a} n`,
-  ])]
+function toCsv(table: CompareTable, display: CompareDisplay): string {
+  // Raw label (with the objective hash) first; the readable label only when there is one.
+  const withDisplay = table.rows.some((row) => row.display_label)
+  const header = [
+    'Class',
+    ...(withDisplay ? ['Class label'] : []),
+    ...table.algorithms.flatMap((a) => [
+      `${a} mean`,
+      `${a} std`,
+      `${a} n`,
+    ]),
+  ]
   const lines = [header.join(',')]
   for (const row of table.rows) {
     const cells = [row.label]
+    if (withDisplay) cells.push(display.classLabels.get(row.label) ?? row.label)
     for (const algo of table.algorithms) {
       const c = row.cells[algo]
       cells.push(
@@ -55,6 +64,25 @@ export function Compare({ catalog, active = true }: CompareProps) {
   const [savingPng, setSavingPng] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const problemInfo = catalog.problems.find((p) => p.name === problem)
+  const displayMetrics = useMemo(() => displayMetricsOf(problemInfo), [problemInfo])
+  const tableProblem = catalog.problems.find((p) => p.name === table?.problem)
+  const display = useMemo<CompareDisplay | null>(
+    () =>
+      table && {
+        classLabels: classLabels(table.rows),
+        metric: metricLabel(tableProblem, table.metric),
+      },
+    [table, tableProblem],
+  )
+  const restrictedBefore = useRef(false)
+
+  // A problem with display_metrics starts on its first one; leaving it restores the default.
+  useEffect(() => {
+    if (displayMetrics.length) setMetric(displayMetrics[0])
+    else if (restrictedBefore.current) setMetric('relocations')
+    restrictedBefore.current = displayMetrics.length > 0
+  }, [displayMetrics])
 
   const loadFolders = async (prob: string) => {
     setError('')
@@ -73,12 +101,6 @@ export function Compare({ catalog, active = true }: CompareProps) {
     if (!active) return
     void loadFolders(problem)
   }, [active, problem])
-
-  useEffect(() => {
-    if (table?.available_metrics?.length && !table.available_metrics.includes(metric)) {
-      setMetric(table.available_metrics[0])
-    }
-  }, [table, metric])
 
   const toggle = (algorithm: string) => {
     setSelected((prev) =>
@@ -170,19 +192,19 @@ export function Compare({ catalog, active = true }: CompareProps) {
   }
 
   const downloadCsv = () => {
-    if (!table) return
-    downloadText(`${exportStem(table)}.csv`, toCsv(table), 'text/csv;charset=utf-8')
+    if (!table || !display) return
+    downloadText(`${exportStem(table)}.csv`, toCsv(table, display), 'text/csv;charset=utf-8')
   }
 
   const downloadLatex = () => {
-    if (!table) return
-    downloadText(`${exportStem(table)}.tex`, toLatex(table), 'text/plain;charset=utf-8')
+    if (!table || !display) return
+    downloadText(`${exportStem(table)}.tex`, toLatex(table, display), 'text/plain;charset=utf-8')
   }
 
   const copyLatex = async () => {
-    if (!table) return
+    if (!table || !display) return
     try {
-      await navigator.clipboard.writeText(toLatex(table))
+      await navigator.clipboard.writeText(toLatex(table, display))
       setNotice('LaTeX table copied to the clipboard.')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -190,11 +212,11 @@ export function Compare({ catalog, active = true }: CompareProps) {
   }
 
   const downloadPng = async () => {
-    if (!table) return
+    if (!table || !display) return
     setSavingPng(true)
     setError('')
     try {
-      const blob = await tableToPngBlob(table)
+      const blob = await tableToPngBlob(table, display)
       downloadBlob(`${exportStem(table)}.png`, blob)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -211,11 +233,23 @@ export function Compare({ catalog, active = true }: CompareProps) {
       'progress',
       'optimal_proven',
     ])
+    const available = table?.problem === problem ? table.available_metrics : undefined
+    if (displayMetrics.length) {
+      return available?.length
+        ? displayMetrics.filter((m) => available.includes(m))
+        : displayMetrics
+    }
     const raw = table?.available_metrics?.length
       ? table.available_metrics
       : ['relocations', 'crane_time', 'time', 'steps']
     return raw.filter((m) => !hidden.has(m))
-  }, [table])
+  }, [table, problem, displayMetrics])
+
+  useEffect(() => {
+    if (table?.available_metrics?.length && !metricOptions.includes(metric)) {
+      setMetric(metricOptions[0] ?? table.available_metrics[0])
+    }
+  }, [table, metric, metricOptions])
 
   return (
     <main className="page compare-page">
@@ -258,7 +292,7 @@ export function Compare({ catalog, active = true }: CompareProps) {
           <span>Metric</span>
           <select value={metric} onChange={(e) => setMetric(e.target.value)}>
             {metricOptions.map((name) => (
-              <option key={name} value={name}>{name}</option>
+              <option key={name} value={name}>{metricLabel(problemInfo, name)}</option>
             ))}
           </select>
         </label>
@@ -342,7 +376,7 @@ export function Compare({ catalog, active = true }: CompareProps) {
           <div className="card-heading">
             <div>
               <span className="eyebrow">Mean ± std by class</span>
-              <h2>{table.metric}</h2>
+              <h2>{display?.metric ?? table.metric}</h2>
             </div>
             <div className="compare-actions">
               <span>
@@ -377,7 +411,9 @@ export function Compare({ catalog, active = true }: CompareProps) {
               <tbody>
                 {table.rows.map((row) => (
                   <tr key={row.label}>
-                    <td><code>{row.label}</code></td>
+                    <td title={row.label}>
+                      <code>{display?.classLabels.get(row.label) ?? row.label}</code>
+                    </td>
                     {table.algorithms.flatMap((algo) => {
                       const cell = row.cells[algo]
                       return [
@@ -405,7 +441,7 @@ export function Compare({ catalog, active = true }: CompareProps) {
             </table>
           </div>
           <p className="description">
-            Highlighted cells are best for <code>{table.metric}</code>
+            Highlighted cells are best for <code>{display?.metric ?? table.metric}</code>
             {' '}({table.lower_is_better ? 'minimum' : 'maximum'} mean).
             Files used:{' '}
             {table.algorithms.map((a) => `${a}=${table.n_files[a] ?? 0}`).join(' · ')}

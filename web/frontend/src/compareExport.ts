@@ -1,5 +1,15 @@
 import type { CompareTable } from './types'
 
+/** Readable names for exports; the raw class label and metric key are the fallback. */
+export interface CompareDisplay {
+  classLabels: Map<string, string>
+  metric: string
+}
+
+function rawDisplay(table: CompareTable): CompareDisplay {
+  return { classLabels: new Map(), metric: table.metric }
+}
+
 function fmt(value: number | null | undefined, digits = 3) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'
   return value.toFixed(digits)
@@ -35,11 +45,19 @@ function latexEscape(text: string) {
 function classToLatex(label: string) {
   const match = label.match(/^(\d+)\s*[×xX]\s*(\d+)$/)
   if (match) return `$${match[1]}\\times ${match[2]}$`
+  const withObjective = label.match(/^(\d+)\s*[×xX]\s*(\d+) · (.+)$/)
+  if (withObjective) {
+    const [, h, w, rest] = withObjective
+    return `$${h}\\times ${w}$ $\\cdot$ ${latexEscape(rest)}`
+  }
   return latexEscape(label)
 }
 
 /** Booktabs-free LaTeX tabular for the current Compare table (display only). */
-export function toLatex(table: CompareTable): string {
+export function toLatex(
+  table: CompareTable,
+  display: CompareDisplay = rawDisplay(table),
+): string {
   const algos = table.algorithms
   const colspec = `l${'cc'.repeat(algos.length)}`
   const header1 = [
@@ -51,7 +69,7 @@ export function toLatex(table: CompareTable): string {
     ...algos.flatMap(() => ['mean $\\pm$ std', '$n$']),
   ].join(' & ')
   const body = table.rows.map((row) => {
-    const cells = [classToLatex(row.label)]
+    const cells = [classToLatex(display.classLabels.get(row.label) ?? row.label)]
     for (const algo of algos) {
       const cell = row.cells[algo]
       if (cell?.mean == null) {
@@ -66,7 +84,7 @@ export function toLatex(table: CompareTable): string {
     }
     return `${cells.join(' & ')} \\\\`
   })
-  const caption = `${latexEscape(table.problem)} ${latexEscape(table.metric)} (mean $\\pm$ std by class)`
+  const caption = `${latexEscape(table.problem)} ${latexEscape(display.metric)} (mean $\\pm$ std by class)`
   const label = `tab:${exportStem(table)}`
   return [
     '\\begin{table}[htbp]',
@@ -109,7 +127,11 @@ function wrapText(
 }
 
 /** Paint the Compare table onto a PNG (no algorithm data is recomputed). */
-export function tableToPngBlob(table: CompareTable): Promise<Blob> {
+export function tableToPngBlob(
+  table: CompareTable,
+  display: CompareDisplay = rawDisplay(table),
+): Promise<Blob> {
+  const classText = (label: string) => display.classLabels.get(label) ?? label
   const scale = 2
   const pad = 28
   const titleH = 36
@@ -130,7 +152,7 @@ export function tableToPngBlob(table: CompareTable): Promise<Blob> {
   const classW = Math.max(
     classMinW,
     ctx.measureText('Class').width,
-    ...table.rows.map((row) => ctx.measureText(row.label).width),
+    ...table.rows.map((row) => ctx.measureText(classText(row.label)).width),
   ) + 20
 
   const meanWidths = table.algorithms.map((algo) => {
@@ -169,7 +191,7 @@ export function tableToPngBlob(table: CompareTable): Promise<Blob> {
   ctx.fillStyle = '#101828'
   ctx.font = 'bold 16px ui-sans-serif, system-ui, sans-serif'
   ctx.fillText(
-    `${table.problem}  ·  ${table.metric}  ·  mean ± std by class`,
+    `${table.problem}  ·  ${display.metric}  ·  mean ± std by class`,
     pad,
     pad + 18,
   )
@@ -247,7 +269,7 @@ export function tableToPngBlob(table: CompareTable): Promise<Blob> {
 
     ctx.font = '13px ui-sans-serif, system-ui, sans-serif'
     ctx.fillStyle = '#101828'
-    ctx.fillText(row.label, originX + 10, y + 19)
+    ctx.fillText(classText(row.label), originX + 10, y + 19)
 
     table.algorithms.forEach((algo, index) => {
       const cell = row.cells[algo]

@@ -513,6 +513,10 @@ button.primary:hover:not(:disabled) {
   gap: 12px;
 }
 
+.metric-cards.has-runtime {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .metric-card {
   padding: 14px 16px;
   border: 1px solid #e5eaf1;
@@ -527,6 +531,11 @@ button.primary:hover:not(:disabled) {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Metric names such as "f2vert (s)" keep their case. */
+.metric-card span.keep-case {
+  text-transform: none;
 }
 
 .metric-card strong {
@@ -1006,7 +1015,8 @@ td code {
     grid-template-columns: 330px minmax(0, 1fr);
   }
 
-  .metric-cards {
+  .metric-cards,
+  .metric-cards.has-runtime {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

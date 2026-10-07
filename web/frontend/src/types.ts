@@ -26,6 +26,9 @@ export interface ProblemInfo {
   description: string
   tags: string[]
   metric_names: string[]
+  /** Metrics shown in summaries and Compare; empty means all (global defaults). */
+  display_metrics?: string[]
+  metric_labels?: Record<string, string>
   config_schema: ConfigSchema
 }
 
@@ -92,6 +95,8 @@ export interface MetricAgg {
 export interface BatchClassSummary {
   source: string
   label: string
+  display_label?: string
+  objective_group?: string
   n: number
   h?: number
   w?: number
@@ -133,6 +138,7 @@ export interface JobSummary {
   result_file: string | null
   result_files?: string[]
   batch_summary?: BatchSummary | null
+  runtime_s?: number | null
 }
 
 export interface RecordsResponse {
@@ -149,6 +155,7 @@ export interface RecordsResponse {
   completed_count?: number | null
   pending_count?: number | null
   instance_source?: string
+  runtime_s?: number | null
 }
 
 export interface SNPair {
@@ -230,6 +237,8 @@ export interface CompareCell {
 
 export interface CompareRow {
   label: string
+  display_label?: string
+  objective_group?: string
   source?: string
   h?: number
   w?: number

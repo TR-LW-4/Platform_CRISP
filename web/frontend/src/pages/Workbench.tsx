@@ -4,6 +4,12 @@ import { defaultsFor } from '../config'
 import { InstanceSourcePanel } from '../components/InstanceSourcePanel'
 import { MetricChart } from '../components/MetricChart'
 import { ParameterForm } from '../components/ParameterForm'
+import {
+  classLabels,
+  displayMetricsOf,
+  metricLabel,
+  objectiveMetricLabel,
+} from '../metricDisplay'
 import type {
   AlgorithmFidelity,
   AlgorithmGeometry,
@@ -150,13 +156,17 @@ const HIDDEN_SUMMARY_METRICS = new Set([
   'optimal_proven',
 ])
 
-function summaryMetricKeys(classes: BatchClassSummary[]): string[] {
+function summaryMetricKeys(
+  classes: BatchClassSummary[],
+  displayMetrics: string[],
+): string[] {
   const keys = new Set<string>()
   for (const row of classes) {
     Object.keys(row.metrics || {}).forEach((key) => {
       if (!HIDDEN_SUMMARY_METRICS.has(key)) keys.add(key)
     })
   }
+  if (displayMetrics.length) return displayMetrics.filter((key) => keys.has(key))
   // Prefer literature-facing metrics first when present.
   const preferred = [
     'objective_value',
@@ -237,8 +247,19 @@ export function Workbench({
         : null,
     [algorithm, problemName, objectiveMode, numBays, numRows],
   )
+  // The job's problem, which can differ from the form while a resumed job loads.
+  const jobProblem =
+    catalog.problems.find((item) => item.name === job?.problem_name) ?? problem
   const batchMetricKeys = useMemo(
-    () => summaryMetricKeys(job?.batch_summary?.classes ?? []),
+    () =>
+      summaryMetricKeys(
+        job?.batch_summary?.classes ?? [],
+        displayMetricsOf(jobProblem),
+      ),
+    [job?.batch_summary, jobProblem],
+  )
+  const batchClassLabels = useMemo(
+    () => classLabels(job?.batch_summary?.classes ?? []),
     [job?.batch_summary],
   )
 
@@ -336,6 +357,7 @@ export function Workbench({
                 completed_count: response.completed_count,
                 pending_count: response.pending_count,
                 instance_source: response.instance_source,
+                runtime_s: response.runtime_s,
               }
             : current,
         )
@@ -434,7 +456,15 @@ export function Workbench({
   }
 
   const latest = records.at(-1) ?? job?.latest
-  const primaryMetric = problem?.metric_names[0] ?? 'Metric'
+  const objectiveName = objectiveMetricLabel(
+    jobProblem,
+    (job?.problem_config ?? problemValues).time_model,
+  )
+  const primaryMetric = objectiveName ?? problem?.metric_names[0] ?? 'Metric'
+  const showRuntime =
+    displayMetricsOf(jobProblem).includes('runtime_s') &&
+    job?.runtime_s != null &&
+    (job.result_files?.length ?? 0) <= 1
   const hasBatchSummary = Boolean(job?.batch_summary?.classes?.length)
   const showBatchSummarySlot = usingLayout || hasBatchSummary
   const layoutLabel = latest?.extra?.layout_file
@@ -636,19 +666,29 @@ export function Workbench({
 
         <section className="run-panel">
           <div className="run-panel-sticky">
-            <div className="metric-cards">
+            <div className={showRuntime ? 'metric-cards has-runtime' : 'metric-cards'}>
               <article className="metric-card">
                 <span>{algorithm?.step_label ?? 'Step'}</span>
                 <strong>{latest?.step ?? '—'}</strong>
               </article>
               <article className="metric-card">
-                <span>Current metric</span>
+                <span className={objectiveName ? 'keep-case' : undefined}>
+                  {objectiveName ? `Current ${objectiveName}` : 'Current metric'}
+                </span>
                 <strong>{displayNumber(latest?.metric)}</strong>
               </article>
               <article className="metric-card">
-                <span>Best metric</span>
+                <span className={objectiveName ? 'keep-case' : undefined}>
+                  {objectiveName ? `Best ${objectiveName}` : 'Best metric'}
+                </span>
                 <strong>{displayNumber(latest?.best_metric)}</strong>
               </article>
+              {showRuntime && (
+                <article className="metric-card">
+                  <span className="keep-case">{metricLabel(jobProblem, 'runtime_s')}</span>
+                  <strong>{displayNumber(job?.runtime_s)}</strong>
+                </article>
+              )}
               <article className="metric-card">
                 <span>{batchLabel ? 'Batch' : 'Updates'}</span>
                 <strong>{batchLabel ?? records.length}</strong>
@@ -691,15 +731,17 @@ export function Workbench({
                           <th>Class</th>
                           <th>n</th>
                           {batchMetricKeys.flatMap((key) => [
-                            <th key={`${key}-mean`}>{key} mean</th>,
-                            <th key={`${key}-std`}>{key} std</th>,
+                            <th key={`${key}-mean`}>{metricLabel(jobProblem, key)} mean</th>,
+                            <th key={`${key}-std`}>{metricLabel(jobProblem, key)} std</th>,
                           ])}
                         </tr>
                       </thead>
                       <tbody>
                         {job!.batch_summary!.classes.map((row) => (
                           <tr key={`${row.source}-${row.label}`}>
-                            <td><code>{row.label}</code></td>
+                            <td title={row.label}>
+                              <code>{batchClassLabels.get(row.label) ?? row.label}</code>
+                            </td>
                             <td>{row.n}</td>
                             {batchMetricKeys.flatMap((key) => {
                               const agg = row.metrics?.[key]
