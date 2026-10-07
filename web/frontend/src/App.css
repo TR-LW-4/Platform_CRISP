@@ -534,7 +534,9 @@ button.primary:hover:not(:disabled) {
 }
 
 /* Metric names such as "f2vert (s)" keep their case. */
-.metric-card span.keep-case {
+.metric-card span.keep-case,
+.chart-caption span.keep-case,
+th.keep-case {
   text-transform: none;
 }
 

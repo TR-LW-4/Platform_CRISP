@@ -461,6 +461,8 @@ export function Workbench({
     (job?.problem_config ?? problemValues).time_model,
   )
   const primaryMetric = objectiveName ?? problem?.metric_names[0] ?? 'Metric'
+  const labelClass = (key: string) =>
+    jobProblem?.metric_labels?.[key] ? 'keep-case' : undefined
   const showRuntime =
     displayMetricsOf(jobProblem).includes('runtime_s') &&
     job?.runtime_s != null &&
@@ -731,8 +733,12 @@ export function Workbench({
                           <th>Class</th>
                           <th>n</th>
                           {batchMetricKeys.flatMap((key) => [
-                            <th key={`${key}-mean`}>{metricLabel(jobProblem, key)} mean</th>,
-                            <th key={`${key}-std`}>{metricLabel(jobProblem, key)} std</th>,
+                            <th key={`${key}-mean`} className={labelClass(key)}>
+                              {metricLabel(jobProblem, key)} mean
+                            </th>,
+                            <th key={`${key}-std`} className={labelClass(key)}>
+                              {metricLabel(jobProblem, key)} std
+                            </th>,
                           ])}
                         </tr>
                       </thead>
@@ -779,7 +785,11 @@ export function Workbench({
                 </div>
               </div>
               <div className="convergence-scroll">
-                <MetricChart records={records} label={primaryMetric} />
+                <MetricChart
+                  records={records}
+                  label={primaryMetric}
+                  keepCase={Boolean(objectiveName)}
+                />
               </div>
             </article>
 

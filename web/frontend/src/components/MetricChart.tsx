@@ -3,9 +3,11 @@ import type { ProgressRecord } from '../types'
 interface MetricChartProps {
   records: ProgressRecord[]
   label: string
+  /** Show the label as written (e.g. "f2vert (s)") instead of in capitals. */
+  keepCase?: boolean
 }
 
-export function MetricChart({ records, label }: MetricChartProps) {
+export function MetricChart({ records, label, keepCase = false }: MetricChartProps) {
   const values = records
     .map((record, index) => ({ index, value: record.metric }))
     .filter((item): item is { index: number; value: number } => item.value !== null)
@@ -56,7 +58,7 @@ export function MetricChart({ records, label }: MetricChartProps) {
         </text>
       </svg>
       <div className="chart-caption">
-        <span>{label}</span>
+        <span className={keepCase ? 'keep-case' : undefined}>{label}</span>
         <strong>{values.at(-1)?.value.toFixed(3)}</strong>
       </div>
     </div>
