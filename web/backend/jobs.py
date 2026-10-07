@@ -45,7 +45,7 @@ FINAL_STATUSES = frozenset({"completed", "stopped", "failed"})
 @dataclass(frozen=True)
 class WorkerFinished:
     result_files: tuple = ()
-    runtime_s: Optional[float] = None  # wall clock of train() on a random layout
+    runtime_s: Optional[float] = None  # wall clock of train() when the job ran one instance
 
 
 @dataclass(frozen=True)
@@ -231,6 +231,7 @@ def _worker_main(
             return
 
         result_files: List[str] = []
+        runtimes: List[float] = []
         batch_total = len(paths)
         for index, layout_path in enumerate(paths):
             if stop_event.is_set():
@@ -275,8 +276,15 @@ def _worker_main(
             )
             if saved:
                 result_files.append(saved)
+                runtimes.append(runtime_s)
 
-        result_queue.put(WorkerFinished(result_files=tuple(result_files)), timeout=2)
+        result_queue.put(
+            WorkerFinished(
+                result_files=tuple(result_files),
+                runtime_s=runtimes[0] if len(runtimes) == 1 else None,
+            ),
+            timeout=2,
+        )
     except BaseException as exc:
         try:
             result_queue.put(
@@ -369,6 +377,7 @@ class Job:
                 "result_file": self.result_file,
                 "result_files": list(self.result_files),
                 "batch_summary": json_safe(self.batch_summary),
+                "runtime_s": self.runtime_s,
             }
             if include_records:
                 payload["records"] = list(self.records)
@@ -460,6 +469,7 @@ class JobManager:
                 "result_file": job.result_file,
                 "result_files": list(job.result_files),
                 "batch_summary": json_safe(job.batch_summary),
+                "runtime_s": job.runtime_s,
                 **job.batch_counts(),
                 "instance_source": job.instance_source,
             }
