@@ -711,3 +711,5 @@ Mean running time per run, baseline → step 5: relocations 17.4 → 17.8 s, O_f
 Result: every objective behaves as fixed in advance, so there is no new deviation to investigate. Against the paper: relocations within ±0.10 of Table 1 on 19 of 21 sizes (10 × 6 +0.55, 10 × 10 +0.58); O_f above E_ACO on 11 (O_f,30) and 10 (O_f,5) of 11 sizes, largely through the literal eq. 44 (§3.6, step 1b); O_v far below E_ACO on all sizes, unexplained ("Checks on the O_v difference").
 
 Scripts and results: `docs/validation/data/jovanovic_2019_step5/` (local, not in git).
+
+**UI clean-up (7 Oct 2026).** `max_iterations` and `report_interval` (never read) left the schema and `[single-bay origin]` and the equation numbers left the description, and 3×5-1, 4×6-1 and 5×7-1 rerun from the new schemas reproduce the overnight result files exactly (metrics, moves, file name).

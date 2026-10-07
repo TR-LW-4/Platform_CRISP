@@ -105,12 +105,13 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     name                = "Jovanović et al. (2019) ACO (CRP-Time)"
     category            = "Heuristic"
     description         = (
-        "[single-bay origin] ACO for the restricted BRP with crane-time "
-        "objectives (EJOR 2019, Sec. 5-6). Ants choose relocations with the "
-        "MinMax heuristic and a pheromone matrix tau[c][d][n][t]; the crane "
-        "time (f2 or f2vert) is evaluated with the shared evaluator, and the "
-        "quality function and early abort use the paper's lower bounds "
-        "LB_f / LB_v (eqs. 44-47)."
+        "ACO for the restricted BRP with crane-time objectives (EJOR 2019, "
+        "Sec. 5-6). Ants choose relocations with the MinMax heuristic and a "
+        "pheromone matrix tau[c][d][n][t]; the crane time (f2 or f2vert) is "
+        "evaluated with the shared evaluator, and the quality function and "
+        "early abort use the paper's bounds LB_f / LB_v on the crane time "
+        "still needed, taken literally (LB_f is not always a valid lower "
+        "bound)."
     )
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"
@@ -535,6 +536,9 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         base = super().config_schema()
+        # Not read by this method.
+        for key in ("max_iterations", "report_interval"):
+            base.pop(key)
         base.update({
             "n_iterations": {
                 "type": "int", "default": 5000, "min": 100, "max": 50000,
