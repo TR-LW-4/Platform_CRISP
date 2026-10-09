@@ -30,14 +30,18 @@ from core.objectives import ObjectiveSpec, movement_f2, movement_f2_vertical
 from core.plan import Movement, RelocationPlan
 from problems.CRP_Time import CRP_Time
 
+from algorithms.CRP_Time.utils.located import non_located
+
 from .algorithm import LopezPlata2019Heuristic
-from .crane_time import TimeModel
-from .measures import beta, greedy, h, non_located, p, q
-from .operating_cost import Bay, CostModel, f
+from .bay import Bay, f
+from .estimates import h, q
+from .greedy import beta, greedy, p
+from .operating_cost import CostModel
 from .step1 import RunningSelection, algorithm1, partial_solutions, select
 from . import step2 as step2_module
 from .step2 import algorithm2_loop, alphas, children, draw, expand, q_m, roulette, sequences
 from .step3 import improve_once, postprocess, refit, temporary_moves
+from .time_model import TimeModel
 
 # Fig. 2 (p. 438): n_S = 6, n_T = 4, stacks bottom -> top.
 FIG2 = [[9, 1, 8], [11, 3, 2], [5, 4], [13, 6], [12, 10, 7], []]
@@ -963,13 +967,13 @@ class TestCompletePlan(unittest.TestCase):
         self.assertEqual((rec.metrics["steps"], rec.metrics["total_moves"], rec.metrics["relocations"]), (15, 15, 6))
 
     def test_truncated_phi_raises(self):
+        import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
         cfg = _config(self.fig2, max_tiers=4)
-        orig = LopezPlata2019Heuristic._step2
         for cut in (lambda phi: phi[:-1], lambda phi: phi[1:]):
             def patched(*args, cut=cut):
-                phi, f_best = orig(*args)
+                phi, f_best = algorithm2_loop(*args)
                 return cut(phi), f_best
-            with self.subTest(cut=cut), mock.patch.object(LopezPlata2019Heuristic, "_step2", staticmethod(patched)):
+            with self.subTest(cut=cut), mock.patch.object(module, "algorithm2_loop", patched):
                 with self.assertRaises(RuntimeError):
                     _run(cfg)
 
@@ -1235,7 +1239,7 @@ class TestPlatform(unittest.TestCase):
         cfg_a = algorithm_config(_config_values(LopezPlata2019Heuristic.config_schema(), values))
         cfg = _config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")
         with mock.patch.object(module, "partial_solutions", step1), mock.patch.object(
-                LopezPlata2019Heuristic, "_step2", staticmethod(step2)):
+                module, "algorithm2_loop", step2):
             LopezPlata2019Heuristic(cfg_a).train(lambda: CRP_Time(config=cfg), queue.Queue(), threading.Event())
         return seen
 

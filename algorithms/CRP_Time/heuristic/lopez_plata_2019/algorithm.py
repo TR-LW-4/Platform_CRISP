@@ -30,66 +30,32 @@ from __future__ import annotations
 import multiprocessing as mp
 import random
 import time
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+from algorithms.CRP_Time.utils.bay import read_bay
+from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.params import parameters
+from algorithms.CRP_Time.utils.plan import actions, replay
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.objectives import ObjectiveSpec
-from core.plan import Movement, RelocationPlan
 
-from .crane_time import TimeModel
-from .measures import beta, greedy
-from .operating_cost import Bay, CostModel, Move
+from .bay import Bay, f
+from .greedy import beta, greedy
+from .operating_cost import CostModel
 from .step1 import partial_solutions
 from .step2 import algorithm2_loop
 from .step3 import postprocess
+from .time_model import TimeModel
 
-
-# ================================================================ #
-#  Platform plan                                                    #
-# ================================================================ #
-
-def _plan_from_phi(stacks: List[List[int]], phi: List[Move], cost: CostModel,
-                   n_rows: int) -> Tuple[float, RelocationPlan, List[int]]:
-    """Replay phi through Bay (impossible moves raise ValueError). Return f(phi) under the cost model,
-    the platform plan and the env actions (0-based destination of each relocation).
-    Stack s is flat index s - 1, i.e. (bay, row) with bays counted from the retrieval point."""
-    def pos(s: int) -> Tuple[int, int]:
-        return (s - 1) // n_rows + 1, (s - 1) % n_rows + 1
-
-    bay = Bay(stacks, cost)
-    plan, actions, f_phi = RelocationPlan(), [], 0.0
-    for s, s2 in phi:
-        stack = bay.stacks[s - 1] if 1 <= s <= len(bay.stacks) else []
-        block = stack[-1] if stack else None
-        f_phi += bay.apply((s, s2))
-        plan.add(Movement(block, pos(s), None if s2 == 0 else pos(s2)))
-        if s2:
-            actions.append(s2 - 1)
-    return f_phi, plan, actions
-
-
-# ================================================================ #
-#  Main heuristic class                                             #
-# ================================================================ #
 
 class LopezPlata2019Heuristic(BaseAlgorithm):
     """
-    Heuristic based on A* for minimizing operating cost (López-Plata et al., C&IE 2019).
-
-    Parameters via config.extra:
-        theta (int): percentage in eq. 29 for the depth beta of step 1 (default 40).
-        lam (int): lambda, nodes per subset N_g and N_q (default 500).
-        node_budget (int): nodes visited by step 1 over all iterations (default 10**7, L18).
-        rho (int): iterations of step 2 (default 300).
-        kappa (int): retrievals per Expansion (default 2).
-        mu (int): sequences in the roulette wheel (default 5).
-        tau (int): branching factor of Expansion (default 3).
-        time_limit_sec (float): wall-clock limit per instance in seconds, checked in step 2 (default 0 = none, L32).
-        cost_model (str): "crane_time" (default: f2 or f2vert, the CRP-Time time model, §4) or
-            "operating_cost" (the paper's eq. 1-3, for the validation in the paper's setting); not in the UI.
-        eta1, gamma1, eta2, gamma2 (float): weights of eq. 1-2 under "operating_cost" (default 1, 1, 2, 2, O01).
+    The parameters in the UI are those of config_schema(). Two settings are not in the UI:
+    cost_model, "crane_time" (default: f2 or f2vert, the CRP-Time time model) or "operating_cost"
+    (the paper's own cost, for the validation in the paper's setting), and under "operating_cost"
+    the weights eta1, gamma1, eta2, gamma2 of CostModel.
     """
 
     name = "López-Plata et al. (2019) A∗-Based Heuristic"
@@ -191,14 +157,10 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         rng_seed = cfg.seed
         n_seeds = 1  # multi-seed eval removed; single run only
 
-        theta = int(cfg.extra.get("theta", 40))
-        lam = int(cfg.extra.get("lam", 500))
-        node_budget = int(cfg.extra.get("node_budget", 10 ** 7))
-        rho = int(cfg.extra.get("rho", 300))
-        kappa = int(cfg.extra.get("kappa", 2))
-        mu = int(cfg.extra.get("mu", 5))
-        tau = int(cfg.extra.get("tau", 3))
-        time_limit = float(cfg.extra.get("time_limit_sec", 0))
+        par = parameters(cfg, type(self))
+        theta, lam, node_budget = int(par["theta"]), int(par["lam"]), int(par["node_budget"])
+        rho, kappa, mu, tau = int(par["rho"]), int(par["kappa"]), int(par["mu"]), int(par["tau"])
+        time_limit = float(par["time_limit_sec"])
         operating = cfg.extra.get("cost_model", "crane_time") == "operating_cost"
         weights = {k: float(cfg.extra[k]) for k in ("eta1", "gamma1", "eta2", "gamma2") if k in cfg.extra}
 
@@ -214,24 +176,14 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             rng = random.Random(seed)   # the only random component: the roulette of step 2
 
             env = problem_factory()
-            # Containers on top at the start stay in the yard, so their retrievals are part of phi.
-            env.reset(options={"skip_auto_retrieve": True})
-
-            n_bays = env.config.num_bays
-            n_rows = env.config.num_rows
-            nT = env.config.max_tiers
-            nS = n_bays * n_rows
-
-            # Initial stacks (priorities bottom->top)
-            init_stacks: List[List[int]] = [[] for _ in range(nS)]
-            for (bay, row), stk in env.yard.stacks.items():
-                flat = (bay - 1) * n_rows + (row - 1)
-                for c in stk.containers:   # bottom to top
-                    init_stacks[flat].append(int(c.priority))
+            # Stack s of the paper is stack s - 1 of the bay; containers on top at the start stay in it.
+            init_stacks, positions = read_bay(env)
+            spec = ObjectiveSpec.from_config(env.config)
+            check_objective(spec, self.name)
 
             # §4: f2 / f2vert from the CRP-Time time model (exact integers, L29); the paper's operating
             # cost only on request, for the validation in the paper's setting.
-            cost = CostModel(n_T=nT, **weights) if operating else TimeModel.from_spec(ObjectiveSpec.from_config(env.config))
+            cost = CostModel(n_T=env.config.max_tiers, **weights) if operating else TimeModel.from_spec(spec)
             root = Bay(init_stacks, cost)
             n_C = sum(len(st) for st in init_stacks)
 
@@ -247,8 +199,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             if leaf is not None and leaf.g < f_best:
                 phi_best, f_best = leaf.phi, leaf.g
             step2 = {"limit_hit": False, "stopped": False, "rho_done": 0, "partials_last": 0}
-            phi_best, f_best = self._step2(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C,
-                                           deadline, step2, stop_event)
+            phi_best, f_best = algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C,
+                                               deadline, step2, stop_event)
             if step2["stopped"]:
                 return   # stopped by the user: no result, as when the stop comes before the run
 
@@ -256,9 +208,11 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             # phi_best itself; the problem validates it and reports its metrics -----
             try:
                 phi_best, f_best = postprocess(init_stacks, phi_best, cost)
-                f_plan, plan, best_solution = _plan_from_phi(init_stacks, phi_best, cost, n_rows)
+                f_plan = f(init_stacks, phi_best, cost)
             except ValueError as err:
                 raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err
+            plan = replay(init_stacks, positions, [(s - 1, s2 - 1 if s2 else None) for s, s2 in phi_best])
+            best_solution = actions(plan, env.config.num_rows)
             env_final = problem_factory()
             if not env_final.validate_plan(plan).get("feasible"):
                 raise RuntimeError("López-Plata: plan rejected by validate_plan: "
@@ -301,17 +255,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             agg = {k: float(np.mean([m[k] for m in all_metrics if k in m]))
                    for k in all_metrics[0]}
             self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0)
-
-    # ---------------------------------------------------------------- #
-    # Step 2                                                           #
-    # ---------------------------------------------------------------- #
-
-    @staticmethod
-    def _step2(partials: List[Bay], phi_best: List[Move], f_best: float, rng: random.Random,
-               rho: int, kappa: int, tau: int, mu: int, n_C: int, deadline: Optional[float] = None,
-               stats: Optional[Dict[str, object]] = None, stop_event=None) -> Tuple[List[Move], float]:
-        return algorithm2_loop(partials, phi_best, f_best, rng, rho, kappa, tau, mu, n_C, deadline, stats,
-                               stop_event)
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

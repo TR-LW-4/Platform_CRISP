@@ -10,7 +10,7 @@ import random
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .operating_cost import Bay, Move
+from .bay import Bay, Move
 
 MQ = (1.0, 2.0, 1.0, 0.5)   # mq_m, mq_b, mq_c, mq_r (p. 446)
 

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Sequence, Tuple
 
-from .operating_cost import Bay, CostModel, Move, f
+from .bay import Bay, Move, f
+from .operating_cost import CostModel
 
 
 def moved_blocks(stacks: Sequence[Sequence[int]], phi: List[Move], cost: CostModel) -> List[int]:
