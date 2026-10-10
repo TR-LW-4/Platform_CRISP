@@ -115,6 +115,12 @@ class TestCraneTime(unittest.TestCase):
             check_objective(ObjectiveSpec(time_model="rmgc_current"), "A")
         with self.assertRaisesRegex(ValueError, "relocations"):
             check_objective(ObjectiveSpec(mode="relocations"), "A")
+        check_objective(ObjectiveSpec(mode="relocations"), "A", ("crane_time", "relocations"))
+        with self.assertRaisesRegex(ValueError, "rmgc_current"):
+            check_objective(ObjectiveSpec(mode="relocations", time_model="rmgc_current"), "A",
+                            ("crane_time", "relocations"))
+        with self.assertRaisesRegex(ValueError, "weighted"):
+            check_objective(ObjectiveSpec(mode="weighted"), "A", ("crane_time", "relocations"))
 
 
 class TestPlan(unittest.TestCase):

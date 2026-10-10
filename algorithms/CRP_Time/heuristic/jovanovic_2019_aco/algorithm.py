@@ -27,77 +27,21 @@ from __future__ import annotations
 
 import copy
 import multiprocessing as mp
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+from algorithms.CRP_Time.utils.bay import read_bay
+from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.params import parameters
+from algorithms.CRP_Time.utils.plan import actions, replay
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
-from core.objectives import (
-    KinematicsModel,
-    ObjectiveSpec,
-    evaluate_plan_objectives,
-    movement_objective_cost,
-)
-from core.plan import Movement, RelocationPlan
-from .scoring import (
-    has_time_lb,
-    lb_container,
-    lb_time,
-    run_greedy_rbrp_time,
-)
+from core.objectives import KinematicsModel, ObjectiveSpec, evaluate_plan_objectives
 
-
-def _solution_to_plan(
-    solution: List[Tuple[int, int, int, int]],
-    stacks_init: Dict[Any, List[int]],
-    all_keys: List[Any],
-    n_total: int,
-) -> RelocationPlan:
-    """Rebuild an explicit tier-annotated plan from the ACO encoding."""
-    stacks = {key: list(values) for key, values in stacks_init.items()}
-    loc = {
-        container: key
-        for key, values in stacks.items()
-        for container in values
-    }
-    plan = RelocationPlan()
-    by_target: Dict[int, List[Tuple[int, int, int, int]]] = {}
-    for record in solution:
-        by_target.setdefault(record[3], []).append(record)
-
-    for target in range(1, n_total + 1):
-        for c, d_val, _mc, _t in by_target.get(target, []):
-            src = loc[c]
-            if d_val <= n_total:
-                dst = loc[d_val]
-            else:
-                dst = all_keys[d_val - n_total - 1]
-            plan.add(
-                Movement(
-                    c,
-                    src,
-                    dst,
-                    from_tier=len(stacks[src]),
-                    to_tier=len(stacks[dst]) + 1,
-                )
-            )
-            stacks[src].pop()
-            stacks[dst].append(c)
-            loc[c] = dst
-
-        src = loc[target]
-        plan.add(
-            Movement(
-                target,
-                src,
-                None,
-                from_tier=len(stacks[src]),
-            )
-        )
-        stacks[src].pop()
-        loc[target] = None
-    return plan
+from .ant import build_solution, decode, start
+from .greedy import greedy
+from .pheromone import global_update, initial, local_update, reinitialise
 
 
 class JovanovicACO_CRPTime(BaseAlgorithm):
@@ -120,10 +64,6 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
-    # ---------------------------------------------------------------- #
-    # Training loop                                                      #
-    # ---------------------------------------------------------------- #
-
     def train(
         self,
         problem_factory: Callable,
@@ -132,13 +72,14 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     ) -> None:
         cfg = self.config
         n_seeds = 1  # multi-seed eval removed; single run only
-        n_iters      = int(cfg.extra.get("n_iterations",   5000))
-        n_ants       = int(cfg.extra.get("n_ants",         10))
-        q0           = float(cfg.extra.get("q0",            0.9))
-        rho          = float(cfg.extra.get("rho",           0.1))
-        phi          = float(cfg.extra.get("phi",           0.9))
-        max_moves    = int(cfg.extra.get("max_moves",       10))
-        max_const    = int(cfg.extra.get("max_const_iter",  100))
+        par          = parameters(cfg, type(self))
+        n_iters      = int(par["n_iterations"])
+        n_ants       = int(par["n_ants"])
+        q0           = float(par["q0"])
+        rho          = float(par["rho"])
+        phi          = float(par["phi"])
+        max_moves    = int(par["max_moves"])
+        max_const    = int(par["max_const_iter"])
         report_every = max(1, n_iters // 50)
 
         all_metrics: List[Dict] = []
@@ -156,73 +97,27 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
-            env.reset(options={"skip_auto_retrieve": True})
+            stacks_init, positions = read_bay(env)
             initial_yard = copy.deepcopy(env.yard)
             objective_spec = ObjectiveSpec.from_config(env.config)
+            check_objective(objective_spec, self.name, ("crane_time", "relocations"))
+            # Only for the legacy RMGC metric of the shared evaluator.
             kinematics = KinematicsModel.from_config_extra(env.config.extra)
 
-            n_total   = int(env.config.num_containers)
-            max_tiers = int(env.config.max_tiers)
-            n_stacks  = env.config.num_bays * env.config.num_rows
+            n_total  = int(env.config.num_containers)
+            n_stacks = len(stacks_init)
+            ant0     = start(stacks_init, positions, int(env.config.max_tiers), objective_spec)
 
-            all_keys:          List[Any] = []
-            key_to_1based_idx: Dict[Any, int] = {}
-            stacks_init:       Dict[Any, List[int]] = {}
-
-            for a in range(n_stacks):
-                key = env._action_to_stack(a)
-                all_keys.append(key)
-                key_to_1based_idx[key] = a + 1
-                stk = env.yard.stacks.get(key)
-                stacks_init[key] = (
-                    [int(c.priority) for c in stk.containers] if stk else []
+            def evaluate(solution):
+                plan = replay(stacks_init, positions, decode(solution, stacks_init, n_total))
+                return plan, evaluate_plan_objectives(
+                    plan, objective_spec, kinematics=kinematics, initial_yard=initial_yard,
                 )
 
-            # ── Greedy warm-start ────────────────────────────────────── #
-            S_best = run_greedy_rbrp_time(
-                stacks_init, all_keys, n_total, max_tiers, key_to_1based_idx,
-                max_moves,
-            )
-
-            # ── Initial lower bound ──────────────────────────────────── #
-            # LB_f / LB_v of the initial bay for val (eqs. 44–47)
-            lb_init_time = lb_time(stacks_init, key_to_1based_idx, objective_spec)
-
-            # ── Precompute locations and stack minima ─────────────────── #
-            loc_init:       List[Any]      = [None] * (n_total + 1)
-            stack_min_init: Dict[Any, int] = {}
-            empty_d:        Dict[Any, int] = {}
-            nw_init:        List[bool]     = [False] * (n_total + 1)
-
-            for key, prios in stacks_init.items():
-                stack_min_init[key] = min(prios) if prios else (n_total + 1)
-                empty_d[key]        = n_total + key_to_1based_idx[key]
-                for i, p in enumerate(prios):
-                    loc_init[p] = key
-                    nw_init[p]  = i > 0 and min(prios[:i]) < p
-
-            # LB(Bay) of the current bay for the early abort (Alg. 2)
-            use_lb = has_time_lb(objective_spec)
-
-            best_plan = _solution_to_plan(
-                S_best, stacks_init, all_keys, n_total
-            )
-            best_metrics = evaluate_plan_objectives(
-                best_plan,
-                objective_spec,
-                kinematics=kinematics,
-                initial_yard=initial_yard,
-            )
-            best_cost = float(best_metrics["objective_value"])
-
-            # ── Pheromone initialisation (Eq. 37) ────────────────────── #
-            val_greedy = 1.0 / max(best_cost - lb_init_time + 1.0, 1.0)
-            tau_0      = val_greedy / n_stacks
-            tau_min    = tau_0 / n_stacks
-            pheromone = np.full(
-                (n_total, n_total + n_stacks, max_moves + 1, n_total),
-                tau_0, dtype=np.float32,
-            )
+            # ── Greedy warm-start and pheromone initialisation ─────── #
+            S_best = greedy(stacks_init, n_total, int(env.config.max_tiers), max_moves)
+            best_cost = float(evaluate(S_best)[1]["objective_value"])
+            pheromone, tau_min = initial(best_cost, ant0.lb, n_total, n_stacks, max_moves)
 
             iters_no_improve = 0
 
@@ -233,263 +128,38 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
                 iter_improved = False
 
-                # ── Colony: each ant builds one solution ──────────────── #
                 for _ant in range(n_ants):
                     if stop_event.is_set():
                         break
-
-                    # Reset per-ant state
-                    stacks       = {k: list(v) for k, v in stacks_init.items()}
-                    M            = [0] * (n_total + 1)
-                    S: List[Tuple[int, int, int, int]] = []
-                    valid        = True
-                    loc          = list(loc_init)
-                    smin         = dict(stack_min_init)
-                    crane_pos    = (1, 1)            # crane starts at (bay=1, row=1)
-                    time_so_far  = 0.0               # accumulated selected objective
-                    nw           = list(nw_init)
-                    lb_cur       = lb_init_time      # LB(Bay) of the current bay
-
-                    for target in range(1, n_total + 1):
-                        if not valid:
-                            break
-
-                        src_key = loc[target]
-                        if src_key is None:
-                            continue
-
-                        # ── Relocate all blockers above target ────────── #
-                        while (
-                            valid
-                            and stacks[src_key]
-                            and stacks[src_key][-1] != target
-                        ):
-                            c = stacks[src_key][-1]
-
-                            # Build candidate list
-                            best_g   = -1.0
-                            best_dst = None
-                            best_d   = 0
-                            c_i      = c - 1
-                            mc_cl    = min(M[c], max_moves)
-                            t_i      = target - 1
-                            cands_g: List[float] = []
-                            cands_k: List[Any]   = []
-                            cands_d: List[int]   = []
-
-                            for dst_key in all_keys:
-                                if dst_key == src_key:
-                                    continue
-                                if len(stacks[dst_key]) >= max_tiers:
-                                    continue
-
-                                # O(1) dd* via smin
-                                sm    = smin[dst_key]
-                                d_val = sm if sm <= n_total else empty_d[dst_key]
-
-                                # Eq. 27
-                                dif_val = (sm - c) if sm > c else (2 * n_total + 1 - sm)
-                                f_val   = 1.0 / (1.0 + dif_val)
-
-                                tau = float(pheromone[c_i, d_val - 1, mc_cl, t_i])
-                                g   = f_val * tau
-                                cands_g.append(g)
-                                cands_k.append(dst_key)
-                                cands_d.append(d_val)
-
-                                if g > best_g:
-                                    best_g   = g
-                                    best_dst = dst_key
-                                    best_d   = d_val
-
-                            if not cands_k:
-                                valid = False
-                                break
-
-                            # Transition rule (Eq. 31–32)
-                            if np.random.uniform() < q0 or len(cands_k) == 1:
-                                dst_key = best_dst
-                                d_val   = best_d
-                            else:
-                                g_arr = np.asarray(cands_g, dtype=np.float64)
-                                g_sum = g_arr.sum()
-                                probs = (
-                                    g_arr / g_sum
-                                    if g_sum > 0.0
-                                    else np.ones(len(cands_k)) / len(cands_k)
-                                )
-                                idx     = np.random.choice(len(cands_k), p=probs)
-                                dst_key = cands_k[idx]
-                                d_val   = cands_d[idx]
-
-                            # Record 4-tuple and apply relocation
-                            mc_rec = mc_cl
-                            S.append((c, d_val, mc_rec, target))
-                            movement = Movement(
-                                c,
-                                src_key,
-                                dst_key,
-                                from_tier=len(stacks[src_key]),
-                                to_tier=len(stacks[dst_key]) + 1,
-                            )
-                            nw_new = smin[dst_key] < c
-
-                            stacks[src_key].pop()
-                            if smin[src_key] == c:
-                                smin[src_key] = (
-                                    min(stacks[src_key])
-                                    if stacks[src_key]
-                                    else (n_total + 1)
-                                )
-
-                            stacks[dst_key].append(c)
-                            if c < smin[dst_key]:
-                                smin[dst_key] = c
-
-                            loc[c]  = dst_key
-                            M[c]   += 1
-
-                            # Accumulate the user-selected additive objective.
-                            cost, _selected_time, crane_pos = movement_objective_cost(
-                                movement,
-                                objective_spec,
-                                kinematics,
-                                crane_pos,
-                            )
-                            time_so_far += cost
-
-                            if use_lb:
-                                lb_cur += lb_container(
-                                    key_to_1based_idx[dst_key], movement.to_tier,
-                                    nw_new, objective_spec,
-                                ) - lb_container(
-                                    key_to_1based_idx[src_key], movement.from_tier,
-                                    nw[c], objective_spec,
-                                )
-                                nw[c] = nw_new
-
-                            # Alg. 2: stop once the partial cost plus LB(Bay)
-                            # reaches the best cost.
-                            if time_so_far + lb_cur >= best_cost:
-                                valid = False
-
-                        # Retrieve target (also incurs crane time)
-                        if (
-                            valid
-                            and stacks[src_key]
-                            and stacks[src_key][-1] == target
-                        ):
-                            movement = Movement(
-                                target,
-                                src_key,
-                                None,
-                                from_tier=len(stacks[src_key]),
-                            )
-                            cost, _selected_time, crane_pos = movement_objective_cost(
-                                movement,
-                                objective_spec,
-                                kinematics,
-                                crane_pos,
-                            )
-                            time_so_far += cost
-                            # The retrieval cost equals the term it removes
-                            # from LB(Bay), so no abort check is needed here.
-                            if use_lb:
-                                lb_cur -= lb_container(
-                                    key_to_1based_idx[src_key], movement.from_tier,
-                                    nw[target], objective_spec,
-                                )
-
-                            stacks[src_key].pop()
-                            if smin[src_key] == target:
-                                smin[src_key] = (
-                                    min(stacks[src_key])
-                                    if stacks[src_key]
-                                    else (n_total + 1)
-                                )
-                            loc[target] = None
-
-                    # ── Local pheromone update (Eq. 36) ──────────────── #
-                    for c, d_val, mc_rec, t in S:
-                        c_i = c - 1
-                        d_i = d_val - 1
-                        t_i = t - 1
-                        if (
-                            0 <= c_i < n_total
-                            and 0 <= d_i < n_total + n_stacks
-                            and 0 <= t_i < n_total
-                        ):
-                            pheromone[c_i, d_i, mc_rec, t_i] = max(
-                                np.float32(tau_min),
-                                np.float32(pheromone[c_i, d_i, mc_rec, t_i] * phi),
-                            )
-
-                    # ── Update best selected objective ─────────────────── #
-                    if valid and time_so_far < best_cost:
-                        best_cost        = time_so_far
-                        S_best           = S.copy()
+                    S, valid, cost = build_solution(ant0, pheromone, q0, max_moves, best_cost, objective_spec)
+                    local_update(pheromone, S, phi, tau_min)
+                    if valid and cost < best_cost:
+                        best_cost        = cost
+                        S_best           = S
                         iter_improved    = True
                         iters_no_improve = 0
 
-                # ── Stagnation reinitialisation ───────────────────────── #
                 if not iter_improved:
                     iters_no_improve += 1
                 if iters_no_improve >= max_const:
-                    val_b   = 1.0 / max(best_cost - lb_init_time + 1.0, 1.0)
-                    tau_new = val_b / n_stacks
-                    tau_min = tau_new / n_stacks
-                    pheromone[:] = np.float32(tau_new)
+                    reinitialise(pheromone, best_cost, ant0.lb, n_stacks)
                     iters_no_improve = 0
 
-                # ── Global pheromone update (Eqs. 34–35) ─────────────── #
-                val_b   = 1.0 / max(best_cost - lb_init_time + 1.0, 1.0)
-                delta   = np.float32(val_b)
-                tau_min = val_b / (n_stacks ** 2)
-                for c, d_val, mc_rec, t in S_best:
-                    c_i = c - 1
-                    d_i = d_val - 1
-                    t_i = t - 1
-                    if (
-                        0 <= c_i < n_total
-                        and 0 <= d_i < n_total + n_stacks
-                        and 0 <= t_i < n_total
-                    ):
-                        old = pheromone[c_i, d_i, mc_rec, t_i]
-                        pheromone[c_i, d_i, mc_rec, t_i] = max(
-                            np.float32(tau_min),
-                            np.float32((1.0 - rho) * old + rho * delta),
-                        )
+                tau_min = global_update(pheromone, S_best, best_cost, ant0.lb, rho, n_stacks)
 
                 # ── Periodic GUI push ─────────────────────────────────── #
                 if (iteration + 1) % report_every == 0:
                     frac = (seed * n_iters + iteration + 1) / (n_seeds * n_iters)
-                    report_plan = _solution_to_plan(
-                        S_best, stacks_init, all_keys, n_total
-                    )
-                    report_metrics = evaluate_plan_objectives(
-                        report_plan,
-                        objective_spec,
-                        kinematics=kinematics,
-                        initial_yard=initial_yard,
-                    )
                     self._push(
                         result_queue,
                         step     = seed + 1,
                         metric   = float(best_cost),
-                        metrics  = report_metrics,
+                        metrics  = evaluate(S_best)[1],
                         progress = min(frac, (seed + 1) / n_seeds),
                     )
 
             # ── End of seed ───────────────────────────────────────────── #
-            best_plan = _solution_to_plan(
-                S_best, stacks_init, all_keys, n_total
-            )
-            metrics = evaluate_plan_objectives(
-                best_plan,
-                objective_spec,
-                kinematics=kinematics,
-                initial_yard=initial_yard,
-            )
+            best_plan, metrics = evaluate(S_best)
             metrics["steps"] = float(best_plan.num_moves())
             metrics["progress"] = 1.0
             all_metrics.append(metrics)
@@ -497,12 +167,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             # <=: the progress pushes have already lowered _best_metric to best_cost
             if float(best_cost) <= self._best_metric:
                 self._best_metric   = float(best_cost)
-                self._best_solution = [
-                    (move.to_pos[0] - 1) * env.config.num_rows
-                    + (move.to_pos[1] - 1)
-                    for move in best_plan.movements
-                    if not move.is_retrieval
-                ]
+                self._best_solution = actions(best_plan, env.config.num_rows)
 
             self._push(
                 result_queue,
