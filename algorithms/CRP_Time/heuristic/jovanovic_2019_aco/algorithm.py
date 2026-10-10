@@ -53,9 +53,10 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
         "Sec. 5-6). Ants choose relocations with the MinMax heuristic and a "
         "pheromone matrix tau[c][d][n][t]; the crane time (f2 or f2vert) is "
         "evaluated with the shared evaluator, and the quality function and "
-        "early abort use the paper's bounds LB_f / LB_v on the crane time "
-        "still needed, taken literally (LB_f is not always a valid lower "
-        "bound)."
+        "early abort use lower bounds on the crane time still needed: LB_v "
+        "as in the paper, and LB_f without the extra ts per non-well-located "
+        "container. Deviation from the paper: the paper's LB_f is not a "
+        "valid lower bound; without that term it is."
     )
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"
