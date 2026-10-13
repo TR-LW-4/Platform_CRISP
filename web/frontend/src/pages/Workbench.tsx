@@ -8,6 +8,7 @@ import type {
   AlgorithmFidelity,
   AlgorithmGeometry,
   AlgorithmInfo,
+  AlgorithmRestriction,
   BatchClassSummary,
   BenchmarkQueueBlock,
   Catalog,
@@ -39,6 +40,56 @@ function compatible(algorithm: AlgorithmInfo, problemName: string) {
     algorithm.compatible_problems.length === 0 ||
     algorithm.compatible_problems.includes(problemName)
   )
+}
+
+type KindFilter = 'all' | 'exact' | 'heuristic' | 'solver'
+type RestrictionFilter = 'all' | 'restricted' | 'unrestricted'
+
+const ALL_FAMILIES = 'All'
+
+const KIND_BUTTONS: { id: KindFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'exact', label: 'Exact' },
+  { id: 'heuristic', label: 'Heuristic' },
+  { id: 'solver', label: 'Solver / IP' },
+]
+
+const RESTRICTION_BUTTONS: { id: RestrictionFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'restricted', label: 'Restricted' },
+  { id: 'unrestricted', label: 'Unrestricted' },
+]
+
+const RESTRICTION_LABELS: Record<AlgorithmRestriction, string> = {
+  restricted: 'Restricted relocation',
+  unrestricted: 'Unrestricted relocation',
+  both: 'Restricted + unrestricted',
+}
+
+/**
+ * Kind is derived from fields the catalog already has. "Exact" follows the
+ * class `category` (not method_group, which files search-based exact methods
+ * under "Tree Search"); "Solver / IP" follows method_group or requires_solver.
+ * An exact Gurobi model therefore appears under both Exact and Solver / IP.
+ */
+function matchesKind(algorithm: AlgorithmInfo, kind: KindFilter) {
+  const category = algorithm.category.toLowerCase()
+  switch (kind) {
+    case 'exact':
+      return category === 'exact'
+    case 'heuristic':
+      return category === 'heuristic' || algorithm.method_group === 'Heuristic'
+    case 'solver':
+      return algorithm.method_group === 'Solver / IP' || algorithm.requires_solver
+    default:
+      return true
+  }
+}
+
+function matchesRestriction(algorithm: AlgorithmInfo, filter: RestrictionFilter) {
+  if (filter === 'all') return true
+  const declared = algorithm.restriction
+  return declared === filter || declared === 'both'
 }
 
 const GEOMETRY_LABELS: Record<AlgorithmGeometry, string> = {
@@ -78,6 +129,7 @@ function assess(
   objectiveMode: string,
   numBays: number,
   numRows: number,
+  restrictedRelocation?: boolean,
 ): Assessment {
   if (!compatible(algorithm, problemName)) {
     return {
@@ -118,6 +170,20 @@ function assess(
     notes.push(
       `Single-bay method on a ${numBays}×${numRows} yard: stacks are flattened, ` +
         'so gantry travel between bays is not part of its decisions.',
+    )
+  }
+
+  if (
+    restrictedRelocation !== undefined &&
+    algorithm.restriction &&
+    algorithm.restriction !== 'both' &&
+    (algorithm.restriction === 'restricted') !== restrictedRelocation
+  ) {
+    status = 'degraded'
+    notes.push(
+      algorithm.restriction === 'restricted'
+        ? 'This algorithm solves the restricted problem but the instance is set to unrestricted relocation; compare only against restricted references.'
+        : 'This algorithm solves the unrestricted problem but the instance is set to restricted relocation; compare only against unrestricted references.',
     )
   }
 
@@ -178,9 +244,10 @@ export function Workbench({
   onResumeHandled,
 }: WorkbenchProps) {
   const [problemName, setProblemName] = useState(catalog.problems[0]?.name ?? '')
-  const [methodGroup, setMethodGroup] = useState('')
+  const [methodGroup, setMethodGroup] = useState(ALL_FAMILIES)
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [restrictionFilter, setRestrictionFilter] = useState<RestrictionFilter>('all')
   const [algorithmName, setAlgorithmName] = useState('')
-  const [solverOnly, setSolverOnly] = useState(false)
   const [problemValues, setProblemValues] = useState<ConfigValues>({})
   const [algorithmValues, setAlgorithmValues] = useState<ConfigValues>({})
   const [instanceSource, setInstanceSource] = useState('random')
@@ -199,21 +266,37 @@ export function Workbench({
 
   const problem = catalog.problems.find((item) => item.name === problemName)
   const compatibleAlgorithms = useMemo(
-    () =>
-      catalog.algorithms.filter(
-        (algorithm) =>
-          compatible(algorithm, problemName) &&
-          (!solverOnly || algorithm.requires_solver),
-      ),
-    [catalog.algorithms, problemName, solverOnly],
+    () => catalog.algorithms.filter((item) => compatible(item, problemName)),
+    [catalog.algorithms, problemName],
   )
-  const methodGroups = useMemo(
-    () => [...new Set(compatibleAlgorithms.map((item) => item.method_group))].sort(),
+  // Restriction buttons only make sense when some algorithm declares a rule.
+  const hasRestrictionInfo = useMemo(
+    () => compatibleAlgorithms.some((item) => item.restriction),
     [compatibleAlgorithms],
   )
+  const filteredAlgorithms = useMemo(
+    () =>
+      compatibleAlgorithms.filter(
+        (item) =>
+          matchesKind(item, kindFilter) &&
+          (!hasRestrictionInfo || matchesRestriction(item, restrictionFilter)),
+      ),
+    [compatibleAlgorithms, kindFilter, restrictionFilter, hasRestrictionInfo],
+  )
+  const methodGroups = useMemo(
+    () => [...new Set(filteredAlgorithms.map((item) => item.method_group))].sort(),
+    [filteredAlgorithms],
+  )
   const groupAlgorithms = useMemo(
-    () => compatibleAlgorithms.filter((item) => item.method_group === methodGroup),
-    [compatibleAlgorithms, methodGroup],
+    () =>
+      methodGroup === ALL_FAMILIES
+        ? filteredAlgorithms
+        : filteredAlgorithms.filter((item) => item.method_group === methodGroup),
+    [filteredAlgorithms, methodGroup],
+  )
+  const undeclaredRestriction = useMemo(
+    () => compatibleAlgorithms.filter((item) => !item.restriction).length,
+    [compatibleAlgorithms],
   )
   const algorithm = catalog.algorithms.find((item) => item.name === algorithmName)
   const running = Boolean(job && !terminalStatuses.includes(job.status))
@@ -226,12 +309,23 @@ export function Workbench({
   const objectiveMode = String(problemValues.objective_mode ?? 'relocations')
   const numBays = Number(problemValues.num_bays ?? 1)
   const numRows = usingLayout ? 1 : Number(problemValues.num_rows ?? 1)
+  const restrictedRelocation =
+    typeof problemValues.restricted_relocation === 'boolean'
+      ? problemValues.restricted_relocation
+      : undefined
   const assessment = useMemo(
     () =>
       algorithm
-        ? assess(algorithm, problemName, objectiveMode, numBays, numRows)
+        ? assess(
+            algorithm,
+            problemName,
+            objectiveMode,
+            numBays,
+            numRows,
+            restrictedRelocation,
+          )
         : null,
-    [algorithm, problemName, objectiveMode, numBays, numRows],
+    [algorithm, problemName, objectiveMode, numBays, numRows, restrictedRelocation],
   )
   const batchMetricKeys = useMemo(
     () => summaryMetricKeys(job?.batch_summary?.classes ?? []),
@@ -251,7 +345,9 @@ export function Workbench({
         const resumedAlgorithm = catalog.algorithms.find(
           (item) => item.name === resumed.algorithm_name,
         )
-        setMethodGroup(resumedAlgorithm?.method_group ?? 'Other')
+        setKindFilter('all')
+        setRestrictionFilter('all')
+        setMethodGroup(resumedAlgorithm?.method_group ?? ALL_FAMILIES)
         setProblemValues(resumed.problem_config)
         setAlgorithmValues(resumed.algorithm_config)
         setInstanceSource(resumed.instance_source ?? 'random')
@@ -276,8 +372,8 @@ export function Workbench({
   }, [catalog.algorithms, resumeJobId, onResumeHandled])
 
   useEffect(() => {
-    if (!methodGroups.includes(methodGroup)) {
-      setMethodGroup(methodGroups[0] ?? '')
+    if (methodGroup !== ALL_FAMILIES && !methodGroups.includes(methodGroup)) {
+      setMethodGroup(ALL_FAMILIES)
     }
   }, [methodGroups, methodGroup])
 
@@ -295,6 +391,19 @@ export function Workbench({
       setFirstOnly(false)
     }
   }, [problem])
+
+  // Picking an algorithm that solves one relocation rule sets the matching
+  // problem flag. Declared after the problem-defaults effect so it wins when
+  // both fire together; skipped while a resumed job restores its own config.
+  useEffect(() => {
+    if (!algorithm || !problem || preserveResumedConfig.current) return
+    if (!('restricted_relocation' in problem.config_schema)) return
+    if (algorithm.restriction === 'restricted') {
+      setProblemValues((current) => ({ ...current, restricted_relocation: true }))
+    } else if (algorithm.restriction === 'unrestricted') {
+      setProblemValues((current) => ({ ...current, restricted_relocation: false }))
+    }
+  }, [algorithm, problem])
 
   useEffect(() => {
     if (algorithm) {
@@ -474,7 +583,12 @@ export function Workbench({
             <select
               value={problemName}
               disabled={running}
-              onChange={(event) => setProblemName(event.target.value)}
+              onChange={(event) => {
+                setProblemName(event.target.value)
+                setKindFilter('all')
+                setRestrictionFilter('all')
+                setMethodGroup(ALL_FAMILIES)
+              }}
             >
               {catalog.problems.map((item) => (
                 <option key={item.name}>{item.name}</option>
@@ -504,6 +618,31 @@ export function Workbench({
             onResolvedCount={handleResolvedCount}
           />
 
+          {hasRestrictionInfo && (
+            <div className="field">
+              <span>Relocation rule</span>
+              <div className="segmented" role="group" aria-label="Relocation rule">
+                {RESTRICTION_BUTTONS.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={restrictionFilter === item.id ? 'active' : ''}
+                    aria-pressed={restrictionFilter === item.id}
+                    disabled={running}
+                    onClick={() => setRestrictionFilter(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {restrictionFilter !== 'all' && undeclaredRestriction > 0 && (
+                <small className="description">
+                  {undeclaredRestriction} algorithm(s) do not declare a relocation
+                  rule and are hidden; choose All to see them.
+                </small>
+              )}
+            </div>
+          )}
           <label className="field">
             <span>Algorithm family</span>
             <select
@@ -511,37 +650,41 @@ export function Workbench({
               disabled={running}
               onChange={(event) => setMethodGroup(event.target.value)}
             >
+              <option value={ALL_FAMILIES}>{ALL_FAMILIES}</option>
               {methodGroups.map((item) => <option key={item}>{item}</option>)}
             </select>
           </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={solverOnly}
-              disabled={running}
-              onChange={(event) => setSolverOnly(event.target.checked)}
-            />
-            External solver algorithms only
-          </label>
           <label className="field">
-            <span>Algorithm</span>
+            <span>Algorithm ({groupAlgorithms.length})</span>
             <select
               value={algorithmName}
-              disabled={running}
+              disabled={running || !groupAlgorithms.length}
               onChange={(event) => setAlgorithmName(event.target.value)}
             >
-              {groupAlgorithms.map((item) => {
-                const itemStatus = assess(
-                  item,
-                  problemName,
-                  objectiveMode,
-                  numBays,
-                  numRows,
-                ).status
+              {!groupAlgorithms.length && (
+                <option value="">No algorithm matches these filters</option>
+              )}
+              {(methodGroup === ALL_FAMILIES ? methodGroups : [methodGroup]).map((group) => {
+                const members = groupAlgorithms.filter((item) => item.method_group === group)
+                if (!members.length) return null
                 return (
-                  <option key={item.name} value={item.name}>
-                    {itemStatus === 'degraded' ? `⚠ ${item.name}` : item.name}
-                  </option>
+                  <optgroup key={group} label={group}>
+                    {members.map((item) => {
+                      const itemStatus = assess(
+                        item,
+                        problemName,
+                        objectiveMode,
+                        numBays,
+                        numRows,
+                        restrictedRelocation,
+                      ).status
+                      return (
+                        <option key={item.name} value={item.name}>
+                          {itemStatus === 'degraded' ? `⚠ ${item.name}` : item.name}
+                        </option>
+                      )
+                    })}
+                  </optgroup>
                 )
               })}
             </select>
@@ -552,6 +695,9 @@ export function Workbench({
                 <span>{algorithm.method_group}</span>
                 {algorithm.category !== algorithm.method_group && (
                   <span>{algorithm.category}</span>
+                )}
+                {algorithm.restriction && (
+                  <span>{RESTRICTION_LABELS[algorithm.restriction]}</span>
                 )}
                 <span>{GEOMETRY_LABELS[algorithm.geometry]}</span>
                 <span>{objectiveLabel(algorithm)}</span>

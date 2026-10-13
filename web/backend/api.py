@@ -131,6 +131,7 @@ def _catalog() -> Dict[str, Any]:
                 algorithm_cls.config_schema() if algorithm_cls is not None else {}
             ),
             "step_label": getattr(algorithm_cls, "step_label", "Step"),
+            "restriction": getattr(algorithm_cls, "restriction", None),
             "method_group": (
                 _algorithm_method_group(algorithm_cls)
                 if algorithm_cls is not None

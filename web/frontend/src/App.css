@@ -1085,3 +1085,37 @@ td code {
     max-height: calc(100vh - 180px);
   }
 }
+
+/* Segmented filter buttons (Workbench: method kind, relocation rule) */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.segmented button {
+  flex: 1 1 auto;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d7dee9;
+  border-radius: 6px;
+  background: #fff;
+  color: #455166;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.segmented button:hover:not(:disabled) {
+  border-color: #2563eb;
+}
+
+.segmented button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.segmented button:disabled {
+  background: #f4f6f9;
+  color: #8d99aa;
+  cursor: not-allowed;
+}

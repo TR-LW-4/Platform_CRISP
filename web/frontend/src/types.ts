@@ -32,6 +32,8 @@ export interface ProblemInfo {
 export type AlgorithmGeometry = 'single-bay' | 'multi-bay'
 export type AlgorithmObjective = 'relocations' | 'crane_time' | 'fixed-rule'
 export type AlgorithmFidelity = 'faithful' | 'adapted' | 'degenerate'
+/** Relocation rule an algorithm solves (CRP-D: Dr vs Du). Undeclared = unknown. */
+export type AlgorithmRestriction = 'restricted' | 'unrestricted' | 'both'
 
 export interface AlgorithmInfo {
   name: string
@@ -46,6 +48,7 @@ export interface AlgorithmInfo {
   geometry: AlgorithmGeometry
   objectives: AlgorithmObjective[]
   fidelity: AlgorithmFidelity
+  restriction?: AlgorithmRestriction | null
 }
 
 export interface Catalog {
