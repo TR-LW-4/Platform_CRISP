@@ -4,7 +4,10 @@ Azari and López-Plata come from the overnight run of 5-6 Oct 2026 (code 0fc9a87
 10 Oct 2026 with the valid lower bound LB_f (0cb0f50, jovanovic_2019.md §3.3); its overnight results with the
 literal eq. 44 are archived and shown in a separate table for comparison.
 
-OPT is read from docs/validation/jovanovic_2019.md ("Checks on the O_v difference": O_f,30 exact vs Table 5).
+OPT is the exact rBRP optimum under f2 per instance (A*, jovanovic_2019_checks2/opt_all.jsonl, O_f,30 = f2) for
+3x5, 3x7 and 4x6. Every run is checked against it (f2 >= OPT - 1e-6, else the script stops); the gap is the mean of
+the per-instance gaps. The class means of the exact optima are checked against the OPT column of Table 5 in
+Jovanović et al. (2019), as listed in docs/validation/jovanovic_2019.md ("Checks on the O_v difference").
 Cross-checks per instance: Jovanović against the in-process reference run of 0cb0f50 (refactor_golden), all classes;
 the archived literal Jovanović results against step 5 (step5_b379031.jsonl, check Of30, seed 0) and López-Plata
 against V35 (f2_bench.jsonl), on 3x5, 3x7, 4x6. After writing, every cell is recomputed from the result files and
@@ -12,8 +15,8 @@ compared with the written Markdown and LaTeX.
 
 Inputs (all local, not in git): results/CRP-Time/ (gitignored), and in docs/validation/data/ (excluded locally)
 overnight_2026-10-05/ (jobs.jsonl, driver.log, results_jovanovic_literal_eq44/), rerun_jovanovic_2026-10-10/
-(jobs.jsonl, driver.log), refactor_golden/head_jovanovic_f2_0cb0f50.jsonl, jovanovic_2019_step5/step5_b379031.jsonl
-and lopez_plata_2019/f2_bench.jsonl. The machine of the runs is recorded below, so the output does not depend on the
+(jobs.jsonl, driver.log), refactor_golden/head_jovanovic_f2_0cb0f50.jsonl, jovanovic_2019_step5/step5_b379031.jsonl,
+lopez_plata_2019/f2_bench.jsonl and jovanovic_2019_checks2/opt_all.jsonl. The machine of the runs is recorded below, so the output does not depend on the
 machine that regenerates it.
 
   python docs/benchmark/make_table.py      (from any directory)
@@ -22,6 +25,7 @@ import json
 import re
 import statistics as st
 import sys
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -31,6 +35,8 @@ RERUN_DIR = DATA / "rerun_jovanovic_2026-10-10"
 RESULTS = REPO / "results" / "CRP-Time"
 ARCHIVE = RUN_DIR / "results_jovanovic_literal_eq44"
 JOV_REFERENCE = DATA / "refactor_golden" / "head_jovanovic_f2_0cb0f50.jsonl"
+OPT_FILE = DATA / "jovanovic_2019_checks2" / "opt_all.jsonl"
+OPT_CLASSES = ["3x5", "3x7", "4x6"]
 OUT_DIR = REPO / "docs" / "benchmark"
 # Machine of both runs (the Python of the conda env rl that ran the server)
 RUN_MACHINE = ("AMD Ryzen 7 8700F 8-Core Processor", "3.11.16", "Windows 11 (10.0.26300)")
@@ -44,6 +50,10 @@ ALGOS = [  # display name, result folder, LaTeX name
 JOV_FOLDER = ALGOS[1][1]
 LITERAL_HEADING = "Jovanović with the literal eq. 44 (overnight run, for comparison)"
 TOL = 1e-9
+OPT_TOL = 1e-6  # the A* compares costs rounded to 6 decimals
+AZARI_LIMIT = "n/a¹"
+AZARI_FOOTNOTE = ("Azari's time limits (GBH 3 s, CSUM 5 s) are not logged; the runtimes suggest that they are "
+                  "reached on 5×7, 6×10 and possibly on 4×6 instance 6 (runtime 5.00 s).")
 
 
 def load(folder, cls, base=RESULTS):
@@ -65,29 +75,65 @@ def runtime_cell(values):
     return ms(values, 3 if st.mean(values) < 10 else 1)
 
 
-def opt_from_log():
+def table5_from_log():
+    """OPT column of Table 5 (O_f,30) per class, as listed in jovanovic_2019.md."""
     text = (REPO / "docs" / "validation" / "jovanovic_2019.md").read_text(encoding="utf-8")
     sec = text[text.index("**OPT column of Table 5 — equal to the exact rBRP optimum"):]
-    opt = {}
-    for h, w, exact, table5 in re.findall(r"\| (\d) × (\d+) \| ([\d.]+) \| ([\d.]+) \|", sec[:3000]):
-        assert exact == table5, (h, w, exact, table5)
-        opt[f"{h}x{w}"] = float(table5)
+    return {f"{h}x{w}": float(table5)
+            for h, w, _exact, table5 in re.findall(r"\| (\d) × (\d+) \| ([\d.]+) \| ([\d.]+) \|", sec[:3000])}
+
+
+def exact_opt():
+    """{class: {instance: exact f2 optimum}} for OPT_CLASSES, 40 instances each."""
+    opt = {cls: {} for cls in OPT_CLASSES}
+    for line in open(OPT_FILE, encoding="utf-8"):
+        d = json.loads(line)
+        cls = d["size"].replace("-", "x")
+        if cls in opt:
+            assert d["inst"] not in opt[cls], (cls, d["inst"])
+            opt[cls][d["inst"]] = d["Of30_opt"]
+    for cls, by_inst in opt.items():
+        assert sorted(by_inst) == list(range(1, 41)), (cls, sorted(by_inst))
     return opt
+
+
+def opt_check(opt):
+    """Stop if any run lies below the exact optimum; otherwise one line per algorithm and class."""
+    out, below = [], []
+    for folder, base, label in [(a[1], RESULTS, a[0]) for a in ALGOS] + [(JOV_FOLDER, ARCHIVE, LITERAL_HEADING)]:
+        for cls in OPT_CLASSES:
+            gaps = {i: m["crane_time_f2"] - opt[cls][i] for i, m in load(folder, cls, base).items()}
+            below += [(label, cls, i, g) for i, g in gaps.items() if g < -OPT_TOL]
+            out.append(f"{label}, {cls}: f2 − OPT per instance, smallest {min(gaps.values()):+.2e} s; optimum "
+                       f"reached (|f2 − OPT| ≤ {OPT_TOL:g}) on {sum(abs(g) <= OPT_TOL for g in gaps.values())}/40")
+    if below:
+        raise SystemExit("f2 below the exact optimum (tolerance 1e-6):\n" + "\n".join(map(str, below)))
+    table5 = table5_from_log()
+    for cls in OPT_CLASSES:
+        mean = Decimal(repr(st.mean(opt[cls].values()))).quantize(Decimal("0.1"), ROUND_HALF_UP)
+        assert float(mean) == table5[cls], (cls, mean, table5[cls])
+        out.append(f"Exact OPT, {cls}: class mean {st.mean(opt[cls].values()):.4f} s, rounded half-up to 0.1 s "
+                   f"equal to Table 5 ({table5[cls]:.1f})")
+    return out
 
 
 def row_of(name, runs, cls, opt):
     v = list(runs.values())
     f2 = [x["crane_time_f2"] for x in v]
+    if "time_limit_hit" in v[0]:
+        limit = f"{int(sum(x['time_limit_hit'] for x in v))}/{len(v)}"
+    else:
+        limit = AZARI_LIMIT if name == ALGOS[0][0] else "–"
     row = {"class": cls.replace("x", "×"), "algorithm": name, "n": str(len(v)), "f2": ms(f2, 1),
            "f2vert": ms([x["crane_time_vertical"] for x in v], 1),
            "relocations": ms([x["relocations"] for x in v], 2),
-           "runtime": runtime_cell([x["runtime_s"] for x in v]),
-           "limit": (f"{int(sum(x['time_limit_hit'] for x in v))}/{len(v)}" if "time_limit_hit" in v[0] else "–")}
+           "runtime": runtime_cell([x["runtime_s"] for x in v]), "limit": limit, "gap": "–", "optimal": "–"}
     if cls in opt:
-        gap = st.mean(f2) - opt[cls]
-        row["gap"] = f"{gap:+.2f} ({100 * gap / opt[cls]:+.3f} %)"
-    else:
-        row["gap"] = "–"
+        gaps = [runs[i]["crane_time_f2"] - opt[cls][i] for i in sorted(runs)]
+        gaps = [0.0 if abs(g) <= OPT_TOL else g for g in gaps]  # float noise of an optimal plan
+        pct = [100 * g / opt[cls][i] for g, i in zip(gaps, sorted(runs))]
+        row["gap"] = f"{st.mean(gaps):+.2f} ({st.mean(pct):+.3f} %)"
+        row["optimal"] = f"{sum(abs(g) <= OPT_TOL for g in gaps)}/{len(gaps)}"
     return row
 
 
@@ -97,9 +143,12 @@ def cells(opt):
     for cls in CLASSES:
         for name, folder, _ in ALGOS:
             rows.append(row_of(name, load(folder, cls), cls, opt))
-        rows.append({"class": cls.replace("x", "×"), "algorithm": "OPT (Jovanović et al. 2019, Table 5, O_f,30)" if cls in opt else
-                     "OPT: none in Table 5", "n": "–", "f2": f"{opt[cls]:.1f}" if cls in opt else "–", "f2vert": "–",
-                     "relocations": "–", "runtime": "–", "limit": "–", "gap": "–"})
+        known = cls in opt
+        rows.append({"class": cls.replace("x", "×"),
+                     "algorithm": "OPT (exact rBRP optimum)" if known else "OPT: not computed",
+                     "n": str(len(opt[cls])) if known else "–",
+                     "f2": ms(list(opt[cls].values()), 1) if known else "–", "f2vert": "–",
+                     "relocations": "–", "runtime": "–", "limit": "–", "gap": "–", "optimal": "–"})
     return rows
 
 
@@ -156,21 +205,20 @@ def run_info(run_dir):
     return commit, log[0][:19], log[-1][:19]
 
 
-HEAD = ["Class", "Algorithm", "n", "f2 (s)", "f2vert (s)", "Relocations", "runtime_s (s)", "Limit hit", "f2 − OPT (s, %)"]
-KEYS = ["class", "algorithm", "n", "f2", "f2vert", "relocations", "runtime", "limit", "gap"]
-LIT_HEAD = ["Class", "n", "f2 (s)", "f2vert (s)", "Relocations", "runtime_s (s)", "f2 − OPT (s, %)"]
-LIT_KEYS = ["class", "n", "f2", "f2vert", "relocations", "runtime", "gap"]
+HEAD = ["Class", "Algorithm", "n", "f2 (s)", "f2vert (s)", "Relocations", "runtime_s (s)", "Limit hit",
+        "Mean f2 − OPT (s, %)", "Optimal"]
+KEYS = ["class", "algorithm", "n", "f2", "f2vert", "relocations", "runtime", "limit", "gap", "optimal"]
+LIT_HEAD = ["Class", "n", "f2 (s)", "f2vert (s)", "Relocations", "runtime_s (s)", "Mean f2 − OPT (s, %)", "Optimal"]
+LIT_KEYS = ["class", "n", "f2", "f2vert", "relocations", "runtime", "gap", "optimal"]
 
 
 def tex_cell(v):
-    return v.replace("±", r"$\pm$").replace("%", r"\%").replace("–", "--").replace("−", "$-$")
+    return (v.replace("±", r"$\pm$").replace("%", r"\%").replace("–", "--").replace("−", "$-$")
+            .replace("¹", r"$^{1}$"))
 
 
 def tex_escape(row):
-    name = {a[0]: a[2] for a in ALGOS}.get(row["algorithm"])
-    if name is None:
-        name = (r"OPT (Jovanovi\'{c} et al.\ 2019, Table 5, $O_{f,30}$)" if row["algorithm"].startswith("OPT (")
-                else r"OPT: none in Table 5")
+    name = {a[0]: a[2] for a in ALGOS}.get(row["algorithm"], row["algorithm"])
     return [tex_cell(v) for v in [row["class"].replace("×", r"$\times$"), name] + [row[k] for k in KEYS[2:]]]
 
 
@@ -178,7 +226,7 @@ def tex_literal(row):
     return [tex_cell(v) for v in [row["class"].replace("×", r"$\times$")] + [row[k] for k in LIT_KEYS[1:]]]
 
 
-def write(rows, lit_rows, notes):
+def write(rows, lit_rows, notes, opt_notes):
     cpu, py, os_ = RUN_MACHINE
     commit, t_start, t_end = run_info(RUN_DIR)
     re_commit, re_start, re_end = run_info(RERUN_DIR)
@@ -191,7 +239,9 @@ def write(rows, lit_rows, notes):
         "",
         "- **Objective:** f2 (crane time with constant pick-up/place-down effort, Voß & Schwarze 2019) is optimised; "
         "f2vert is reported from the same runs (the platform evaluates the final plan under both). Relocations are "
-        "measured, not optimised. Restricted BRP, H = T + 2, CRISP time defaults (ts 1.2 s, tpp 30 s).",
+        "measured, not optimised. Restricted BRP, H = T + 2 (set per instance by the Caserta loader; the "
+        "`max_tiers` 3 in the `prob_config` of the result files is the unused form value), CRISP time defaults "
+        "(ts 1.2 s, tpp 30 s).",
         "- **Instances:** Caserta, all 40 instances per class. Seed 0.",
         f"- **Runs:** web jobs through `/api/jobs` (the Workbench path), strictly one after another, one "
         f"instance at a time in one worker process. Azari and López-Plata: overnight run, code `{commit}`, "
@@ -205,15 +255,21 @@ def write(rows, lit_rows, notes):
         "Jovanović: 5000 ACO iterations (defaults). López-Plata: paper parameters (ρ 300, λ 500, θ 40, κ 2, µ 5, "
         "τ 3, node budget 10⁷) with `time_limit_sec` 600, checked before step 2 and after every completed partial "
         "solution (L32); greedy and step 1 are not interrupted.",
-        "- **OPT:** the O_f,30 column of Table 5 in Jovanović et al. (2019), equal to the average exact rBRP "
-        "optimum where checked (`docs/validation/jovanovic_2019.md`, \"Checks on the O_v difference\"); O_f,30 = f2. "
-        "Table 5 has no row for 5×7 and 6×10. Gap: unrounded class mean − OPT (OPT is printed to 0.1 s).",
+        "- **OPT:** the exact rBRP optimum under f2 per instance (A* over bay states, restricted BRP, H = T + 2, "
+        "ts 1.2 s, tpp 30 s; `docs/validation/jovanovic_2019.md`, \"Checks on the O_v difference\"). All three "
+        "algorithms use the restricted rule, so OPT is a lower bound for each of them. Its class means equal the "
+        "O_f,30 column of Table 5 in Jovanović et al. (2019). Not computed for 5×7 and 6×10.",
+        f"- **Gap:** mean over the 40 instances of the per-instance gap f2 − OPT, in s and in % of that "
+        f"instance's OPT. Optimal: instances with |f2 − OPT| ≤ {OPT_TOL:g} s; their gap counts as 0 (float sums "
+        f"in a different order). No instance lies below OPT.",
         "- **Format:** mean ± standard deviation (n − 1) over the 40 instances; runtime_s with 3 decimals below 10 s, "
-        "1 decimal above. Limit hit: López-Plata instances that reached the 600 s limit.",
+        "1 decimal above. Limit hit: López-Plata instances that reached the 600 s limit; Jovanović has no "
+        "wall-clock limit.",
         "",
     ]
     md = ["| " + " | ".join(HEAD) + " |", "|" + "---|" * len(HEAD)]
     md += ["| " + " | ".join(r[k] for k in KEYS) + " |" for r in rows]
+    md += ["", f"¹ {AZARI_FOOTNOTE}"]
     lit = ["", f"## {LITERAL_HEADING}", "",
            f"Code `{commit}`, same overnight run as Azari and López-Plata; result files archived in "
            "`docs/validation/data/overnight_2026-10-05/results_jovanovic_literal_eq44/` (local).", "",
@@ -221,16 +277,18 @@ def write(rows, lit_rows, notes):
     lit += ["| " + " | ".join(r[k] for k in LIT_KEYS) + " |" for r in lit_rows]
     checks = ["", "**Cross-checks (per instance, f2, f2vert and relocations, tolerance 1e-6):**", ""]
     checks += [f"- {n}" for n in notes]
+    checks += ["", "**Exact optimum (per instance, f2):**", ""]
+    checks += [f"- {n}" for n in opt_notes]
     (OUT_DIR / "crp_time_f2_comparison.md").write_text("\n".join(intro + md + lit + checks) + "\n", encoding="utf-8")
     tex = [
         "% CRP-Time comparison under f2, generated by make_table.py from the web runs; see crp_time_f2_comparison.md for the setup.",
         r"\begin{table}[htbp]",
         r"\centering",
         r"\small",
-        r"\begin{tabular}{llrlllllr}",
+        r"\begin{tabular}{llrlllllrr}",
         r"\toprule",
         " & ".join(["Class", "Algorithm", "$n$", "$f_2$ (s)", r"$f_2^{\mathrm{vert}}$ (s)", "Relocations",
-                     "Runtime (s)", "Limit hit", r"$f_2 - \mathrm{OPT}$ (s, \%)"]) + r" \\",
+                     "Runtime (s)", "Limit hit", r"Mean $f_2 - \mathrm{OPT}$ (s, \%)", "Optimal"]) + r" \\",
         r"\midrule",
     ]
     for i, r in enumerate(rows):
@@ -238,16 +296,17 @@ def write(rows, lit_rows, notes):
         if r["algorithm"].startswith("OPT") and i != len(rows) - 1:
             tex.append(r"\midrule")
     tex += [r"\bottomrule", r"\end{tabular}",
-            r"\caption{CRP-Time, Caserta instances, 40 per class, seed 0: $f_2$ optimised, $f_2^{\mathrm{vert}}$ reported from the same runs; mean $\pm$ standard deviation. OPT: $O_{f,30}$ column of Table 5 in Jovanovi\'{c} et al.\ (2019). Jovanovi\'{c} with the valid lower bound $LB_f$ (eq.~44 without the $t_s$ per non-well-located container; deviation from the paper). L\'{o}pez-Plata with a 600 s time limit per instance.}",
+            r"\par\smallskip\footnotesize $^{1}$ " + tex_cell(AZARI_FOOTNOTE).replace("×", r"$\times$"),
+            r"\caption{CRP-Time, Caserta instances, 40 per class, seed 0: $f_2$ optimised, $f_2^{\mathrm{vert}}$ reported from the same runs; mean $\pm$ standard deviation. OPT: exact restricted-BRP optimum under $f_2$ per instance; its class means equal the $O_{f,30}$ column of Table 5 in Jovanovi\'{c} et al.\ (2019). Gap: mean of the per-instance gaps; Optimal: instances with $|f_2 - \mathrm{OPT}| \le 10^{-6}$ s. Jovanovi\'{c} with the valid lower bound $LB_f$ (eq.~44 without the $t_s$ per non-well-located container; deviation from the paper). L\'{o}pez-Plata with a 600 s time limit per instance.}",
             r"\label{tab:crp-time-f2-comparison}", r"\end{table}",
             "",
             r"\begin{table}[htbp]",
             r"\centering",
             r"\small",
-            r"\begin{tabular}{lrlllll}",
+            r"\begin{tabular}{lrllllrr}",
             r"\toprule",
             " & ".join(["Class", "$n$", "$f_2$ (s)", r"$f_2^{\mathrm{vert}}$ (s)", "Relocations", "Runtime (s)",
-                         r"$f_2 - \mathrm{OPT}$ (s, \%)"]) + r" \\",
+                         r"Mean $f_2 - \mathrm{OPT}$ (s, \%)", "Optimal"]) + r" \\",
             r"\midrule"]
     tex += [" & ".join(tex_literal(r)) + r" \\" for r in lit_rows]
     tex += [r"\bottomrule", r"\end{tabular}",
@@ -290,16 +349,16 @@ def main():
         n_jobs, bad = jobs_check(run_dir)
         print(f"{run_dir.name}/jobs.jsonl: {n_jobs} jobs, not completed / not 40 files / missing runtime_s: "
               f"{bad or 'none'}")
-    opt = opt_from_log()
-    print("OPT from jovanovic_2019.md:", {k: v for k, v in opt.items() if k in CLASSES})
-    opt = {k: v for k, v in opt.items() if k in CLASSES}
     for folder, base in [(a[1], RESULTS) for a in ALGOS] + [(JOV_FOLDER, ARCHIVE)]:
         for cls in CLASSES:
             ids = sorted(load(folder, cls, base))
             assert ids == list(range(1, 41)), (folder, base, cls, ids)
+    opt = exact_opt()
+    opt_notes = opt_check(opt)
+    print("\n".join(opt_notes))
     notes = cross_checks()
     print("\n".join(notes))
-    write(cells(opt), literal_cells(opt), notes)
+    write(cells(opt), literal_cells(opt), notes, opt_notes)
     n_main, n_lit = verify(opt)
     print(f"verified {n_main} + {n_lit} rows in Markdown and LaTeX against the result files")
 
