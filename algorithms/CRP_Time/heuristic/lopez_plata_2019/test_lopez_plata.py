@@ -1256,10 +1256,10 @@ class TestPlatform(unittest.TestCase):
     def test_ui_values_reach_the_steps(self):
         t0 = time.monotonic()
         seen = self._captured({"theta": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "mu": 2,
-                               "tau": 4, "seed": 9, "time_limit_sec": 60})
+                               "tau": 4, "time_limit_sec": 60})
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": 0, "lam": 7, "node_budget": 12345, "rho": 3, "kappa": 1, "tau": 4, "mu": 2})
-        self.assertEqual(seen["draw"], random.Random(9).random())
+        self.assertEqual(seen["draw"], random.Random(0).random())   # the seed is not a field: 0
         self.assertTrue(t0 + 60 <= seen["deadline"] <= time.monotonic() + 60)
 
     def test_catalog_name(self):
@@ -1272,7 +1272,7 @@ class TestPlatform(unittest.TestCase):
 
     def test_ui_rejects_removed_fields(self):
         from web.backend.api import _config_values
-        for key in ("delta", "max_partial_nodes", "alpha1", "eta1"):
+        for key in ("delta", "max_partial_nodes", "alpha1", "eta1", "seed"):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 _config_values(LopezPlata2019Heuristic.config_schema(), {key: 1})
 

@@ -80,6 +80,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     geometry = "single-bay"
     objectives = ["crane_time"]
     fidelity = "faithful"
+    relocation_rule = "restricted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -91,7 +92,6 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     def config_schema(cls) -> Dict:
         base = super().config_schema()
         base.update({
-            "seed": {**base["seed"], "help": "Seed of the roulette wheel of step 2, the only random component."},
             "theta": {
                 "type": "int", "default": 40, "min": 0, "max": 100,
                 "label": "Depth percentage (θ)",
@@ -139,8 +139,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                         "and step 1 are not interrupted. Not in the paper (L32).",
             },
         })
-        # Not read by this method.
-        for key in ("max_iterations", "report_interval"):
+        # max_iterations and report_interval are not read; the seed is not a field, so it stays 0.
+        for key in ("max_iterations", "report_interval", "seed"):
             base.pop(key)
         return base
 
@@ -242,7 +242,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 metric=primary,
                 metrics=final_metrics,
                 progress=(seed_idx + 1) / n_seeds,
-                snapshot=env_final.get_state_snapshot() if hasattr(env_final, "get_state_snapshot") else None,
+                snapshot=env_final.get_state_snapshot(),
                 extra={"operating_cost": f_plan} if operating else None,
             )
 

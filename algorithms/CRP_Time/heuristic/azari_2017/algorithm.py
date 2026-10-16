@@ -53,6 +53,7 @@ class Azari2017CSUM(BaseAlgorithm):
     geometry = "single-bay"
     objectives = ["crane_time"]
     fidelity = "faithful"
+    relocation_rule = "restricted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -74,7 +75,6 @@ class Azari2017CSUM(BaseAlgorithm):
                 break
 
             env = problem_factory()
-            env.config.seed = int(cfg.seed) + seed_idx
             stacks, positions = read_bay(env)
             objective_spec = ObjectiveSpec.from_config(env.config)
             check_objective(objective_spec, self.name)
@@ -98,7 +98,7 @@ class Azari2017CSUM(BaseAlgorithm):
             extra = {"csum_solution_found": found}
 
             plan = replay(stacks, positions, moves)
-            metrics, _ = finish(problem_factory, plan, objective_spec, self.name)
+            metrics, env_final = finish(problem_factory, plan, objective_spec, self.name)
             all_metrics.append(metrics)
 
             primary = float(metrics["objective_value"])
@@ -112,7 +112,7 @@ class Azari2017CSUM(BaseAlgorithm):
                 metric=primary,
                 metrics=metrics,
                 progress=(seed_idx + 1) / n_seeds,
-                snapshot=env.get_state_snapshot(),
+                snapshot=env_final.get_state_snapshot(),
                 extra=extra,
             )
 
@@ -136,16 +136,9 @@ class Azari2017CSUM(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         base = super().config_schema()
-        # Not read by this method.
-        for key in ("max_iterations", "report_interval"):
+        # max_iterations and report_interval are not read; the seed is not a field, so it stays 0.
+        for key in ("max_iterations", "report_interval", "seed"):
             base.pop(key)
-        base["seed"] = {
-            **base["seed"],
-            "help": (
-                "No effect: GBH and CSUM have no random component, and the "
-                "layout is read from the Caserta file."
-            ),
-        }
         base.update({
             "gbh_time_limit_s": {
                 "type": "float", "default": 3.0, "min": 0.1, "max": 120.0,

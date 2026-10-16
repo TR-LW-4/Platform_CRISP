@@ -63,6 +63,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     geometry            = "single-bay"
     objectives          = ["crane_time"]
     fidelity            = "faithful"
+    relocation_rule     = "restricted"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
@@ -162,7 +163,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
             # ── End of seed ───────────────────────────────────────────── #
             best_plan = replay(stacks_init, positions, decode(S_best, stacks_init, n_total))
-            metrics, _ = finish(problem_factory, best_plan, objective_spec, self.name)
+            metrics, env_final = finish(problem_factory, best_plan, objective_spec, self.name)
             all_metrics.append(metrics)
 
             # <=: the progress pushes have already lowered _best_metric to best_cost
@@ -176,7 +177,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 metric   = float(best_cost),
                 metrics  = metrics,
                 progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
+                snapshot = env_final.get_state_snapshot(),
             )
 
         if all_metrics:
@@ -202,8 +203,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     @classmethod
     def config_schema(cls) -> Dict:
         base = super().config_schema()
-        # Not read by this method.
-        for key in ("max_iterations", "report_interval"):
+        # max_iterations and report_interval are not read; the seed is not a field, so it stays 0.
+        for key in ("max_iterations", "report_interval", "seed"):
             base.pop(key)
         base.update({
             "n_iterations": {

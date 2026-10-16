@@ -749,3 +749,5 @@ Result: every objective behaves as fixed in advance, so there is no new deviatio
 Scripts and results: `docs/validation/data/jovanovic_2019_step5/` (local, not in git).
 
 **UI clean-up (7 Oct 2026).** `max_iterations` and `report_interval` (never read) left the schema and `[single-bay origin]` and the equation numbers left the description, and 3×5-1, 4×6-1 and 5×7-1 rerun from the new schemas reproduce the overnight result files exactly (metrics, moves, file name).
+
+**UI (16 Oct 2026).** The seed field left the schema; the colony is seeded with 0, as in all benchmark runs. Also the Workbench shows the relocation rule as a chip ("Restricted relocations", `relocation_rule = "restricted"`), the crane-time model is a fixed preset (f2 or f2vert with the Voß & Schwarze values; the parameter fields are hidden, so result names do not change), and the final record's snapshot is the bay after the problem has replayed the plan (before: the initial bay). Checked: a Workbench job on 3×4-1 completes and is saved under the f2 name hash of the stored results; the golden runs (200 f2, 15 f2vert) are bit-identical to `99ea9ef`.
