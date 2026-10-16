@@ -148,12 +148,43 @@ class CRP_Time(CRP_R):
         schema = cls._crane_time_schema()
         for key in ("num_cranes", "crane_speed"):
             schema.pop(key)
+        # Fixed presets: the time model alone selects the Voß–Schwarze (2019)
+        # parameters. They stay in the schema, hidden, because they are part
+        # of the result-file and Compare-group hashes.
+        preset = {
+            key: schema[key]["default"]
+            for key in (
+                "stack_s_per_stack",
+                "pickup_place_s",
+                "empty_vertical_s_per_tier",
+                "loaded_vertical_s_per_tier",
+                "outside_height",
+            )
+        }
+        for key in preset:
+            schema[key] = {
+                **schema[key],
+                "visibleWhen": {"key": "time_model", "values": []},
+            }
         schema["time_model"] = {
             **schema["time_model"],
             "options": ["f2", "f2_vertical"],
+            "optionLabels": {
+                "f2": (
+                    f"f2 (ts {preset['stack_s_per_stack']:g} s, "
+                    f"tpp {preset['pickup_place_s']:g} s)"
+                ),
+                "f2_vertical": (
+                    f"f2vert (ts {preset['stack_s_per_stack']:g} s, "
+                    f"tr0 {preset['empty_vertical_s_per_tier']:g} s, "
+                    f"tr1 {preset['loaded_vertical_s_per_tier']:g} s, "
+                    f"hout {preset['outside_height']:g})"
+                ),
+            },
             "help": (
                 "Voß–Schwarze (2019) f2 (constant pick-up/place-down time) "
-                "or f2vert (tier-dependent)."
+                "or f2vert (tier-dependent), with the parameter values of "
+                "Voß & Schwarze (2019)."
             ),
         }
         return schema

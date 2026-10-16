@@ -12,6 +12,7 @@ import {
 } from '../metricDisplay'
 import type {
   AlgorithmFidelity,
+  AlgorithmRelocationRule,
   AlgorithmGeometry,
   AlgorithmInfo,
   BatchClassSummary,
@@ -60,6 +61,11 @@ const FIDELITY_LABELS: Record<AlgorithmFidelity, string> = {
   faithful: 'Faithful reproduction',
   adapted: 'Platform adaptation',
   degenerate: 'Degenerate baseline',
+}
+
+const RELOCATION_RULE_LABELS: Record<AlgorithmRelocationRule, string> = {
+  restricted: 'Restricted relocations',
+  unrestricted: 'Unrestricted relocations',
 }
 
 // Objective modes under which crane time is part of what is minimised.
@@ -591,6 +597,9 @@ export function Workbench({
                 )}
                 <span>{GEOMETRY_LABELS[algorithm.geometry]}</span>
                 <span>{objectiveLabel(algorithm)}</span>
+                {algorithm.relocation_rule && (
+                  <span>{RELOCATION_RULE_LABELS[algorithm.relocation_rule]}</span>
+                )}
                 {algorithm.fidelity !== 'faithful' && (
                   <span>{FIDELITY_LABELS[algorithm.fidelity]}</span>
                 )}

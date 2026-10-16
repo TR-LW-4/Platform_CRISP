@@ -15,6 +15,8 @@ export interface ConfigField {
   help?: string
   options?: ConfigValue[]
   choices?: ConfigValue[]
+  /** Text shown for an option instead of its value. */
+  optionLabels?: Record<string, string>
   visibleWhen?: VisibilityCondition | VisibilityCondition[]
 }
 
@@ -35,6 +37,7 @@ export interface ProblemInfo {
 export type AlgorithmGeometry = 'single-bay' | 'multi-bay'
 export type AlgorithmObjective = 'relocations' | 'crane_time' | 'fixed-rule'
 export type AlgorithmFidelity = 'faithful' | 'adapted' | 'degenerate'
+export type AlgorithmRelocationRule = 'restricted' | 'unrestricted'
 
 export interface AlgorithmInfo {
   name: string
@@ -49,6 +52,8 @@ export interface AlgorithmInfo {
   geometry: AlgorithmGeometry
   objectives: AlgorithmObjective[]
   fidelity: AlgorithmFidelity
+  /** null if the algorithm does not declare its relocation rule. */
+  relocation_rule: AlgorithmRelocationRule | null
 }
 
 export interface Catalog {

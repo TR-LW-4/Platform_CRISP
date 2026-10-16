@@ -71,7 +71,7 @@ export function ParameterForm({
               >
                 {options.map((option) => (
                   <option key={String(option)} value={String(option)}>
-                    {String(option)}
+                    {field.optionLabels?.[String(option)] ?? String(option)}
                   </option>
                 ))}
               </select>

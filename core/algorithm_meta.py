@@ -18,6 +18,14 @@ Three attributes are declared on every ``BaseAlgorithm`` subclass:
 ``fidelity``
     How close the implementation is to the published method.
 
+One attribute is optional:
+
+``relocation_rule``
+    ``restricted`` if the published method only relocates the containers above
+    the current target, ``unrestricted`` if it may relocate any top container;
+    absent (``None``) if not declared. Results are compared only between methods
+    with the same rule.
+
 Degradation is *derived*, never stored: a single-bay method is perfectly valid
 under a relocation-count objective no matter how the yard is shaped, and only
 becomes a weak baseline once crane time enters the objective on a yard that
@@ -75,6 +83,10 @@ FIDELITY_LABELS = {
     FIDELITY_DEGENERATE: "Degenerate baseline",
 }
 
+RELOCATION_RESTRICTED = "restricted"
+RELOCATION_UNRESTRICTED = "unrestricted"
+RELOCATION_RULES = (RELOCATION_RESTRICTED, RELOCATION_UNRESTRICTED)
+
 # Assessment outcomes, ordered from best to worst.
 STATUS_OK = "ok"
 STATUS_DEGRADED = "degraded"
@@ -96,6 +108,7 @@ def algorithm_meta(cls: type) -> Dict[str, Any]:
             getattr(cls, "objectives", None) or [OBJECTIVE_RELOCATIONS]
         ),
         "fidelity": getattr(cls, "fidelity", FIDELITY_FAITHFUL),
+        "relocation_rule": getattr(cls, "relocation_rule", None),
     }
 
 
@@ -242,6 +255,10 @@ def validate_meta(cls: type) -> List[str]:
     if meta["fidelity"] not in FIDELITIES:
         problems.append(
             f"fidelity {meta['fidelity']!r} not in {list(FIDELITIES)}"
+        )
+    if meta["relocation_rule"] not in (None, *RELOCATION_RULES):
+        problems.append(
+            f"relocation_rule {meta['relocation_rule']!r} not in {list(RELOCATION_RULES)}"
         )
 
     objectives: Sequence[str] = meta["objectives"]
