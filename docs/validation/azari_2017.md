@@ -4,6 +4,8 @@ Paper: E. Azari, H. Eskandari, A. Nourmohammadi, "Decreasing the crane working t
 
 Code: `algorithms/CRP_Time/heuristic/azari_2017/`
 
+File:line references without a commit of their own point to the code at `fec8fb1`, the last commit before the PlatEMO-style refactor (Azari's code there is that of `584d656`); the refactor in `92d5be5` split `algorithm.py` into `gbh.py`, `csum.py`, `branching.py` and `lower_bound.py`.
+
 ## 1. Specification from the paper
 
 ### Problem setting (Sec. 2–3, p. 311)
@@ -317,7 +319,20 @@ Before the fix, stack 7 was rejected only because of stack 5, which is BB and is
 
 Requires the Ünlüyurt & Aydın (2012) instances and their time model; neither is available.
 
-### Check 4 — under the crane-time-only setting (f2 / f2vert) — **not done**
+### Check 4 — under the crane-time-only setting (f2 / f2vert) — **done for f2** (16 Oct 2026)
+
+Per instance against the exact optimum, on the f2 benchmark in `results/CRP-Time` (web run of 5–6 Oct 2026, code `0fc9a87`; Caserta, 40 instances per class, GBH 3 s, CSUM 5 s). OPT is the exact restricted-BRP optimum under f2 per instance (A* over bay states, H = T + 2, ts 1.2 s, tpp 30 s; `docs/validation/data/jovanovic_2019_checks2/opt_all.jsonl`, method in `jovanovic_2019.md`, "Checks on the O_v difference"). Azari is restricted as well, so OPT is a lower bound for its plans. Gap: mean over the 40 instances of the per-instance gap f2 − OPT, in s and in % of that instance's OPT; optimal: |f2 − OPT| ≤ 10⁻⁶ s. Computed with `docs/benchmark/make_table.py` (`bad657d`).
+
+| Class | Mean f2 − OPT (s) | Mean f2 − OPT (%) | Optimal |
+|---|---|---|---|
+| 3 × 5 | +3.72 | +0.456 | 22/40 |
+| 3 × 7 | +7.11 | +0.601 | 19/40 |
+| 4 × 6 | +10.62 | +0.751 | 11/40 |
+
+- No instance lies below OPT: the smallest per-instance gap is −4.6·10⁻¹³ s (float sums in a different order).
+- On 3 × 5 and 3 × 7, GBH and CSUM exhaust their search trees within the limits (longest run 0.04 s, and the runs without time limits give the same plans on all 80 instances), so the non-optimal results there come from the restricted branching and the NMOV pruning, not from the time limit.
+- On 4 × 6, 27 of the 29 non-optimal instances also finished within 1 s. Instance 6 (5.00 s, +64.8 s) probably reached the CSUM limit and instance 36 (3.03 s, +14.4 s) possibly the GBH limit; Azari does not log whether a limit was reached.
+- f2vert: not run on the benchmark.
 
 ### Check 5 — GBH as depth-first search (since `6cf6b3c`) — **passes**
 

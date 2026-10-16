@@ -56,8 +56,8 @@ def greedy(
                     best_score = score
                     best_dst   = dst
 
-            # R_c is empty (eq. 1): Alg. 1 cannot continue, so S_g and
-            # tau_0 (eq. 37) are undefined.
+            # No stack can take the blocker: Alg. 1 cannot continue, so neither the
+            # greedy solution S_g nor the initial pheromone tau_0 is defined.
             if best_dst < 0:
                 raise ValueError(
                     f"Jovanović greedy start (Alg. 1): no free stack for container "

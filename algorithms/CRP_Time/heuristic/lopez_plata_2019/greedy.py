@@ -1,6 +1,6 @@
 """
 The greedy of López-Plata et al. (2019), Sec. 7.1, which gives the upper bound for step 1, and
-the depth beta of step 1 that follows from the length of its solution (eq. 29-30). Stacks are
+the depth beta of step 1 that follows from the length of its solution. Stacks are
 numbered 1..n_S.
 """
 
@@ -15,8 +15,8 @@ from .bay import Bay, Move
 
 def greedy(bay: Bay) -> Tuple[List[Move], float]:
     """Greedy of Sec. 7.1 (p. 445) from the configuration of bay: relocate c+ to the
-    stack with the lowest m' (eq. 2, drop tier n(s') + 1), ties to the lowest stack
-    index (O19). Returns the moves and their cost (eq. 3)."""
+    stack with the lowest loaded-trip cost m' (drop tier n(s') + 1), ties to the lowest stack
+    index (O19). Returns the moves and their cost."""
     bay = bay.copy()
     cost, phi, total = bay.cost, [], 0
     while bay.target is not None:
@@ -37,7 +37,7 @@ def greedy(bay: Bay) -> Tuple[List[Move], float]:
 
 
 def p(n_C: int) -> Fraction:
-    """Eq. 30 (p. 446) with the end values swapped (O02 (c)): the printed ramp runs from 1.5
+    """Factor p of the depth beta (p. 446), with the end values swapped (O02 (c)): the printed ramp runs from 1.5
     at n_C = 9 to 0.5 at n_C = 25, so the printed ends 0.5 and 1.5 are read as a misprint."""
     if n_C <= 9:
         return Fraction(3, 2)
@@ -47,5 +47,5 @@ def p(n_C: int) -> Fraction:
 
 
 def beta(phi_len: int, n_C: int, theta: float = 40) -> int:
-    """Eq. 29 (p. 446): depth of step 1 in moves, from the length of the greedy solution."""
+    """Depth beta of step 1 in moves (p. 446): theta percent of the length of the greedy solution, times p(n_C)."""
     return math.floor(phi_len * Fraction(theta) / 100 * p(n_C))

@@ -4,6 +4,8 @@ Paper: R. Jovanovic, M. Tuba, S. Voß, "An efficient ant colony optimization alg
 
 Code: `algorithms/CRP_Time/heuristic/jovanovic_2019_aco/`
 
+File:line references without a commit of their own point to the code at `fec8fb1`, the last commit before the PlatEMO-style refactor (Jovanović's code there is that of `c0c2f44`); the refactor in `0778e71` split `algorithm.py` and `scoring.py` into modules, and references to later code name a module and function instead of a line.
+
 ## 1. Specification from the paper
 
 ### Problem setting (p. 79)
@@ -315,6 +317,20 @@ Result:
 | 4 × 5 | 2429.2 | 2424.6 | +4.6 | 20.2 |
 
 Result: the error of the code is below E_ACO on all 8 sizes, by a wide margin: +4.6 against 20.2 on 4 × 5 and +6.8 against 25.5 on 3 × 8. See the open observation below.
+
+### Check 4 — crane-time-only setting (f2), per instance against the exact optimum — **done** (16 Oct 2026)
+
+The objective is that of Check 2 (O_f,30 = f2, §3.1), here per instance and on the f2 benchmark in `results/CRP-Time` (web rerun of 10 Oct 2026 with the valid LB_f, code `0cb0f50`; Caserta, 40 instances per class, 5000 iterations, seed 0). OPT is the exact restricted-BRP optimum under f2 per instance (A* over bay states, H = T + 2, ts 1.2 s, tpp 30 s; `docs/validation/data/jovanovic_2019_checks2/opt_all.jsonl`, method in `jovanovic_2019.md`, "Checks on the O_v difference"). The ACO is restricted as well, so OPT is a lower bound for its plans. Gap: mean over the 40 instances of the per-instance gap f2 − OPT, in s and in % of that instance's OPT; optimal: |f2 − OPT| ≤ 10⁻⁶ s. Computed with `docs/benchmark/make_table.py` (`bad657d`).
+
+| Class | Mean f2 − OPT (s) | Mean f2 − OPT (%) | Optimal |
+|---|---|---|---|
+| 3 × 5 | +0.00 | +0.000 | 40/40 |
+| 3 × 7 | +0.00 | +0.000 | 40/40 |
+| 4 × 6 | +0.36 | +0.025 | 37/40 |
+
+- No instance lies below OPT: the smallest per-instance gap is −4.6·10⁻¹³ s (float sums in a different order).
+- The three non-optimal instances of 4 × 6 (12, 28 and 36) are each 4.8 s above OPT.
+- f2vert: not run on the benchmark.
 
 ### Seed spread
 

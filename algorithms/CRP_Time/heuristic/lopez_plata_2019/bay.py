@@ -45,7 +45,7 @@ class Bay:
         return next(s for s, st in enumerate(self.stacks, 1) if self.target in st)
 
     def apply(self, move: Move) -> float:
-        """Carry out one move; return its term of eq. 3: the empty trip from the
+        """Carry out one move; return its cost: the empty trip from the
         last drop to the pickup plus the loaded trip to the drop."""
         s, s2 = move
         self._check(s, s2)
@@ -94,6 +94,6 @@ class Bay:
 
 
 def f(stacks: Sequence[Sequence[int]], phi: Iterable[Move], cost: CostModel) -> float:
-    """Eq. 3 for a (partial) solution phi, starting from the initial configuration."""
+    """Cost of a (partial) solution phi, the sum of its move costs, starting from the initial configuration."""
     bay = Bay(stacks, cost)
     return sum(bay.apply(move) for move in phi)

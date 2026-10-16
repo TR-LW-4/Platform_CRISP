@@ -2,7 +2,7 @@
 LopezPlata2019Heuristic
 <2019> <heuristic> <time> <single-bay> <CRP-Time>
 A*-based heuristic for the restricted BRP, converted to crane time (f2 / f2vert)
-theta       --- 40 ---       Percentage in eq. 29 for the depth beta of step 1
+theta       --- 40 ---       Percentage of the greedy length for the depth beta of step 1
 lam         --- 500 ---      Nodes per subset N_g and N_q (lambda)
 node_budget --- 10000000 --- Nodes visited by step 1 (not in the paper, L18)
 rho         --- 300 ---      Iterations of step 2
@@ -188,7 +188,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             root = Bay(init_stacks, cost)
             n_C = sum(len(st) for st in init_stacks)
 
-            # ----- Step 1 (Sec. 6.1): the greedy (Sec. 7.1) gives ub and |phi| for beta (eq. 29),
+            # ----- Step 1 (Sec. 6.1): the greedy (Sec. 7.1) gives ub and |phi|, from which beta follows;
             # Algorithm 1 runs to depth beta within the node budget (L18), and N = N_g + N_q -----
             greedy_phi, ub = greedy(root)
             depth = beta(len(greedy_phi), n_C, theta)

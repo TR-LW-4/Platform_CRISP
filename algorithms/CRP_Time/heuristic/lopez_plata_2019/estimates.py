@@ -1,6 +1,6 @@
 """
-Estimates of López-Plata et al. (2019) used by the search: h, the estimate of the remaining cost
-(eq. 21-22), and q, the quality of a configuration (eq. 23-26). Both work on a Bay; stacks are
+Estimates of López-Plata et al. (2019) used by the search: h, the estimate of the remaining cost,
+and q, the quality of a configuration. Both work on a Bay; stacks are
 numbered 1..n_S.
 """
 
@@ -27,13 +27,13 @@ def h(bay: Bay) -> float:
 
 
 def q(bay: Bay, n_C: int) -> float:
-    """Quality of a configuration (eq. 23-26, p. 443-444), lower is better:
+    """Quality of a configuration (p. 443-444), lower is better:
     sum over the blocks c of q_b(c) + q_c(c) / n_C + q_r(c) / maxDist, with n_C the
     number of blocks of the instance and maxDist = max_s d(s, 0) = n_S."""
     max_dist = len(bay.stacks)
     total = 0.0
     for s, stack in enumerate(bay.stacks, 1):
         for c, bad in zip(stack, non_located(stack)):
-            q_c = abs(c - min(stack)) if len(stack) > 1 else c - bay.target   # eq. 24
-            total += bad + q_c / n_C + s / max_dist                           # eq. 23, 25
+            q_c = abs(c - min(stack)) if len(stack) > 1 else c - bay.target   # distance to the stack's lowest number
+            total += bad + q_c / n_C + s / max_dist                           # q_b + q_c / n_C + q_r / maxDist
     return total

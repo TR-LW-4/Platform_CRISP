@@ -7,6 +7,8 @@
 
 Page numbers refer to the journal pagination (436–452). "Eq." refers to the paper's equation numbers.
 
+File:line references without a commit of their own point to the code at `fec8fb1`, the last commit before the PlatEMO-style refactor (López-Plata's code there is that of `bafedc6`); the refactor in `2b395bd` split and renamed the modules, one per step.
+
 ---
 
 ## §0 Goal and ground rules
@@ -486,6 +488,17 @@ Neither depends on the crane position. Defaults: $ts$ = 1.2, $tpp$ = 30, $tr_0$ 
 **Metadata (`2d9ab40`).** `objectives = ["crane_time"]`. The operating cost stays available only through an internal switch without a schema field, so that V01 and V22 stay reproducible; in crane-time mode the metric `operating_cost` is not reported, and `train()` raises if its own f of the plan differs from the platform's crane time by more than 1e-6. Display name since V37: "López-Plata et al. (2019) A∗-Based Heuristic", with ∗ (U+2217), matching the heading of Sec. 6 on p. 443, "6. Heuristic algorithm based on A∗" (Thom, from the page image). The name also names the result folder; `224dce5` used an ASCII "*", which Windows does not allow in a folder name, so every UI job ended "failed" when its result was saved (V37). Before that: "Operating-Cost Heuristic"; `results/` held nothing under either earlier name.
 
 **Validation plan (h.1–h.8).** 1: every move equals the platform evaluator (done, `TestCraneTime`). 2: h ≤ the exact remaining time in every reachable state, both models, four parameter sets, with the literal eq. 22 as a mutant that fails (done, V28). 3: incremental h exact (done, V28). 4: hand examples (V29, checked by Thom). 5 and 7: complete runs with the exact optima (V30). 6: comparison with the operating-cost version (V31). 8: runtime on 5×5-1 (V32) and on instance 1 of 3×6–3×8, 4×5–4×7 and 5×4 (V34). UI check in crane-time mode: V33. Voß & Schwarze (2019) is used for the setup and the parameter values only, not as a benchmark for results.
+
+**Check against the exact optimum (f2 benchmark, 16 Oct 2026).** Per instance, on the f2 benchmark in `results/CRP-Time` (web run of 5–6 Oct 2026, code `0fc9a87`; Caserta, 40 instances per class, paper parameters, `time_limit_sec` 600, seed 0; no instance of these classes reached the limit). OPT is the exact restricted-BRP optimum under f2 per instance (A* over bay states, H = T + 2, ts 1.2 s, tpp 30 s; `docs/validation/data/jovanovic_2019_checks2/opt_all.jsonl`, method in `jovanovic_2019.md`, "Checks on the O_v difference"). López-Plata is restricted as well, so OPT is a lower bound for its plans. Gap: mean over the 40 instances of the per-instance gap f2 − OPT, in s and in % of that instance's OPT; optimal: |f2 − OPT| ≤ 10⁻⁶ s. Computed with `docs/benchmark/make_table.py` (`bad657d`).
+
+| Class | Mean f2 − OPT (s) | Mean f2 − OPT (%) | Optimal |
+|---|---|---|---|
+| 3 × 5 | +0.39 | +0.043 | 39/40 |
+| 3 × 7 | +0.39 | +0.032 | 38/40 |
+| 4 × 6 | +1.98 | +0.138 | 32/40 |
+
+- No instance lies below OPT: the smallest per-instance gap is −2.3·10⁻¹³ s (float sums in a different order).
+- f2vert: not run on the benchmark.
 
 ## §5 Deviations and assumptions
 

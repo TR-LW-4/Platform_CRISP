@@ -73,6 +73,6 @@ class TimeModel:
         return self.move(None, s, pick, d, drop)
 
     def q_m(self, s: int, n_s: int, d: int, n_d: int) -> int:
-        """Eq. 27 in crane time: the time of relocating c+ from s to the top of d. The empty return
-        trip of eq. 27 has no cost of its own, because f2 and f2vert do not depend on the crane position."""
+        """q_m in crane time: the time of relocating c+ from s to the top of d. The empty return
+        trip in q_m has no cost of its own, because f2 and f2vert do not depend on the crane position."""
         return self.move(None, s, n_s, d, n_d + 1)

@@ -16,12 +16,13 @@ MQ = (1.0, 2.0, 1.0, 0.5)   # mq_m, mq_b, mq_c, mq_r (p. 446)
 
 
 def q_m(bay: Bay, s: int, d: int) -> float:
-    """Eq. 27 from the cost model: relocating c+ from s to the top of d."""
+    """q_m from the cost model: relocating c+ from s to the top of d."""
     return bay.cost.q_m(s, len(bay.stacks[s - 1]), d, len(bay.stacks[d - 1]))
 
 
 def alphas(bay: Bay, n_C: int, mq: Sequence[float] = MQ) -> List[Tuple[float, int]]:
-    """Eq. 28 for relocating c+ from s(c*) to every other non-full stack d: (alpha, d).
+    """Score alpha, a weighted sum of q_m, q_b, q_c and q_r, of relocating c+ from s(c*) to every
+    other non-full stack d: (alpha, d).
     q_b, q_c and q_r are those of c+ on d after the move (O11, Fig. 4); maxMov is the largest
     q_m over these same destinations; maxDist = n_S."""
     s = bay.target_stack()
@@ -32,8 +33,8 @@ def alphas(bay: Bay, n_C: int, mq: Sequence[float] = MQ) -> List[Tuple[float, in
     out = []
     for d, move in zip(dests, moves):
         dest = bay.stacks[d - 1]
-        q_b = 1 if dest and min(dest) < c else 0                        # eq. 23
-        q_c = c - min(min(dest), c) if dest else c - bay.target          # eq. 24 (O10 (a) if c is alone)
+        q_b = 1 if dest and min(dest) < c else 0                        # c+ would be badly placed on d
+        q_c = c - min(min(dest), c) if dest else c - bay.target          # c - target if d is empty (O10 (a))
         out.append((move / max_mov * mq[0] + q_b * mq[1] + q_c / n_C * mq[2] + d / n_S * mq[3], d))
     return out
 
