@@ -26,6 +26,7 @@ from problems.CRP_Time import CRP_Time
 
 from .bay import free_destinations, read_bay, target_stack
 from .crane_time import check_objective, move_time
+from .finish import finish
 from .located import min_due, non_located, well_placed
 from .params import parameters
 from .plan import actions, replay
@@ -143,6 +144,33 @@ class TestPlan(unittest.TestCase):
     def test_replay_refuses_an_empty_source(self):
         with self.assertRaises(ValueError):
             replay([[1], []], [(1, 1), (2, 1)], [(1, 0)])
+
+
+class TestFinish(unittest.TestCase):
+
+    def test_finish_equals_the_evaluator(self):
+        for model, mode in (("f2", "crane_time"), ("f2_vertical", "crane_time"), ("f2", "relocations")):
+            with self.subTest(time_model=model, mode=mode):
+                env = _env("data4-6-7.dat", time_model=model, objective_mode=mode)
+                stacks, positions = read_bay(env)
+                initial_yard = copy.deepcopy(env.yard)
+                plan = replay(stacks, positions, _plan_by_lowest_stack(stacks, env.config.max_tiers))
+                spec = ObjectiveSpec.from_config(env.config)
+                want = evaluate_plan_objectives(plan, spec, kinematics=KinematicsModel.from_config_extra(
+                    env.config.extra), initial_yard=initial_yard)
+                metrics, _ = finish(lambda: _env("data4-6-7.dat", time_model=model, objective_mode=mode),
+                                    plan, spec, "A")
+                self.assertEqual({k: metrics[k] for k in want}, want)
+                self.assertEqual(metrics["steps"], float(plan.num_moves()))
+                self.assertEqual(metrics["progress"], 1.0)
+
+    def test_finish_refuses_an_infeasible_plan(self):
+        env = _env("data3-5-1.dat")
+        stacks, positions = read_bay(env)
+        moves = _plan_by_lowest_stack(stacks, env.config.max_tiers)
+        plan = replay(stacks, positions, moves[:-1])   # the last container stays in the bay
+        with self.assertRaisesRegex(RuntimeError, "A: plan rejected by validate_plan"):
+            finish(lambda: _env("data3-5-1.dat"), plan, ObjectiveSpec.from_config(env.config), "A")
 
 
 class TestParams(unittest.TestCase):

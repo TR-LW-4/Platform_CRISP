@@ -33,6 +33,7 @@ import numpy as np
 
 from algorithms.CRP_Time.utils.bay import read_bay
 from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
@@ -160,9 +161,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                     )
 
             # ── End of seed ───────────────────────────────────────────── #
-            best_plan, metrics = evaluate(S_best)
-            metrics["steps"] = float(best_plan.num_moves())
-            metrics["progress"] = 1.0
+            best_plan = replay(stacks_init, positions, decode(S_best, stacks_init, n_total))
+            metrics, _ = finish(problem_factory, best_plan, objective_spec, self.name)
             all_metrics.append(metrics)
 
             # <=: the progress pushes have already lowered _best_metric to best_cost

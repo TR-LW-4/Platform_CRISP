@@ -6,6 +6,7 @@ bay        read_bay, target_stack, free_destinations
 located    min_due, non_located, well_placed
 crane_time check_objective, move_time
 plan       replay, actions
+finish     finish
 params     parameters
 
 ------------------------------- Copyright --------------------------------

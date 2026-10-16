@@ -19,7 +19,6 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
-import copy
 import multiprocessing as mp
 import sys
 from typing import Callable, Dict, List, Optional
@@ -28,10 +27,11 @@ import numpy as np
 
 from algorithms.CRP_Time.utils.bay import read_bay
 from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.objectives import KinematicsModel, ObjectiveSpec, evaluate_plan_objectives
+from core.objectives import ObjectiveSpec
 
 from .csum import csum
 from .gbh import gbh
@@ -76,11 +76,8 @@ class Azari2017CSUM(BaseAlgorithm):
             env = problem_factory()
             env.config.seed = int(cfg.seed) + seed_idx
             stacks, positions = read_bay(env)
-            initial_yard = copy.deepcopy(env.yard)
             objective_spec = ObjectiveSpec.from_config(env.config)
             check_objective(objective_spec, self.name)
-            # Only for the legacy RMGC metric of the shared evaluator.
-            kinematics = KinematicsModel.from_config_extra(env.config.extra)
             max_tiers = int(env.config.max_tiers)
 
             moves, found = [], True
@@ -101,10 +98,7 @@ class Azari2017CSUM(BaseAlgorithm):
             extra = {"csum_solution_found": found}
 
             plan = replay(stacks, positions, moves)
-            metrics = evaluate_plan_objectives(
-                plan, objective_spec, kinematics=kinematics, initial_yard=initial_yard,
-            )
-            metrics["steps"] = float(plan.num_moves())
+            metrics, _ = finish(problem_factory, plan, objective_spec, self.name)
             all_metrics.append(metrics)
 
             primary = float(metrics["objective_value"])
