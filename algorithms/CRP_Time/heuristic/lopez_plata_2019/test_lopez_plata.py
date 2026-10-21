@@ -1213,7 +1213,8 @@ class TestPlatform(unittest.TestCase):
         from core.results.store import _safe_token
         self.assertFalse(set('<>:"\\|?*') & set(_safe_token(cls.name)), "result folder invalid on Windows")
         self.assertEqual((cls.objectives, cls.fidelity, cls.geometry), (["crane_time"], "faithful", "single-bay"))
-        for word in ("restricted", "crane time", "f2vert", "rmgc_current", "L18", "L19", "L27", "L32"):
+        for word in ("crane working time", "corrected lower bound", "corrected misprint", "node budget",
+                     "600 s time limit"):
             self.assertIn(word, cls.description)
         import algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm as module
         for author in ("López-Plata", "Expósito-Izquierdo", "Lalla-Ruiz", "Melián-Batista", "Moreno-Vega"):

@@ -50,14 +50,14 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     name                = "Jovanović et al. (2019) ACO (CRP-Time)"
     category            = "Heuristic"
     description         = (
-        "ACO for the restricted BRP with crane-time objectives (EJOR 2019, "
-        "Sec. 5-6). Ants choose relocations with the MinMax heuristic and a "
-        "pheromone matrix tau[c][d][n][t]; the crane time (f2 or f2vert) is "
-        "evaluated with the shared evaluator, and the quality function and "
-        "early abort use lower bounds on the crane time still needed: LB_v "
-        "as in the paper, and LB_f without the extra ts per non-well-located "
-        "container. Deviation from the paper: the paper's LB_f is not a "
-        "valid lower bound; without that term it is."
+        "Ant colony optimisation: ants build relocation plans guided by "
+        "pheromones and a greedy heuristic, and the search stops after a fixed "
+        "number of iterations, with the seed fixed at 0 so that results are "
+        "reproducible. Deviation from the paper: under f2, the lower bound on "
+        "the remaining crane time, used to cut off ants early and to rate "
+        "solutions for the pheromone update, omits the paper’s extra travel "
+        "term per misplaced container, because the paper’s bound is not "
+        "always a valid lower bound."
     )
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"

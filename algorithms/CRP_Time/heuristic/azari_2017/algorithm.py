@@ -42,12 +42,12 @@ class Azari2017CSUM(BaseAlgorithm):
     name = "Azari et al. (2017) CSUM"
     category = "Heuristic"
     description = (
-        "CSUM heuristic for CRP-Time (Scientia Iranica 2017). "
-        "Pipeline: GBH initial solution -> A/B partition by relocation count -> "
-        "CSUM tree search minimizing crane working time (TCW). "
-        "A-set containers follow GBH branching; B-set containers follow "
-        "constant-summation branching. "
-        "Implementation is self-contained and does not depend on other algorithms."
+        "Two-phase tree search: GBH, a depth-first search that minimises the number of moves, "
+        "provides a starting solution (3 s limit), after which CSUM searches for the plan with the "
+        "lowest crane working time, pruning on the number of moves rather than on time (5 s limit). "
+        "The search is deterministic, but both limits are wall-clock, so on larger instances results "
+        "can differ between runs and machines; if CSUM finds no complete plan in time, the GBH plan "
+        "is returned."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"

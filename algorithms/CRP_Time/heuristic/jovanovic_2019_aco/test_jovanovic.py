@@ -162,7 +162,7 @@ class TestLowerBound(unittest.TestCase):
         """The label stays faithful; the deviation in LB_f is named in the description."""
         from .algorithm import JovanovicACO_CRPTime as cls
         self.assertEqual(cls.fidelity, "faithful")
-        for words in ("Deviation from the paper", "LB_f without the extra ts"):
+        for words in ("Deviation from the paper", "under f2", "omits the paper’s extra travel term"):
             self.assertIn(words, cls.description)
 
 
