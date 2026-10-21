@@ -1198,7 +1198,7 @@ class TestPlatform(unittest.TestCase):
     def test_schema(self):
         schema = LopezPlata2019Heuristic.config_schema()
         self.assertEqual({k: schema[k]["default"] for k in self.PAPER}, self.PAPER)
-        self.assertEqual((schema["time_limit_sec"]["default"], schema["time_limit_sec"]["min"]), (0, 0))
+        self.assertEqual((schema["time_limit_sec"]["default"], schema["time_limit_sec"]["min"]), (600, 0))
         self.assertEqual(schema["theta"]["type"], "int")
         self.assertEqual((schema["theta"]["min"], schema["theta"]["max"], schema["lam"]["max"]), (0, 100, 500))
         for key in ("delta", "num_expansions", "max_partial_nodes", "alpha1", "beta1", "alpha2", "beta2",
@@ -1245,6 +1245,7 @@ class TestPlatform(unittest.TestCase):
         return seen
 
     def test_ui_defaults_reach_the_steps(self):
+        t0 = time.monotonic()
         seen = self._captured({})
         stacks = parse_caserta_dat(DEFAULT_CASERTA_DIR / "data3-4-1.dat")[2]
         tm = TimeModel.from_spec(ObjectiveSpec.from_config(_config(DEFAULT_CASERTA_DIR / "data3-4-1.dat")))
@@ -1252,7 +1253,7 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual({k: seen[k] for k in ("depth", "lam", "node_budget", "rho", "kappa", "tau", "mu")},
                          {"depth": depth, **{k: v for k, v in self.PAPER.items() if k != "theta"}})
         self.assertEqual(seen["draw"], random.Random(0).random())
-        self.assertIsNone(seen["deadline"])   # time_limit_sec 0: no limit (L32)
+        self.assertTrue(t0 + 600 <= seen["deadline"] <= time.monotonic() + 600)   # time_limit_sec 600 (L32)
 
     def test_ui_values_reach_the_steps(self):
         t0 = time.monotonic()

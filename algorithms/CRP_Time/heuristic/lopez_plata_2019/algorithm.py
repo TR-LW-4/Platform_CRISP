@@ -9,7 +9,7 @@ rho         --- 300 ---      Iterations of step 2
 kappa       --- 2 ---        Retrievals per Expansion
 mu          --- 5 ---        Sequences in the roulette wheel
 tau         --- 3 ---        Branching factor of Expansion
-time_limit_sec --- 0 ---     Time limit per instance checked in step 2, 0 = none (not in the paper, L32)
+time_limit_sec --- 600 ---   Time limit per instance checked in step 2, 0 = none (not in the paper, L32)
 
 ------------------------------- Reference --------------------------------
 I. López-Plata, C. Expósito-Izquierdo, E. Lalla-Ruiz, B. Melián-Batista,
@@ -126,7 +126,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
                 "help": "Paper: 3 (p. 446).",
             },
             "time_limit_sec": {
-                "type": "int", "default": 0, "min": 0, "max": 864_000,
+                "type": "int", "default": 600, "min": 0, "max": 864_000,
                 "label": "Time limit per instance (s)",
                 "help": "0 = no limit, the paper's behaviour. Otherwise step 2 stops before the first and "
                         "after every completed partial solution once the limit has passed; the greedy "
