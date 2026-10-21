@@ -6,6 +6,10 @@ Code: `algorithms/CRP_Time/heuristic/azari_2017/`
 
 File:line references without a commit of their own point to the code at `fec8fb1`, the last commit before the PlatEMO-style refactor (Azari's code there is that of `584d656`); the refactor in `92d5be5` split `algorithm.py` into `gbh.py`, `csum.py`, `branching.py` and `lower_bound.py`.
 
+## Summary
+
+The implementation follows the paper's pseudocode for both phases, GBH (Fig. 2) and CSUM (Fig. 3), and reproduces both worked examples in the paper (Fig. 1 and Fig. 4); the paper's own instances and time model are not available, so its numerical results could not be checked. The remaining differences are the unified Voß & Schwarze crane-time model, since the paper gives no formulas, and a few choices the paper leaves open (§3.2). Validation found and fixed four main differences from the paper: GBH was a single greedy pass instead of a depth-first search with backtracking; CSUM pruned on time instead of on the number of moves and kept the GBH solution as its initial best; the set-B branching compared against every earlier stack instead of only BG stacks; and the scored plan omitted the containers already on top at the start, which made the reported f2 too low on the 199 affected Caserta instances. Against exact optima under f2, the mean gap is 0.46 %, 0.60 % and 0.75 % on 3×5, 3×7 and 4×6, with 22, 19 and 11 of 40 instances optimal and none below the optimum; on 3×5 and 3×7 the search trees are exhausted, so the gap comes from the paper's restricted branching and move-count pruning, not from the time limits. Read literally, the paper's CSUM can end slower than its own GBH starting solution (195 of 840 Caserta runs under f2) and falls back to the GBH plan when it finds no complete plan in time (23 of 840, all in the largest classes). Both time limits are wall-clock: CSUM reaches its limit in 366 of 840 runs, and on those instances results can differ between runs and machines. The PlatEMO-style refactor (`92d5be5`) is bit-identical to the code before it on all golden instances.
+
 ## 1. Specification from the paper
 
 ### Problem setting (Sec. 2–3, p. 311)

@@ -1,13 +1,14 @@
-# Validation log — López-Plata et al. (2019)
+# López-Plata et al. (2019) — validation log
 
-**Paper:** I. López-Plata, C. Expósito-Izquierdo, E. Lalla-Ruiz, B. Melián-Batista, J. M. Moreno-Vega (2019). *Minimizing the operating cost of block retrieval operations in stacking facilities.* Computers & Industrial Engineering 136, 436–452.
-**Code:** `algorithms/CRP_Time/heuristic/lopez_plata_2019/`
-**Relocation rule:** restricted
-**Status:** §1 (specification) complete. §2, §3 and §5 filled in (code comparison, 29 Sept 2026); §4 still open. Rebuild in 7 steps; steps 1 (eq. 1–3) and 2 (complete plans) done.
+Paper: I. López-Plata, C. Expósito-Izquierdo, E. Lalla-Ruiz, B. Melián-Batista, J. M. Moreno-Vega, "Minimizing the operating cost of block retrieval operations in stacking facilities", *Computers & Industrial Engineering* 136 (2019) 436–452. Page numbers below are journal pages; "Eq." refers to the paper's equation numbers.
 
-Page numbers refer to the journal pagination (436–452). "Eq." refers to the paper's equation numbers.
+Code: `algorithms/CRP_Time/heuristic/lopez_plata_2019/`
 
 File:line references without a commit of their own point to the code at `fec8fb1`, the last commit before the PlatEMO-style refactor (López-Plata's code there is that of `bafedc6`); the refactor in `2b395bd` split and renamed the modules, one per step.
+
+## Summary
+
+The original implementation did not follow the paper: among other things, every plan was incomplete because the moves of step 1 were not kept, the cost function had a sign error and counted only loaded relocation trips, the well-located test was inverted, and the lower bound, greedy start, selection, Expansion subtree, roulette wheel and postprocessing were missing; the heuristic of Sec. 6 was therefore rebuilt step by step. In the paper's own setting (operating cost, eq. 1–3), the code reproduces the costs of Fig. 2 (531 and 513), the evaluation of Fig. 4 and the postprocessing example of Fig. 5; Algorithm 1 without a depth limit is exact on Fig. 2 and on the 40 Caserta 3 × 3 instances; and the full heuristic with the paper's parameters finds the proven optimum on 100, 100, 92.5, 95, 85.7 and 82.4 % of the 3 × 3, 3 × 4, 3 × 5, 4 × 4, 3 × 6 and 4 × 5 instances (3 × 6 and 4 × 5: proven instances only), against 100, 100, 97.5, 100, 97.5 and 86.8 % in Fig. 8, with every gap at most 2.42 %. The conversion to crane time changes only the cost terms: g, the greedy start and the postprocessing use f2 or f2vert, the relocation evaluation uses the time of the relocation itself, and the lower bound h is a corrected bound in the form of eq. 21–22 that is proven admissible, since a literal translation is not. Further documented deviations are a corrected misprint in eq. 30, a node budget on step 1 (without it, step 1 does not finish within 600 s from 3 × 6 upwards) and a per-instance time limit in step 2 (600 s), after which the best plan found so far is returned. Against exact optima under f2, the mean gap is 0.043 %, 0.032 % and 0.138 % on 3 × 5, 3 × 7 and 4 × 6, with 39, 38 and 32 of 40 instances optimal and none below the optimum; under f2vert fewer instances are solved optimally (75 % on 3 × 5 and 87.5 % on 4 × 4). The postprocessing almost never improves a solution (0 of 240 instances with the paper's parameters), consistent with Fig. 9 for those parameters, but the paper's larger gains on weaker configurations are not reproduced. Runtime grows steeply with stack height (one ρ iteration takes 28–42 min on 6 × 10-1); on the largest classes the node budget limits step 1, which gives the same result on any machine, while the time limit cuts off step 2, so results there depend on the machine. The PlatEMO-style refactor (`2b395bd`) is bit-identical to the code before it on the golden instances.
 
 ---
 
