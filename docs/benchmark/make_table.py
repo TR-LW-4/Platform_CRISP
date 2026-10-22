@@ -41,6 +41,7 @@ OUT_DIR = REPO / "docs" / "benchmark"
 # Machine of both runs (the Python of the conda env rl that ran the server)
 RUN_MACHINE = ("AMD Ryzen 7 8700F 8-Core Processor", "3.11.16", "Windows 11 (10.0.26300)")
 CLASSES = ["3x5", "3x7", "4x6", "5x7", "6x10"]
+OBJECTIVE = ("crane_time", "f2")  # objective_mode and time_model of the runs in the table
 ALGOS = [  # display name, result folder, LaTeX name
     ("Azari et al. (2017) CSUM", "Azari_et_al._(2017)_CSUM", r"Azari et al.\ (2017) CSUM"),
     ("Jovanović et al. (2019) ACO", "Jovanović_et_al._(2019)_ACO_(CRP-Time)", r"Jovanovi\'{c} et al.\ (2019) ACO"),
@@ -56,13 +57,20 @@ AZARI_FOOTNOTE = ("Azari's time limits (GBH 3 s, CSUM 5 s) are not logged; the r
                   "reached on 5×7, 6×10 and possibly on 4×6 instance 6 (runtime 5.00 s).")
 
 
-def load(folder, cls, base=RESULTS):
+def load(folder, cls, base=RESULTS, objective=OBJECTIVE):
+    """{instance: metrics} of one class, from the result files of one objective and time model only
+    (caserta_<class>_<id>_obj-<mode>-<model>-<hash>.json). Runs of the same instance under another objective or
+    time model have their own files; two files of one instance under the same objective and time model (other
+    parameters, so another hash) stop the script."""
+    mode, model = objective
     runs = {}
-    for f in sorted((base / folder).glob(f"caserta_{cls}_*.json")):
+    for f in sorted((base / folder).glob(f"caserta_{cls}_*_obj-{mode}-{model}-*.json")):
         d = json.loads(f.read_text(encoding="utf-8"))
-        layout = d["prob_config"]["layout_file_path"]
-        m = re.search(r"data(\d+)-(\d+)-(\d+)\.dat$", layout)
-        assert f"{m.group(1)}x{m.group(2)}" == cls, (f, layout)
+        pc = d["prob_config"]
+        assert (pc.get("objective_mode"), pc.get("time_model")) == objective, (f, objective)
+        m = re.search(r"data(\d+)-(\d+)-(\d+)\.dat$", pc["layout_file_path"])
+        assert f"{m.group(1)}x{m.group(2)}" == cls, (f, pc["layout_file_path"])
+        assert int(m.group(3)) not in runs, f"two result files for {cls} #{m.group(3)} under {mode}/{model}: {f}"
         runs[int(m.group(3))] = d["metrics"]
     return runs
 
