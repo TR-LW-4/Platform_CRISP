@@ -17,6 +17,13 @@ export function displayMetricsOf(problem: ProblemInfo | undefined): string[] {
   return problem?.display_metrics ?? []
 }
 
+/** Display metrics with the optimised crane-time metric of the time model first. */
+export function displayMetricsFor(problem: ProblemInfo | undefined, timeModel: unknown): string[] {
+  const metrics = displayMetricsOf(problem)
+  const main = TIME_MODEL_METRIC[String(timeModel ?? '')]
+  return main && metrics.includes(main) ? [main, ...metrics.filter((key) => key !== main)] : metrics
+}
+
 export function metricLabel(problem: ProblemInfo | undefined, key: string): string {
   return problem?.metric_labels?.[key] ?? key
 }

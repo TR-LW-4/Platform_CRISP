@@ -6,6 +6,7 @@ import { MetricChart } from '../components/MetricChart'
 import { ParameterForm } from '../components/ParameterForm'
 import {
   classLabels,
+  displayMetricsFor,
   displayMetricsOf,
   metricLabel,
   objectiveMetricLabel,
@@ -260,9 +261,9 @@ export function Workbench({
     () =>
       summaryMetricKeys(
         job?.batch_summary?.classes ?? [],
-        displayMetricsOf(jobProblem),
+        displayMetricsFor(jobProblem, job?.problem_config?.time_model),
       ),
-    [job?.batch_summary, jobProblem],
+    [job?.batch_summary, job?.problem_config?.time_model, jobProblem],
   )
   const batchClassLabels = useMemo(
     () => classLabels(job?.batch_summary?.classes ?? []),
