@@ -16,13 +16,17 @@ import unittest
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
 from core.objectives import (
+    PRACTICE_PARAMETERS,
     KinematicsModel,
     ObjectiveSpec,
     annotate_plan_tiers,
     evaluate_plan_objectives,
+    is_practice,
+    movement_f2_vertical,
     movement_objective_cost,
 )
-from core.plan import RelocationPlan
+from core.plan import Movement, RelocationPlan
+from core.results.aggregate import summarize_run_dicts
 from problems.CRP_Time import CRP_Time
 
 from .bay import free_destinations, read_bay, target_stack
@@ -174,6 +178,53 @@ class TestFinish(unittest.TestCase):
         plan = replay(stacks, positions, moves[:-1])   # the last container stays in the bay
         with self.assertRaisesRegex(RuntimeError, "A: plan rejected by validate_plan"):
             finish(lambda: _env("data3-5-1.dat"), plan, ObjectiveSpec.from_config(env.config), "A", 0.0)
+
+
+class TestPracticePreset(unittest.TestCase):
+    """The CRP-Time option f2_vertical_practice: f2vert with the practice parameters, no f2."""
+
+    def _values(self, time_model):
+        schema = CRP_Time.config_schema()
+        defaults = {k: s["default"] for k, s in schema.items() if "default" in s}
+        return CRP_Time.resolve_values({**defaults, "time_model": time_model})
+
+    def test_resolves_to_f2vert_with_the_practice_parameters(self):
+        values = self._values("f2_vertical_practice")
+        self.assertEqual(values["time_model"], "f2_vertical")
+        self.assertEqual({k: values[k] for k in PRACTICE_PARAMETERS}, PRACTICE_PARAMETERS)
+        self.assertEqual(values["pickup_place_s"], CRP_Time.config_schema()["pickup_place_s"]["default"])
+        self.assertTrue(is_practice(values))
+        for model in ("f2", "f2_vertical"):
+            self.assertEqual(self._values(model)["time_model"], model)
+            self.assertFalse(is_practice(self._values(model)))
+
+    def test_one_move_by_hand(self):
+        """Retrieval from tier 3 of stack 2 with H = 5 (h_max = 6): 2 * 2.328 * 2 + (12 - 3 - 1.5) * (1.727 + 3.455)
+        = 9.312 + 38.865 = 48.177 s."""
+        spec = ObjectiveSpec(time_model="f2_vertical", max_tiers=5, num_rows=1, **PRACTICE_PARAMETERS)
+        self.assertAlmostEqual(movement_f2_vertical(Movement(7, (2, 1), None, from_tier=3), spec), 48.177, places=9)
+
+    def _finish(self, time_model):
+        values = self._values(time_model)
+        env = _env("data4-6-7.dat", **values)
+        stacks, positions = read_bay(env)
+        plan = replay(stacks, positions, _plan_by_lowest_stack(stacks, env.config.max_tiers))
+        return finish(lambda: _env("data4-6-7.dat", **values), plan, ObjectiveSpec.from_config(env.config), "A", 0.0)[0]
+
+    def test_finish_reports_f2vert_and_no_f2(self):
+        practice, f2vert = self._finish("f2_vertical_practice"), self._finish("f2_vertical")
+        self.assertNotIn("crane_time_f2", practice)
+        self.assertEqual(set(practice) | {"crane_time_f2"}, set(f2vert))
+        self.assertEqual(practice["objective_value"], practice["crane_time_vertical"])
+        self.assertEqual(practice["relocations"], f2vert["relocations"])
+        self.assertNotEqual(practice["crane_time_vertical"], f2vert["crane_time_vertical"])
+
+    def test_class_label(self):
+        path = str(DEFAULT_CASERTA_DIR / "data3-5-1.dat")
+        runs = [{"prob_config": {**self._values(model), "layout_file_path": path}, "metrics": {"relocations": 1.0}}
+                for model in ("f2_vertical", "f2_vertical_practice")]
+        labels = sorted(row["display_label"] for row in summarize_run_dicts(runs)["classes"])
+        self.assertEqual(labels, ["3×5 · f2vert", "3×5 · f2vert (practice)"])
 
 
 class TestStopwatch(unittest.TestCase):

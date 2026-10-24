@@ -29,6 +29,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
+from core.results.store import _objective_result_suffix  # noqa: E402
+from problems.CRP_Time import CRP_Time  # noqa: E402
+
 DATA = REPO / "docs" / "validation" / "data"
 RUN_DIR = DATA / "overnight_2026-10-05"
 RERUN_DIR = DATA / "rerun_jovanovic_2026-10-10"
@@ -41,7 +46,7 @@ OUT_DIR = REPO / "docs" / "benchmark"
 # Machine of both runs (the Python of the conda env rl that ran the server)
 RUN_MACHINE = ("AMD Ryzen 7 8700F 8-Core Processor", "3.11.16", "Windows 11 (10.0.26300)")
 CLASSES = ["3x5", "3x7", "4x6", "5x7", "6x10"]
-OBJECTIVE = ("crane_time", "f2")  # objective_mode and time_model of the runs in the table
+TIME_MODEL = "f2"  # CRP-Time time-model option of the runs in the table (f2, f2_vertical, f2_vertical_practice)
 ALGOS = [  # display name, result folder, LaTeX name
     ("Azari et al. (2017) CSUM", "Azari_et_al._(2017)_CSUM", r"Azari et al.\ (2017) CSUM"),
     ("Jovanović et al. (2019) ACO", "Jovanović_et_al._(2019)_ACO_(CRP-Time)", r"Jovanovi\'{c} et al.\ (2019) ACO"),
@@ -57,20 +62,27 @@ AZARI_FOOTNOTE = ("Azari's time limits (GBH 3 s, CSUM 5 s) are not logged; the r
                   "reached on 5×7, 6×10 and possibly on 4×6 instance 6 (runtime 5.00 s).")
 
 
-def load(folder, cls, base=RESULTS, objective=OBJECTIVE):
-    """{instance: metrics} of one class, from the result files of one objective and time model only
-    (caserta_<class>_<id>_obj-<mode>-<model>-<hash>.json). Runs of the same instance under another objective or
-    time model have their own files; two files of one instance under the same objective and time model (other
-    parameters, so another hash) stop the script."""
-    mode, model = objective
+def objective_suffix(time_model=TIME_MODEL):
+    """Result-name suffix (_obj-<mode>-<model>-<digest>) of a Workbench run with the CRP-Time form defaults and this
+    time-model option; the digest covers the time parameters, so f2vert and its practice preset differ."""
+    defaults = {key: spec["default"] for key, spec in CRP_Time.config_schema().items() if "default" in spec}
+    return _objective_result_suffix(CRP_Time.resolve_values({**defaults, "time_model": time_model}))
+
+
+def load(folder, cls, base=RESULTS, time_model=TIME_MODEL):
+    """{instance: metrics} of one class, from the result files whose name carries the objective digest of the
+    time-model option only (caserta_<class>_<id><objective_suffix>.json). Runs of the same instance under another
+    objective, time model or parameter set have their own files; a file whose configuration gives another digest
+    than its name stops the script."""
+    suffix = objective_suffix(time_model)
     runs = {}
-    for f in sorted((base / folder).glob(f"caserta_{cls}_*_obj-{mode}-{model}-*.json")):
+    for f in sorted((base / folder).glob(f"caserta_{cls}_*{suffix}.json")):
         d = json.loads(f.read_text(encoding="utf-8"))
         pc = d["prob_config"]
-        assert (pc.get("objective_mode"), pc.get("time_model")) == objective, (f, objective)
+        assert _objective_result_suffix(pc) == suffix, (f, suffix)
         m = re.search(r"data(\d+)-(\d+)-(\d+)\.dat$", pc["layout_file_path"])
         assert f"{m.group(1)}x{m.group(2)}" == cls, (f, pc["layout_file_path"])
-        assert int(m.group(3)) not in runs, f"two result files for {cls} #{m.group(3)} under {mode}/{model}: {f}"
+        assert int(m.group(3)) not in runs, f"two result files for {cls} #{m.group(3)} with {suffix}: {f}"
         runs[int(m.group(3))] = d["metrics"]
     return runs
 
