@@ -12,7 +12,8 @@ and copy benchmark/Caserta_dataset/ (gitignored) into the checkout first.
       copy results/ to <campaign_dir>/results_before/ with an md5 manifest, check the copy, and record the start
       time, commit and machine in <campaign_dir>/campaign.json (refuses an existing campaign)
   python docs/benchmark/campaign.py run <campaign_dir> <algorithm> <preset> [--classes 3x5,3x7] [--instances 1-10]
-      run one block; refuses when the checkout differs from the recorded commit or another run is active
+      run one block; refuses when the checkout differs from the recorded commit, the Python version differs from
+      the recorded one, or another run is active
   python docs/benchmark/campaign.py status <campaign_dir> [<algorithm> <preset>] [--classes ...] [--instances ...]
   python docs/benchmark/campaign.py check <campaign_dir> [<algorithm> <preset>] [--classes ...] [--instances ...]
       replay every saved plan independently against its Caserta file (only the top container of the target's stack
@@ -300,6 +301,11 @@ def cmd_run(args) -> None:
     if current["commit"] != info["commit"] or current["modified"]:
         raise SystemExit(f"checkout {current['commit'][:7]} (modified: {bool(current['modified'])}) differs from the "
                          f"campaign commit {info['commit'][:7]}; check out that commit with no modified files")
+    python = sys.version.split()[0]
+    if python != info["python"]:
+        # Float sums differ between Python versions (sum() is compensated since 3.12), and so do runtimes.
+        raise SystemExit(f"Python {python} ({sys.executable}) differs from the campaign's Python {info['python']}; "
+                         "run with the same interpreter")
     problem, algo_values, cls = block_values(args.algorithm, args.preset)
     instances = parse_range(args.instances)
     classes = args.classes.split(",") if args.classes else CLASSES
