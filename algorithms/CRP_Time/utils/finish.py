@@ -20,16 +20,17 @@ from core.plan import RelocationPlan
 
 
 def finish(problem_factory: Callable, plan: RelocationPlan, spec: ObjectiveSpec,
-           algorithm: str) -> Tuple[Dict[str, float], Any]:
+           algorithm: str, runtime_s: float) -> Tuple[Dict[str, float], Any]:
     """Metrics of the final plan, and the problem that validated it.
 
     A new problem replays the plan under its own rules (only the top container of
     the current target's stack moves, retrievals in priority order, no stack above
     its height, an empty bay at the end) and evaluates it; an infeasible plan
     raises. objective_value is the algorithm's own objective under spec, steps the
-    number of moves (relocations and retrievals).
+    number of moves (relocations and retrievals), runtime_s the algorithm's own
+    running time (utils.timer).
     Example:
-        metrics, env = finish(problem_factory, plan, spec, self.name)
+        metrics, env = finish(problem_factory, plan, spec, self.name, timer.elapsed)
     """
     env = problem_factory()
     if not env.validate_plan(plan).get("feasible"):
@@ -38,4 +39,5 @@ def finish(problem_factory: Callable, plan: RelocationPlan, spec: ObjectiveSpec,
     metrics = env.get_metrics()
     metrics["objective_value"] = objective_value(metrics, spec)
     metrics["steps"] = float(plan.num_moves())
+    metrics["runtime_s"] = float(runtime_s)
     return metrics, env

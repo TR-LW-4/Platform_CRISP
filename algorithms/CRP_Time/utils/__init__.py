@@ -8,6 +8,7 @@ crane_time check_objective, move_time
 plan       replay, actions
 finish     finish
 params     parameters
+timer      Stopwatch
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.

@@ -36,6 +36,7 @@ from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
 from core.objectives import KinematicsModel, ObjectiveSpec, evaluate_plan_objectives
@@ -109,6 +110,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
 
             n_total  = int(env.config.num_containers)
             n_stacks = len(stacks_init)
+            timer    = Stopwatch()
+            timer.start()
             ant0     = start(stacks_init, positions, int(env.config.max_tiers), objective_spec)
 
             def evaluate(solution):
@@ -153,17 +156,19 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 # ── Periodic GUI push ─────────────────────────────────── #
                 if (iteration + 1) % report_every == 0:
                     frac = (seed * n_iters + iteration + 1) / (n_seeds * n_iters)
-                    self._push(
-                        result_queue,
-                        step     = seed + 1,
-                        metric   = float(best_cost),
-                        metrics  = evaluate(S_best)[1],
-                        progress = min(frac, (seed + 1) / n_seeds),
-                    )
+                    with timer.paused():
+                        self._push(
+                            result_queue,
+                            step     = seed + 1,
+                            metric   = float(best_cost),
+                            metrics  = evaluate(S_best)[1],
+                            progress = min(frac, (seed + 1) / n_seeds),
+                        )
 
             # ── End of seed ───────────────────────────────────────────── #
+            timer.stop()
             best_plan = replay(stacks_init, positions, decode(S_best, stacks_init, n_total))
-            metrics, env_final = finish(problem_factory, best_plan, objective_spec, self.name)
+            metrics, env_final = finish(problem_factory, best_plan, objective_spec, self.name, timer.elapsed)
             all_metrics.append(metrics)
 
             # <=: the progress pushes have already lowered _best_metric to best_cost

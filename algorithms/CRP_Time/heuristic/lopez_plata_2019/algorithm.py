@@ -39,6 +39,7 @@ from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.objectives import ObjectiveSpec
 
@@ -181,6 +182,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             cost = CostModel(n_T=env.config.max_tiers, **weights) if operating else TimeModel.from_spec(spec)
             root = Bay(init_stacks, cost)
             n_C = sum(len(st) for st in init_stacks)
+            timer = Stopwatch()
+            timer.start()
 
             # ----- Step 1 (Sec. 6.1): the greedy (Sec. 7.1) gives ub and |phi|, from which beta follows;
             # Algorithm 1 runs to depth beta within the node budget (L18), and N = N_g + N_q -----
@@ -203,12 +206,13 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             # phi_best itself; the problem validates it and reports its metrics -----
             try:
                 phi_best, f_best = postprocess(init_stacks, phi_best, cost)
+                timer.stop()
                 f_plan = f(init_stacks, phi_best, cost)
             except ValueError as err:
                 raise RuntimeError(f"López-Plata: impossible move in phi: {err}") from err
             plan = replay(init_stacks, positions, [(s - 1, s2 - 1 if s2 else None) for s, s2 in phi_best])
             best_solution = actions(plan, env.config.num_rows)
-            final_metrics, env_final = finish(problem_factory, plan, spec, self.name)
+            final_metrics, env_final = finish(problem_factory, plan, spec, self.name, timer.elapsed)
             if operating:
                 final_metrics["operating_cost"] = f_plan
             elif abs(cost.seconds(f_plan) - final_metrics["crane_time"]) > 1e-6:

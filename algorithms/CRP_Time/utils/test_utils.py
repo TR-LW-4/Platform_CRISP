@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import importlib
 import re
+import time
 import unittest
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
@@ -30,6 +31,7 @@ from .finish import finish
 from .located import min_due, non_located, well_placed
 from .params import parameters
 from .plan import actions, replay
+from .timer import Stopwatch
 
 ALGORITHMS = [
     ("algorithms.CRP_Time.heuristic.azari_2017.algorithm", "Azari2017CSUM"),
@@ -159,10 +161,11 @@ class TestFinish(unittest.TestCase):
                 want = evaluate_plan_objectives(plan, spec, kinematics=KinematicsModel.from_config_extra(
                     env.config.extra), initial_yard=initial_yard)
                 metrics, _ = finish(lambda: _env("data4-6-7.dat", time_model=model, objective_mode=mode),
-                                    plan, spec, "A")
+                                    plan, spec, "A", 0.25)
                 self.assertEqual({k: metrics[k] for k in want}, want)
                 self.assertEqual(metrics["steps"], float(plan.num_moves()))
                 self.assertEqual(metrics["progress"], 1.0)
+                self.assertEqual(metrics["runtime_s"], 0.25)
 
     def test_finish_refuses_an_infeasible_plan(self):
         env = _env("data3-5-1.dat")
@@ -170,7 +173,30 @@ class TestFinish(unittest.TestCase):
         moves = _plan_by_lowest_stack(stacks, env.config.max_tiers)
         plan = replay(stacks, positions, moves[:-1])   # the last container stays in the bay
         with self.assertRaisesRegex(RuntimeError, "A: plan rejected by validate_plan"):
-            finish(lambda: _env("data3-5-1.dat"), plan, ObjectiveSpec.from_config(env.config), "A")
+            finish(lambda: _env("data3-5-1.dat"), plan, ObjectiveSpec.from_config(env.config), "A", 0.0)
+
+
+class TestStopwatch(unittest.TestCase):
+
+    def test_paused_time_is_not_counted(self):
+        timer = Stopwatch()
+        timer.start()
+        time.sleep(0.05)
+        with timer.paused():
+            time.sleep(0.2)
+        time.sleep(0.05)
+        self.assertGreaterEqual(timer.stop(), 0.1)
+        self.assertLess(timer.elapsed, 0.2)
+
+    def test_stopped_and_paused_when_stopped(self):
+        timer = Stopwatch()
+        with timer.paused():   # not running: stays stopped afterwards
+            pass
+        self.assertEqual(timer.stop(), 0.0)
+        timer.start()
+        first = timer.stop()
+        time.sleep(0.05)
+        self.assertEqual(timer.stop(), first)
 
 
 class TestParams(unittest.TestCase):

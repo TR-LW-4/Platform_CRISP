@@ -30,6 +30,7 @@ from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.objectives import ObjectiveSpec
 
@@ -80,6 +81,8 @@ class Azari2017CSUM(BaseAlgorithm):
             check_objective(objective_spec, self.name)
             max_tiers = int(env.config.max_tiers)
 
+            timer = Stopwatch()
+            timer.start()
             moves, found = [], True
             if any(stacks):
                 initial = gbh(stacks, max_tiers, gbh_limit)
@@ -90,15 +93,17 @@ class Azari2017CSUM(BaseAlgorithm):
                 if not found:
                     # Not covered by the paper: fall back to the GBH solution.
                     moves = initial
-                    print(
-                        "[Azari2017CSUM] CSUM found no complete solution within "
-                        "csum_time_limit_s; returning the GBH solution.",
-                        file=sys.stderr, flush=True,
-                    )
+                    with timer.paused():
+                        print(
+                            "[Azari2017CSUM] CSUM found no complete solution within "
+                            "csum_time_limit_s; returning the GBH solution.",
+                            file=sys.stderr, flush=True,
+                        )
+            timer.stop()
             extra = {"csum_solution_found": found}
 
             plan = replay(stacks, positions, moves)
-            metrics, env_final = finish(problem_factory, plan, objective_spec, self.name)
+            metrics, env_final = finish(problem_factory, plan, objective_spec, self.name, timer.elapsed)
             all_metrics.append(metrics)
 
             primary = float(metrics["objective_value"])
