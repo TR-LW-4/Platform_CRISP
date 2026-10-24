@@ -21,6 +21,7 @@ from core.objectives import (
     PRACTICE_PARAMETERS,
     KinematicsModel,
     ObjectiveSpec,
+    compute_crane_time_accel,
     evaluate_plan_objectives,
 )
 from core.plan import Movement, RelocationPlan
@@ -43,8 +44,11 @@ class CRP_Time(CRP_R):
         "crane_time_f2",
         "crane_time_vertical",
         "crane_time_rmgc",
+        "crane_time_accel",
         "steps",
     ]
+    # Crane time with acceleration of the plan (evaluation only, never optimised).
+    report_crane_time_accel = True
     # UI display only; the evaluator still reports every metric above.
     display_metrics = [
         "crane_time_f2",
@@ -100,6 +104,8 @@ class CRP_Time(CRP_R):
             spec,
             kinematics=KinematicsModel.from_config_extra(self.config.extra),
         )
+        if self.report_crane_time_accel:
+            metrics["crane_time_accel"] = compute_crane_time_accel(self._plan, spec)
         metrics["steps"] = float(self._total_steps)
         metrics["progress"] = min(
             1.0,

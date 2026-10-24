@@ -20,13 +20,17 @@ from core.objectives import (
     KinematicsModel,
     ObjectiveSpec,
     annotate_plan_tiers,
+    compute_crane_time_accel,
     evaluate_plan_objectives,
     is_practice,
+    movement_accel,
     movement_f2_vertical,
     movement_objective_cost,
+    movement_time,
 )
 from core.plan import Movement, RelocationPlan
 from core.results.aggregate import summarize_run_dicts
+from problems.CRP_MO import CRP_MO
 from problems.CRP_Time import CRP_Time
 
 from .bay import free_destinations, read_bay, target_stack
@@ -225,6 +229,54 @@ class TestPracticePreset(unittest.TestCase):
                 for model in ("f2_vertical", "f2_vertical_practice")]
         labels = sorted(row["display_label"] for row in summarize_run_dicts(runs)["classes"])
         self.assertEqual(labels, ["3×5 · f2vert", "3×5 · f2vert (practice)"])
+
+
+class TestCraneTimeAccel(unittest.TestCase):
+    """Crane time with acceleration (evaluation only), against values computed by hand. Row 2.54 m, tier 2.591 m;
+    model 1: trolley 1.0 m/s, 0.33 m/s², spreader 0.3 m/s²; model 2: trolley 1.2 m/s, 0.35 m/s², spreader 0.5 m/s²;
+    spreader 1.5 m/s empty, 0.75 m/s laden."""
+
+    def test_movement_time(self):
+        # One trolley row, v²/a above the distance: 2 sqrt(2.54 / 0.33) = 5.549 and 2 sqrt(2.54 / 0.35) = 5.388.
+        self.assertAlmostEqual(movement_time(2.54, 1.0, 0.33), 5.5487, places=4)
+        self.assertAlmostEqual(movement_time(2.54, 1.2, 0.35), 5.3878, places=4)
+        # 3.5 tiers empty, model 1, top speed reached: 9.0685 / 1.5 + 1.5 / 0.3 = 11.0457.
+        self.assertAlmostEqual(movement_time(3.5 * 2.591, 1.5, 0.3), 11.0457, places=4)
+        # One tier laden, model 1: 2.591 / 0.75 + 0.75 / 0.3 = 5.9547.
+        self.assertAlmostEqual(movement_time(2.591, 0.75, 0.3), 5.9547, places=4)
+        self.assertEqual(movement_time(0.0, 1.0, 0.33), 0.0)
+
+    def test_moves_by_hand(self):
+        """H = 3, h_max = 4. Relocation from tier 3 of stack 1 to tier 2 of stack 2: trolley 2 x 5.4682, spreader
+        1 tier empty down 5.2152, 1 tier laden up 5.4547, 2 tiers laden down 8.9093, 2 tiers empty up 7.3834 (means of
+        the two models): 37.899 s. Retrieval from tier 1 of stack 2 (hout 1.5): model 1 2 x 8.1103 + 10.1820 +
+        12.8640 + 11.1367 + 9.2934 = 59.6967, model 2 2 x 7.6619 + 8.1820 + 11.8640 + 10.1367 + 7.3183 = 52.8248;
+        mean 56.2608 s."""
+        spec = ObjectiveSpec(time_model="f2", max_tiers=3, num_rows=1)
+        self.assertAlmostEqual(movement_accel(Movement(1, (1, 1), (2, 1), from_tier=3, to_tier=2), spec), 37.899,
+                               delta=5e-4)
+        self.assertAlmostEqual(movement_accel(Movement(1, (2, 1), None, from_tier=1), spec), 56.2608, delta=5e-4)
+
+    def test_reported_for_the_final_plan_only_as_a_metric(self):
+        """finish() reports it, equal under f2, f2vert and the practice preset (it depends on the plan only), and
+        objective_value is unchanged; CRP-MO does not report it."""
+        values = {}
+        for model in ("f2", "f2_vertical", "f2_vertical_practice"):
+            schema = CRP_Time.config_schema()
+            run = CRP_Time.resolve_values({**{k: s["default"] for k, s in schema.items() if "default" in s},
+                                           "time_model": model})
+            env = _env("data4-6-7.dat", **run)
+            stacks, positions = read_bay(env)
+            plan = replay(stacks, positions, _plan_by_lowest_stack(stacks, env.config.max_tiers))
+            spec = ObjectiveSpec.from_config(env.config)
+            metrics, _ = finish(lambda: _env("data4-6-7.dat", **run), plan, spec, "A", 0.0)
+            self.assertEqual(metrics["crane_time_accel"], compute_crane_time_accel(plan, spec))   # replay sets tiers
+            self.assertEqual(metrics["objective_value"], metrics[spec.time_metric])
+            values[model] = metrics["crane_time_accel"]
+        self.assertEqual(len(set(values.values())), 1)
+        mo = CRP_MO(config=problem_config_for_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-1.dat", {}))
+        mo.reset()
+        self.assertNotIn("crane_time_accel", mo.get_metrics())
 
 
 class TestStopwatch(unittest.TestCase):

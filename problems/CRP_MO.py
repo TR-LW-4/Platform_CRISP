@@ -46,6 +46,7 @@ class CRP_MO(CRP_Time):
     ]
     display_metrics: List[str] = []   # not CRP-Time's restriction
     metric_labels: Dict[str, str] = {}
+    report_crane_time_accel = False   # CRP-Time's evaluation-only metric
 
     def evaluate_vector(self, solution: List[int]) -> Tuple[float, float]:
         """Return ``(relocations, crane_time)`` for one action sequence."""

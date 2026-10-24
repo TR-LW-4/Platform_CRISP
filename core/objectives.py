@@ -20,6 +20,7 @@ the two travel times.
 from __future__ import annotations
 
 import copy
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional, Tuple, TYPE_CHECKING
 
@@ -320,6 +321,62 @@ def movement_f2_vertical(move: "Movement", spec: ObjectiveSpec) -> float:
 def compute_f2_vertical(plan: "RelocationPlan", spec: ObjectiveSpec) -> float:
     """Voß--Schwarze f2vert with tier-dependent pickup/place-down effort."""
     return sum(movement_f2_vertical(move, spec) for move in plan.movements)
+
+
+# Crane time with acceleration: an evaluation-only metric (never optimised) for
+# the final plan, from the same simulated ASC models as the practice preset.
+# All movements happen one after another. Per move: the trolley travels the
+# rows between the stacks laden and returns empty (two trips; a retrieval goes
+# to the truck at stack 0); the spreader goes down empty to the source tier, up
+# laden to h_max, down laden to the destination tier (hout for a retrieval) and
+# up empty to h_max, with h_max = max_tiers + 1 in tiers as in f2vert. Each
+# movement accelerates and decelerates at a constant rate, and its time is the
+# mean over the two ASC models.
+ROW_PITCH_M = 2.54
+TIER_HEIGHT_M = 2.591
+SPREADER_SPEED_M_S = {"empty": 1.5, "laden": 0.75}
+ASC_MODELS = (   # trolley speed (m/s) and acceleration (m/s²), spreader acceleration (m/s²)
+    {"trolley": (1.0, 0.33), "spreader_accel": 0.3},
+    {"trolley": (1.2, 0.35), "spreader_accel": 0.5},
+)
+
+
+def movement_time(distance: float, speed: float, accel: float) -> float:
+    """Time of one movement over distance (m) from rest to rest: d/v + v/a if the top
+    speed v is reached (d >= v²/a), otherwise 2 sqrt(d/a)."""
+    if distance <= 0:
+        return 0.0
+    if distance >= speed * speed / accel:
+        return distance / speed + speed / accel
+    return 2.0 * math.sqrt(distance / accel)
+
+
+def movement_accel(move: "Movement", spec: ObjectiveSpec) -> float:
+    """Crane time with acceleration of one tier-annotated movement."""
+    if move.from_tier is None or (not move.is_retrieval and move.to_tier is None):
+        raise ValueError("crane time with acceleration requires movement tiers")
+    h_max = float(spec.max_tiers + 1)
+    src = _stack_index(move.from_pos, spec.num_rows)
+    if move.is_retrieval:
+        rows, drop = src, spec.outside_height
+    else:
+        rows, drop = abs(src - _stack_index(move.to_pos, spec.num_rows)), move.to_tier
+    pick_m = (h_max - move.from_tier) * TIER_HEIGHT_M
+    drop_m = (h_max - drop) * TIER_HEIGHT_M
+    empty, laden = SPREADER_SPEED_M_S["empty"], SPREADER_SPEED_M_S["laden"]
+    total = 0.0
+    for model in ASC_MODELS:
+        speed, accel = model["trolley"]
+        spreader = model["spreader_accel"]
+        total += 2.0 * movement_time(rows * ROW_PITCH_M, speed, accel)
+        total += movement_time(pick_m, empty, spreader) + movement_time(pick_m, laden, spreader)
+        total += movement_time(drop_m, laden, spreader) + movement_time(drop_m, empty, spreader)
+    return total / len(ASC_MODELS)
+
+
+def compute_crane_time_accel(plan: "RelocationPlan", spec: ObjectiveSpec) -> float:
+    """Crane time with acceleration of a tier-annotated plan (evaluation only)."""
+    return sum(movement_accel(move, spec) for move in plan.movements)
 
 
 def movement_selected_time(
