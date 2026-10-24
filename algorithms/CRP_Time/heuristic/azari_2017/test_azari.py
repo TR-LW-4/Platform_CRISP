@@ -85,7 +85,8 @@ class TestNoSolution(unittest.TestCase):
         with mock.patch.object(algorithm, "csum", expired), contextlib.redirect_stderr(err):
             records = _train(cfg)
         self.assertIn("returning the GBH solution", err.getvalue())
-        self.assertEqual([r.extra for r in records], [{"csum_solution_found": False}] * 2)
+        self.assertEqual([r.extra["csum_solution_found"] for r in records], [False] * 2)
+        self.assertEqual(len(records[-1].extra["moves"]), 48)   # the saved plan is the GBH solution
         metrics = records[0].metrics
         self.assertEqual(metrics["total_moves"], 48)
         self.assertAlmostEqual(metrics["crane_time_f2"], 1725.60, places=6)

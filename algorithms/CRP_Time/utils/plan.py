@@ -1,6 +1,6 @@
 """
 From a sequence of moves on the stack lists to a platform plan, and from a plan
-to the problem's actions.
+to the problem's actions or to the moves saved with a result.
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.
@@ -12,7 +12,7 @@ corresponding original algorithm paper.
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from core.plan import Movement, RelocationPlan
 
@@ -46,3 +46,23 @@ def replay(stacks: Sequence[Sequence[int]], positions: Sequence[Tuple[int, int]]
 def actions(plan: RelocationPlan, num_rows: int) -> List[int]:
     """The problem's actions for a plan: the flat index of each relocation's destination."""
     return [(m.to_pos[0] - 1) * num_rows + (m.to_pos[1] - 1) for m in plan.movements if not m.is_retrieval]
+
+
+def saved_moves(plan: RelocationPlan) -> List[Dict[str, Any]]:
+    """The plan as the moves saved with a result (the final record's extra["moves"]), in the format of
+    core.move_export.moves_to_json, so core.move_export.plan_from_json rebuilds it. container_id is the
+    container's retrieval priority, positions are (bay, row), tiers 1-based.
+
+    Example:
+        self._push(..., extra={"moves": saved_moves(plan)})
+    """
+    out = []
+    for m in plan.movements:
+        entry = {"kind": "retrieve" if m.is_retrieval else "relocate", "container_id": int(m.container_id),
+                 "from": [int(m.from_pos[0]), int(m.from_pos[1])],
+                 "to": None if m.is_retrieval else [int(m.to_pos[0]), int(m.to_pos[1])],
+                 "from_tier": int(m.from_tier)}
+        if not m.is_retrieval:
+            entry["to_tier"] = int(m.to_tier)
+        out.append(entry)
+    return out

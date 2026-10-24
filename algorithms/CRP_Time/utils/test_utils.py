@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import copy
 import importlib
+import queue
 import re
+import threading
 import time
 import unittest
 
@@ -28,8 +30,10 @@ from core.objectives import (
     movement_objective_cost,
     movement_time,
 )
+from core.move_export import plan_from_json
 from core.plan import Movement, RelocationPlan
 from core.results.aggregate import summarize_run_dicts
+from core.results.store import moves_from_records
 from problems.CRP_MO import CRP_MO
 from problems.CRP_Time import CRP_Time
 
@@ -38,7 +42,7 @@ from .crane_time import check_objective, move_time
 from .finish import finish
 from .located import min_due, non_located, well_placed
 from .params import parameters
-from .plan import actions, replay
+from .plan import actions, replay, saved_moves
 from .timer import Stopwatch
 
 ALGORITHMS = [
@@ -277,6 +281,33 @@ class TestCraneTimeAccel(unittest.TestCase):
         mo = CRP_MO(config=problem_config_for_caserta_dat(DEFAULT_CASERTA_DIR / "data3-5-1.dat", {}))
         mo.reset()
         self.assertNotIn("crane_time_accel", mo.get_metrics())
+
+
+class TestSavedMoves(unittest.TestCase):
+    """The final record carries the validated plan as extra["moves"], which save_run writes to the result file."""
+
+    def test_round_trip(self):
+        env = _env("data4-6-7.dat")
+        stacks, positions = read_bay(env)
+        plan = replay(stacks, positions, _plan_by_lowest_stack(stacks, env.config.max_tiers))
+        self.assertEqual(plan_from_json(saved_moves(plan)).movements, plan.movements)
+
+    def test_final_record_of_each_algorithm(self):
+        """The saved moves replay feasibly and give the reported metrics (data3-5-1, f2; Jovanović with 200
+        iterations to keep the test short)."""
+        for (module, name), extra in zip(ALGORITHMS, ({}, {"n_iterations": 200}, {})):
+            with self.subTest(algorithm=name):
+                cls = getattr(importlib.import_module(module), name)
+                q = queue.Queue()
+                cls(config=AlgorithmConfig(extra=extra)).train(lambda: _env("data3-5-1.dat"), q, threading.Event())
+                records = [q.get_nowait() for _ in range(q.qsize())]
+                final = records[-1]
+                self.assertEqual(moves_from_records(records), final.extra["moves"])
+                env = _env("data3-5-1.dat")
+                checked = env.validate_plan(plan_from_json(final.extra["moves"]))
+                self.assertTrue(checked["feasible"])
+                for key in ("relocations", "crane_time_f2", "crane_time_vertical", "crane_time_accel"):
+                    self.assertEqual(checked[key], final.metrics[key], key)
 
 
 class TestStopwatch(unittest.TestCase):

@@ -38,7 +38,7 @@ from algorithms.CRP_Time.utils.bay import read_bay
 from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
-from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.objectives import ObjectiveSpec
@@ -161,6 +161,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         weights = {k: float(cfg.extra[k]) for k in ("eta1", "gamma1", "eta2", "gamma2") if k in cfg.extra}
 
         all_metrics: List[Dict] = []
+        best_moves: List[Dict] = []
 
         for seed_idx in range(n_seeds):
             if stop_event.is_set():
@@ -233,6 +234,7 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = list(best_solution)
+                best_moves = saved_moves(plan)
 
             self._push(
                 result_queue,
@@ -247,7 +249,8 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
         if all_metrics:
             agg = {k: float(np.mean([m[k] for m in all_metrics if k in m]))
                    for k in all_metrics[0]}
-            self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0)
+            self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0,
+                       extra={"moves": best_moves})
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution

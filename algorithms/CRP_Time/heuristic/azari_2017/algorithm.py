@@ -29,7 +29,7 @@ from algorithms.CRP_Time.utils.bay import read_bay
 from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
-from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.objectives import ObjectiveSpec
@@ -70,6 +70,7 @@ class Azari2017CSUM(BaseAlgorithm):
         gbh_limit = max(0.1, float(par["gbh_time_limit_s"]))
         csum_limit = max(0.1, float(par["csum_time_limit_s"]))
         all_metrics: List[Dict[str, float]] = []
+        best_moves: List[Dict] = []
 
         for seed_idx in range(n_seeds):
             if stop_event.is_set():
@@ -110,6 +111,7 @@ class Azari2017CSUM(BaseAlgorithm):
             if primary < self._best_metric:
                 self._best_metric = primary
                 self._best_solution = actions(plan, env.config.num_rows)
+                best_moves = saved_moves(plan)
 
             self._push(
                 result_queue,
@@ -132,7 +134,7 @@ class Azari2017CSUM(BaseAlgorithm):
                 metric=self._best_metric,
                 metrics=agg,
                 progress=1.0,
-                extra=extra,
+                extra={**extra, "moves": best_moves},
             )
 
     def get_best_solution(self) -> Optional[List[int]]:

@@ -35,7 +35,7 @@ from algorithms.CRP_Time.utils.bay import read_bay
 from algorithms.CRP_Time.utils.crane_time import check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
-from algorithms.CRP_Time.utils.plan import actions, replay
+from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
@@ -87,6 +87,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
         report_every = max(1, n_iters // 50)
 
         all_metrics: List[Dict] = []
+        best_moves:  List[Dict] = []
 
         for seed in range(n_seeds):
             if stop_event.is_set():
@@ -175,6 +176,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             if float(best_cost) <= self._best_metric:
                 self._best_metric   = float(best_cost)
                 self._best_solution = actions(best_plan, env.config.num_rows)
+                best_moves          = saved_moves(best_plan)
 
             self._push(
                 result_queue,
@@ -196,6 +198,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
+                extra    = {"moves": best_moves},
             )
 
     def get_best_solution(self) -> Optional[List[int]]:
