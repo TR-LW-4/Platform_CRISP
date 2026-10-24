@@ -14,6 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+from core.objectives import is_practice
+
 # Skip non-scalar / non-numeric noise, and low-value display metrics.
 # retrievals ≈ N (often constant); total_moves = relocations + retrievals.
 SKIP_METRIC_KEYS = frozenset({
@@ -201,10 +203,12 @@ def _objective_values(data: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _crane_time_model_display(data: Mapping[str, Any]) -> str:
-    """Short time-model name of a crane-time run ("f2", "f2vert"); empty otherwise."""
+    """Short time-model name of a crane-time run ("f2", "f2vert", "f2vert (practice)"); empty otherwise."""
     values = _objective_values(data)
     if values.get("objective_mode") != "crane_time":
         return ""
+    if is_practice(values):
+        return "f2vert (practice)"
     model = str(values.get("time_model", "f2"))
     return _TIME_MODEL_DISPLAY.get(model, model)
 

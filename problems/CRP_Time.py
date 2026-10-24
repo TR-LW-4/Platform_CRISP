@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 
 from core.objectives import (
+    PRACTICE_PARAMETERS,
     KinematicsModel,
     ObjectiveSpec,
     evaluate_plan_objectives,
@@ -166,9 +167,17 @@ class CRP_Time(CRP_R):
                 **schema[key],
                 "visibleWhen": {"key": "time_model", "values": []},
             }
+        # The practice preset is f2vert with other parameter values; the run
+        # gets time_model f2_vertical and those values (resolve_values), so its
+        # result files have their own name. tpp keeps its value; it enters
+        # only f2, which is not reported for this preset.
+        practice = PRACTICE_PARAMETERS
         schema["time_model"] = {
             **schema["time_model"],
-            "options": ["f2", "f2_vertical"],
+            "options": ["f2", "f2_vertical", "f2_vertical_practice"],
+            "resolvesTo": {
+                "f2_vertical_practice": {"time_model": "f2_vertical", **preset, **practice},
+            },
             "optionLabels": {
                 "f2": (
                     f"f2 (ts {preset['stack_s_per_stack']:g} s, "
@@ -180,11 +189,18 @@ class CRP_Time(CRP_R):
                     f"tr1 {preset['loaded_vertical_s_per_tier']:g} s, "
                     f"hout {preset['outside_height']:g})"
                 ),
+                "f2_vertical_practice": (
+                    f"f2vert (practice parameters: ts {practice['stack_s_per_stack']:g} s, "
+                    f"tr0 {practice['empty_vertical_s_per_tier']:g} s, "
+                    f"tr1 {practice['loaded_vertical_s_per_tier']:g} s, "
+                    f"hout {practice['outside_height']:g})"
+                ),
             },
             "help": (
                 "Voß–Schwarze (2019) f2 (constant pick-up/place-down time) "
                 "or f2vert (tier-dependent), with the parameter values of "
-                "Voß & Schwarze (2019)."
+                "Voß & Schwarze (2019), or f2vert with practice parameters "
+                "(simulated ASC models; f2 is not reported)."
             ),
         }
         return schema

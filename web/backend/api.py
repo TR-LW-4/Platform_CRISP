@@ -228,10 +228,10 @@ def start_job(payload: RunInput):
         raise HTTPException(404, f"Unknown algorithm: {payload.algorithm_name}")
     try:
         validate_source_for_problem(payload.problem_name, payload.instance_source)
-        problem_values = _config_values(
+        problem_values = problem_cls.resolve_values(_config_values(
             problem_cls.config_schema(),
             payload.problem_config,
-        )
+        ))
         algorithm_values = _config_values(
             algorithm_cls.config_schema(),
             payload.algorithm_config,

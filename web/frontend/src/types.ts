@@ -17,6 +17,8 @@ export interface ConfigField {
   choices?: ConfigValue[]
   /** Text shown for an option instead of its value. */
   optionLabels?: Record<string, string>
+  /** Values a preset option stands for; the backend runs with these instead. */
+  resolvesTo?: Record<string, ConfigValues>
   visibleWhen?: VisibilityCondition | VisibilityCondition[]
 }
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -227,3 +227,18 @@ class BaseProblem(gym.Env, ABC):
             "enable_type":    {"type": "bool",  "default": False},
             "seed":           {"type": "int",   "default": 0,  "min": 0, "max": 9999},
         }
+
+    @classmethod
+    def resolve_values(cls, values: Mapping[str, Any]) -> Dict[str, Any]:
+        """
+        Run values from form values: an option that stands for a preset
+        (``resolvesTo`` of its schema field) is replaced by the values it sets.
+        The web API and main.py call this before a run, so the run, the name
+        of its result file and the saved configuration hold the actual values.
+        """
+        out = dict(values)
+        for key, spec in cls.config_schema().items():
+            preset = (spec.get("resolvesTo") or {}).get(out.get(key))
+            if preset:
+                out.update(preset)
+        return out

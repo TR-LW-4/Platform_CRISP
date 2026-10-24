@@ -10,6 +10,7 @@ interface ClassRow {
 const TIME_MODEL_METRIC: Record<string, string> = {
   f2: 'crane_time_f2',
   f2_vertical: 'crane_time_vertical',
+  f2_vertical_practice: 'crane_time_vertical',
 }
 
 export function displayMetricsOf(problem: ProblemInfo | undefined): string[] {

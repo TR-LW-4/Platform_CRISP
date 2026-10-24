@@ -275,7 +275,7 @@ def cmd_layout_run(
 
     # objective_mode travels with time_model because the saved-result identity
     # is keyed off it; CRP-Time forces "crane_time" as its only mode anyway.
-    prob_params = (
+    prob_params = pcls.resolve_values(
         {"time_model": time_model, "objective_mode": "crane_time"}
         if time_model
         else {}
@@ -505,11 +505,12 @@ if __name__ == "__main__":
     )
     layout_parser.add_argument(
         "--time-model",
-        choices=["f2", "f2_vertical", "rmgc_current"],
+        choices=["f2", "f2_vertical", "f2_vertical_practice", "rmgc_current"],
         help=(
             "CRP-Time crane-time model the search minimises: Voß–Schwarze f2 "
-            "(default), f2vert with tier-dependent pickup/place-down, or the "
-            "legacy multi-bay RMGC model. Other problems ignore it."
+            "(default), f2vert with tier-dependent pickup/place-down, f2vert "
+            "with the practice parameters, or the legacy multi-bay RMGC model. "
+            "Other problems ignore it."
         ),
     )
     layout_parser.add_argument(

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import { defaultsFor } from '../config'
+import { defaultsFor, formValuesFor } from '../config'
 import { InstanceSourcePanel } from '../components/InstanceSourcePanel'
 import { MetricChart } from '../components/MetricChart'
 import { ParameterForm } from '../components/ParameterForm'
@@ -283,7 +283,14 @@ export function Workbench({
           (item) => item.name === resumed.algorithm_name,
         )
         setMethodGroup(resumedAlgorithm?.method_group ?? 'Other')
-        setProblemValues(resumed.problem_config)
+        const resumedProblem = catalog.problems.find(
+          (item) => item.name === resumed.problem_name,
+        )
+        setProblemValues(
+          resumedProblem
+            ? formValuesFor(resumedProblem.config_schema, resumed.problem_config)
+            : resumed.problem_config,
+        )
         setAlgorithmValues(resumed.algorithm_config)
         setInstanceSource(resumed.instance_source ?? 'random')
         setRecords(resumed.records ?? [])

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Mapping, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .plan import Movement, RelocationPlan
@@ -197,6 +197,28 @@ class ObjectiveSpec:
             "f2_vertical": "crane_time_vertical",
             "rmgc_current": "crane_time_rmgc",
         }[self.time_model]
+
+
+# Practice preset of the f2vert type: simulated ASC models with a row pitch of
+# 2.54 m (trolley 1.0 and 1.2 m/s, times averaged), a tier height of 2.591 m and
+# a spreader at 1.5 m/s empty and 0.75 m/s laden, rounded to 0.001 s. It has no
+# value for tpp, so f2 is not reported for it.
+PRACTICE_PARAMETERS: Dict[str, float] = {
+    "stack_s_per_stack": 2.328,
+    "empty_vertical_s_per_tier": 1.727,
+    "loaded_vertical_s_per_tier": 3.455,
+    "outside_height": 1.5,
+}
+
+
+def is_practice(values: Mapping[str, Any]) -> bool:
+    """True for f2vert with the practice parameters (config values or an ObjectiveSpec's fields)."""
+    if values.get("time_model") != "f2_vertical":
+        return False
+    try:
+        return all(float(values[key]) == value for key, value in PRACTICE_PARAMETERS.items())
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def _stack_index(pos: Tuple[int, int], num_rows: int) -> int:
@@ -378,6 +400,8 @@ def evaluate_plan_objectives(
     metrics["crane_time"] = metrics[spec.time_metric]
     metrics["time"] = metrics["crane_time"]
     metrics["objective_value"] = objective_value(metrics, spec)
+    if is_practice({key: getattr(spec, key) for key in ("time_model", *PRACTICE_PARAMETERS)}):
+        del metrics["crane_time_f2"]
     return metrics
 
 
