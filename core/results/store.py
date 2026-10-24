@@ -269,6 +269,25 @@ def save_run(
     return path
 
 
+def with_runtime(
+    metrics: Dict[str, float],
+    train_wall_s: Optional[float],
+) -> Dict[str, float]:
+    """
+    Add the runner's wall clock of ``train()`` to the metrics of a run.
+
+    An algorithm that measures its own running time reports ``runtime_s``
+    itself (the CRP-Time algorithms, algorithms/CRP_Time/utils/timer.py); that
+    value is kept and the wall clock is added as ``train_wall_s``. Otherwise the
+    wall clock is ``runtime_s``, as before.
+    """
+    if train_wall_s is None:
+        return metrics
+    if "runtime_s" in metrics:
+        return {**metrics, "train_wall_s": train_wall_s}
+    return {**metrics, "runtime_s": train_wall_s}
+
+
 def moves_from_records(records: List[Any]) -> Optional[List[Dict[str, Any]]]:
     """Extract ``moves`` from the last progress record, if any."""
     if not records:

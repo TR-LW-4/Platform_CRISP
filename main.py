@@ -221,12 +221,12 @@ def _algorithm_config_from_schema(algo_cls, overrides: dict):
 
 
 def _timed_train(inst, factory, q, ev):
-    """Subprocess target of layout-run: train(), then ("runtime_s", wall clock of train()) on the queue."""
+    """Subprocess target of layout-run: train(), then ("train_wall_s", wall clock of train()) on the queue."""
     import time
 
     started = time.perf_counter()
     inst.train(factory, q, ev)
-    q.put(("runtime_s", time.perf_counter() - started))
+    q.put(("train_wall_s", time.perf_counter() - started))
 
 
 def cmd_layout_run(
@@ -255,7 +255,7 @@ def cmd_layout_run(
     from core.registry import get_algorithm_class, get_problem_class
     from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
     from core.benchmarks.caserta import problem_config_for_caserta_dat
-    from core.results.store import moves_from_records, save_run
+    from core.results.store import moves_from_records, save_run, with_runtime
     from core.benchmarks.zhu import problem_config_for_zhu_txt
 
     root = Path(__file__).resolve().parent
@@ -329,7 +329,7 @@ def cmd_layout_run(
 
     while not q.empty():
         records.append(q.get_nowait())
-    runtime_s = next((r[1] for r in records if isinstance(r, tuple)), None)
+    train_wall_s = next((r[1] for r in records if isinstance(r, tuple)), None)
     records = [r for r in records if not isinstance(r, tuple)]
 
     if not records:
@@ -337,6 +337,7 @@ def cmd_layout_run(
         return
 
     final = records[-1]
+    metrics = with_runtime(final.metrics, train_wall_s)
     algo_cat = getattr(acls, "category", "")
     print(f"\nlayout: {p}")
     print(f"problem={problem}  algorithm={algo}")
@@ -345,8 +346,8 @@ def cmd_layout_run(
         f"best_metric={final.best_metric:.6f}  progress={final.progress:.4f}"
     )
     print(f"metrics: {final.metrics}")
-    if runtime_s is not None:
-        print(f"runtime_s: {runtime_s:.3f}")
+    if train_wall_s is not None:
+        print(f"runtime_s: {metrics['runtime_s']:.3f}  train_wall_s: {train_wall_s:.3f}")
     moves = getattr(final, "extra", None) or {}
     move_list = moves.get("moves") if isinstance(moves, dict) else None
     if move_list:
@@ -372,11 +373,7 @@ def cmd_layout_run(
             seed=abs(hash(p.name)) % 2_000_000_000,
             prob_config=prob_save,
             algo_config=algo_params,
-            metrics=(
-                final.metrics
-                if runtime_s is None
-                else {**final.metrics, "runtime_s": runtime_s}
-            ),
+            metrics=metrics,
             history=history,
             moves=moves_from_records(records),
         )

@@ -27,6 +27,7 @@ from core.results.store import (
     moves_from_records,
     result_path_for,
     save_run,
+    with_runtime,
 )
 from web.backend.summary_pages import save_batch_summary_sidecar
 from web.backend.benchmarks import (
@@ -45,7 +46,8 @@ FINAL_STATUSES = frozenset({"completed", "stopped", "failed"})
 @dataclass(frozen=True)
 class WorkerFinished:
     result_files: tuple = ()
-    runtime_s: Optional[float] = None  # wall clock of train() when the job ran one instance
+    # Single-instance job: the saved runtime_s (layouts), or the wall clock of train() (random layouts).
+    runtime_s: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -133,7 +135,7 @@ def _save_layout_run(
     problem_values: Dict[str, Any],
     algorithm_values: Dict[str, Any],
     records: Sequence[Any],
-    runtime_s: Optional[float] = None,
+    train_wall_s: Optional[float] = None,
 ) -> Optional[str]:
     if not records:
         return None
@@ -159,8 +161,7 @@ def _save_layout_run(
             }
             for r in records
         ]
-    if runtime_s is not None:
-        metrics = {**metrics, "runtime_s": runtime_s}
+    metrics = with_runtime(metrics, train_wall_s)
     prob_save = {
         **problem_values,
         LAYOUT_FILE_EXTRA_KEY: str(layout_path),
@@ -223,6 +224,7 @@ def _worker_main(
             def factory():
                 return problem_cls(config=problem_cfg)
 
+            # The wall clock of train(); _save_completed applies with_runtime.
             started = time.perf_counter()
             algorithm.train(factory, result_queue, stop_event)
             result_queue.put(
@@ -258,7 +260,7 @@ def _worker_main(
 
             started = time.perf_counter()
             algorithm.train(factory, proxy, stop_event)
-            runtime_s = time.perf_counter() - started
+            train_wall_s = time.perf_counter() - started
             # Interrupted instance is unfinished: drop the buffer and continue
             # later from this same layout file.
             if stop_event.is_set():
@@ -272,11 +274,12 @@ def _worker_main(
                 problem_values=problem_values,
                 algorithm_values=algorithm_values,
                 records=buffer,
-                runtime_s=runtime_s,
+                train_wall_s=train_wall_s,
             )
             if saved:
                 result_files.append(saved)
-                runtimes.append(runtime_s)
+                final_metrics = getattr(buffer[-1], "metrics", None) or {}
+                runtimes.append(with_runtime(final_metrics, train_wall_s)["runtime_s"])
 
         result_queue.put(
             WorkerFinished(
@@ -718,6 +721,8 @@ class JobManager:
             }
             for record in job.records
         ]
+        metrics = with_runtime(final["metrics"], job.runtime_s)
+        job.runtime_s = metrics.get("runtime_s")
         try:
             path = save_run(
                 problem=job.problem_name,
@@ -726,11 +731,7 @@ class JobManager:
                 seed=int(job.problem_config.get("seed", 0)),
                 prob_config=job.problem_config,
                 algo_config=job.algorithm_config,
-                metrics=(
-                    final["metrics"]
-                    if job.runtime_s is None
-                    else {**final["metrics"], "runtime_s": job.runtime_s}
-                ),
+                metrics=metrics,
                 history=history,
                 moves=moves_from_records(job.records),
             )
