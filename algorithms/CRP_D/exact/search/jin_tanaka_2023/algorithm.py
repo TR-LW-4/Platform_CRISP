@@ -24,10 +24,9 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
-import numpy as np
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
 from core.layout_trace import trace_layout
@@ -57,7 +56,7 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
-    def get_best_solution(self) -> Optional[List[int]]:
+    def get_best_solution(self) -> Optional[list]:
         return self._best_solution
 
     # ---------------------------------------------------------------- #
@@ -106,19 +105,27 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
             tf.write(instance_text)
             tmp_path = tf.name
 
+        hard_timeout = float(time_limit_sec) + 60.0
         try:
             cmd = [
                 str(binary),
                 "--input",  tmp_path,
                 "--time_limit", str(int(time_limit_sec)),
             ]
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=float(time_limit_sec) + 60.0,
-                check=False,
-            )
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=hard_timeout,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as exc:
+                # subprocess.run() has already killed the child process.
+                raise RuntimeError(
+                    f"Jin solver exceeded the hard timeout of {hard_timeout:.0f}s "
+                    f"(time limit {time_limit_sec}s + 60s grace) and was killed."
+                ) from exc
         finally:
             try:
                 os.unlink(tmp_path)
@@ -129,10 +136,10 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
         stderr = proc.stderr or ""
         blob   = stdout + "\n" + stderr
 
-        return self._parse_output(stdout, blob)
+        return self._parse_output(stdout, blob, proc.returncode)
 
     def _parse_output(
-        self, stdout: str, blob: str
+        self, stdout: str, blob: str, returncode: Optional[int] = None
     ) -> Tuple[int, bool, str]:
         matches = self._STAT_RE.findall(stdout)
         if matches:
@@ -155,7 +162,7 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
 
         raise RuntimeError(
             "Jin solver produced no parseable output.\n"
-            f"returncode={blob[:200]}\n---\n{blob[-4000:]}"
+            f"returncode={returncode}\n---\n{blob[-4000:]}"
         )
 
     # ---------------------------------------------------------------- #
@@ -168,57 +175,72 @@ class JinTanaka2023ForCRPD(BaseAlgorithm):
         result_queue: mp.Queue,
         stop_event: mp.Event,
     ) -> None:
-        cfg_a   = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
-        extra   = cfg_a.extra or {}
+        extra   = self.config.extra or {}
         t_limit = int(extra.get("jin_time_limit_sec", 600))
 
-        all_metrics: List[Dict[str, float]] = []
+        if stop_event.is_set():
+            return
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        trace_layout("JinTanaka2023ForCRPD.train: single run")
 
-            trace_layout(f"JinTanaka2023ForCRPD.train: seed {seed + 1}/{n_seeds}")
+        # The exact solver is deterministic and the instance comes from the
+        # environment, so there is exactly one run (seed 0).
+        env = problem_factory()
+        env.reset(seed=0, options={"skip_auto_retrieve": True})
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        instance_text = yard_to_jin_instance(env.config, env.yard)
 
-            instance_text = yard_to_jin_instance(env.config, env.yard)
-            n_reloc, optimal, _dbg = self._run_solver(instance_text, t_limit)
+        t_start = time.perf_counter()
+        n_reloc, optimal, _dbg = self._run_solver(instance_text, t_limit)
+        runtime = time.perf_counter() - t_start
 
-            metrics = {
-                "relocations":       float(n_reloc),
-                "steps":             float(n_reloc),
-                "time":              float(n_reloc),
-                "optimal_proven":    1.0 if optimal else 0.0,
-                "jin_time_limit_sec": float(t_limit),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
+        metrics: Dict[str, float] = {
+            "relocations":        float(n_reloc),
+            "steps":              float(n_reloc),
+            "time":               0.0,   # same convention as the Tanaka wrapper
+            "runtime_sec":        float(runtime),
+            "optimal_proven":     1.0 if optimal else 0.0,
+            "jin_time_limit_sec": float(t_limit),
+        }
+        primary = float(n_reloc)
 
-            if primary < self._best_metric:
-                self._best_solution = []
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = []   # exact solver does not replay env
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = agg.get("relocations", 0.0),
-                metrics  = agg,
-                progress = 1.0,
-                snapshot = {},
-            )
+    # ---------------------------------------------------------------- #
+    # GUI configuration schema                                           #
+    # ---------------------------------------------------------------- #
+
+    @classmethod
+    def config_schema(cls) -> Dict[str, Any]:
+        base = super().config_schema()
+        base.update({
+            "jin_time_limit_sec": {
+                "type":    "int",
+                "default": 600,
+                "min":     1,
+                "max":     86400,
+                "label":   "IDBB time limit (s)",
+                "help":    "Wall-clock limit passed to main-solve via --time_limit.",
+            },
+            "jin_binary": {
+                "type":    "str",
+                "default": "",
+                "label":   "Path to main-solve (optional)",
+                "help": (
+                    "Leave empty to use the bundled vendor/main-solve. "
+                    "Override or set env JIN_UCRP_BINARY to use a custom build."
+                ),
+            },
+        })
+        return base

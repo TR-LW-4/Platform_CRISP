@@ -104,6 +104,7 @@ export interface BatchClassSummary {
   yard_stacks?: number
   yard_tiers?: number
   metrics: Record<string, MetricAgg>
+  n_opt?: number
 }
 
 export interface BatchSummary {

@@ -237,3 +237,61 @@ def problem_config_for_caserta_dat(dat_path: Path, prob_params_no_geom: Dict[str
         f"path={cfg.extra[LAYOUT_FILE_EXTRA_KEY]}"
     )
     return cfg
+
+
+def apply_group_transform(stacks: List[List[int]], G: int) -> List[List[int]]:
+    """de Melo da Silva (2018) Algorithm 2: priority -> group ID in 1..G."""
+    if G <= 0:
+        raise ValueError(f"G must be positive, got {G}")
+    return [[(p % G) or G for p in stack] for stack in stacks]
+
+
+def problem_config_for_caserta_grouped_dat(
+    dat_path: Path,
+    prob_params_no_geom: Dict[str, Any],
+    G: int,
+):
+    """Caserta instance transformed to grouped priorities (de Melo da Silva Alg. 2)."""
+    from core.base_problem import ProblemConfig
+
+    S, N, raw_stacks = parse_caserta_dat(dat_path)
+    stacks = apply_group_transform(raw_stacks, G)
+    h_cap  = implied_tier_capacity(S, N, raw_stacks)   # geometry unchanged
+
+    cfg = ProblemConfig()
+    for k, v in prob_params_no_geom.items():
+        if k in ("num_bays", "num_rows", "max_tiers",
+                 "num_containers", "num_groups", "seed"):
+            continue
+        if hasattr(cfg, k) and k != "extra":
+            setattr(cfg, k, v)
+        else:
+            cfg.extra[k] = v
+
+    cfg.num_bays       = S
+    cfg.num_rows       = 1
+    cfg.max_tiers      = h_cap
+    cfg.num_containers = N
+    cfg.num_groups     = G
+    cfg.seed           = 0
+    cfg.extra[LAYOUT_FILE_EXTRA_KEY] = str(dat_path.resolve())
+    cfg.extra["group_transform_G"]   = int(G)   # provenance
+    trace_layout(f"caserta_grouped: S={S} N={N} G={G} max_tiers={h_cap}")
+    return cfg, stacks
+
+def apply_grouped_stacks_to_yard(yard, cfg, stacks: List[List[int]]) -> List[Container]:
+    """Place grouped-priority containers (id unique, priority = group)."""
+    from core.container import Container, ContainerSize, ContainerType
+    containers, cid = [], 1
+    for s_idx, groups in enumerate(stacks):
+        for g in groups:
+            containers.append(Container(
+                id=cid, group=g, priority=g,
+                weight=10.0, size=ContainerSize.TEU, ctype=ContainerType.STANDARD,
+            ))
+            cid += 1
+    it = iter(containers)
+    for s_idx, groups in enumerate(stacks):
+        for _ in groups:
+            yard.place(s_idx + 1, 1, next(it))
+    return containers

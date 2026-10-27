@@ -11,6 +11,7 @@ from core.benchmarks.caserta import (
     collect_paths_from_hw_queue,
     index_ws_by_height,
     problem_config_for_caserta_dat,
+    problem_config_for_caserta_grouped_dat,
 )
 from core.benchmarks.zhu import (
     DEFAULT_ZHU_DIR,
@@ -137,6 +138,20 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
                 "and one or more (S, N) scales."
             ),
         })
+        ws_by_height = index_ws_by_height(caserta_root())
+        heights = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
+        sources.append({
+            "id": SOURCE_CASERTA,
+            "label": "Caserta Benchmark",
+            "available": bool(heights),
+            "heights": heights,
+            "ws_by_height": {str(h): ws_by_height[h] for h in heights},
+            "caption": (
+                "Filename data[H]-[w]-[id].dat. Select height H and one or more "
+                "stack counts w, then add to the instance list. For de Melo da "
+                "Silva algorithms, num_groups controls the Caserta priority grouping."
+            ),
+        })
 
     if problem_name in BENCH_STOW_PROBLEMS:
         classes_by_a = index_classes_by_min_vessel_height(stow_root())
@@ -256,9 +271,22 @@ def problem_config_for_layout(
     source: str,
     layout_path: Path,
     problem_values: Mapping[str, Any],
+    algorithm_name: Optional[str] = None,
 ):
     """Build ProblemConfig for one benchmark layout file."""
     params = dict(problem_values)
+    if (
+        source == SOURCE_CASERTA
+        and algorithm_name is not None
+        and algorithm_name.startswith("de Melo da Silva (2018)")
+    ):
+        cfg, grouped_stacks = problem_config_for_caserta_grouped_dat(
+            layout_path,
+            params,
+            G=int(params.get("num_groups", 3)),
+        )
+        cfg.extra["caserta_grouped_stacks"] = grouped_stacks
+        return cfg
     if source == SOURCE_ZHU_DUP:
         return problem_config_for_zhu_dup_txt(layout_path, params)
     if source == SOURCE_ZHU:
@@ -282,11 +310,16 @@ def validate_source_for_problem(problem_name: str, source: str) -> None:
         if problem_name in NO_RANDOM_PROBLEMS:
             raise ValueError(
                 f"{problem_name} uses standard benchmark instances only "
-                "(Caserta/Zhu for CRP-R/U, ZhuDup for CRP-D)"
+                "(Caserta/Zhu for CRP-R/U; Caserta/ZhuDup for CRP-D)"
             )
         return
-    if source in {SOURCE_CASERTA, SOURCE_ZHU} and problem_name not in BENCH_PROBLEMS:
-        raise ValueError(f"{source} benchmark requires CRP-R or CRP-U")
+    if (
+        source == SOURCE_CASERTA
+        and problem_name not in BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
+    ):
+        raise ValueError("caserta benchmark requires CRP-R, CRP-U, or CRP-D")
+    if source == SOURCE_ZHU and problem_name not in BENCH_PROBLEMS:
+        raise ValueError("zhu benchmark requires CRP-R or CRP-U")
     if source == SOURCE_ZHU_DUP and problem_name not in BENCH_DUP_PROBLEMS:
         raise ValueError("zhu_dup benchmark requires CRP-D")
     if source == SOURCE_STOW and problem_name not in BENCH_STOW_PROBLEMS:

@@ -116,10 +116,30 @@ class CRP_D(BaseProblem):
         path_str = layout_path_from_extra(self.config.extra)
         if not path_str:
             raise ValueError(
-                "CRP-D requires a ZhuDup layout file "
+                "CRP-D requires a Caserta or ZhuDup benchmark layout file "
                 "(set extra['layout_file_path']). Random layouts are disabled."
             )
-        self._load_zhu_dup_file(Path(path_str))
+        path = Path(path_str)
+        grouped_stacks = self.config.extra.get("caserta_grouped_stacks")
+        if grouped_stacks is not None:
+            from core.benchmarks.caserta import apply_grouped_stacks_to_yard
+
+            self.containers = apply_grouped_stacks_to_yard(
+                self.yard,
+                self.config,
+                grouped_stacks,
+            )
+        elif path.suffix.lower() == ".dat":
+            from core.benchmarks.caserta import apply_caserta_file_to_yard
+
+            trace_layout(f"CRP_D._build_episode: Caserta file {path.resolve()}")
+            self.containers = apply_caserta_file_to_yard(
+                self.yard,
+                self.config,
+                path,
+            )
+        else:
+            self._load_zhu_dup_file(path)
 
     def _load_zhu_dup_file(self, path: Path) -> None:
         from core.benchmarks.zhu_duplicate import apply_dup_file_to_yard

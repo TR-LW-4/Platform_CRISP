@@ -234,6 +234,7 @@ def _worker_main(
                 instance_source,
                 layout_path,
                 problem_values,
+                algorithm_name=algorithm_name,
             )
             algorithm = algorithm_cls(config=algorithm_cfg)
             buffer: List[Any] = []

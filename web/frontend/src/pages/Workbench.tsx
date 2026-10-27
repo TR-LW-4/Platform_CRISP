@@ -210,13 +210,19 @@ const HIDDEN_SUMMARY_METRICS = new Set([
   'steps',
   'progress',
   'optimal_proven',
+  'n_opt',
 ])
 
-function summaryMetricKeys(classes: BatchClassSummary[]): string[] {
+function summaryMetricKeys(classes: BatchClassSummary[], problemName: string): string[] {
   const keys = new Set<string>()
   for (const row of classes) {
     Object.keys(row.metrics || {}).forEach((key) => {
-      if (!HIDDEN_SUMMARY_METRICS.has(key)) keys.add(key)
+      if (
+        !HIDDEN_SUMMARY_METRICS.has(key) &&
+        !(problemName === 'CRP-D' && key === 'time')
+      ) {
+        keys.add(key)
+      }
     })
   }
   // Prefer literature-facing metrics first when present.
@@ -328,8 +334,8 @@ export function Workbench({
     [algorithm, problemName, objectiveMode, numBays, numRows, restrictedRelocation],
   )
   const batchMetricKeys = useMemo(
-    () => summaryMetricKeys(job?.batch_summary?.classes ?? []),
-    [job?.batch_summary],
+    () => summaryMetricKeys(job?.batch_summary?.classes ?? [], problemName),
+    [job?.batch_summary, problemName],
   )
 
   useEffect(() => {
@@ -787,10 +793,12 @@ export function Workbench({
                 <span>Current metric</span>
                 <strong>{displayNumber(latest?.metric)}</strong>
               </article>
-              <article className="metric-card">
-                <span>Best metric</span>
-                <strong>{displayNumber(latest?.best_metric)}</strong>
-              </article>
+              {problem?.name !== 'CRP-D' && (
+                <article className="metric-card">
+                  <span>Best metric</span>
+                  <strong>{displayNumber(latest?.best_metric)}</strong>
+                </article>
+              )}
               <article className="metric-card">
                 <span>{batchLabel ? 'Batch' : 'Updates'}</span>
                 <strong>{batchLabel ?? records.length}</strong>
@@ -832,6 +840,7 @@ export function Workbench({
                         <tr>
                           <th>Class</th>
                           <th>n</th>
+                          <th title="Instances proven optimal (compare with #opt in the paper)">#opt</th>
                           {batchMetricKeys.flatMap((key) => [
                             <th key={`${key}-mean`}>{key} mean</th>,
                             <th key={`${key}-std`}>{key} std</th>,
@@ -843,6 +852,11 @@ export function Workbench({
                           <tr key={`${row.source}-${row.label}`}>
                             <td><code>{row.label}</code></td>
                             <td>{row.n}</td>
+                              <td>
+                                {row.n_opt === undefined || row.n_opt === null
+                                  ? '—'
+                                  : `${row.n_opt} / ${row.n}`}
+                              </td>
                             {batchMetricKeys.flatMap((key) => {
                               const agg = row.metrics?.[key]
                               return [

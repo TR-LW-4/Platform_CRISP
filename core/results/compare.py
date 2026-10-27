@@ -205,10 +205,14 @@ def compare_algorithms(
         "shifters",
     ]
     metric_keys = {m for m in metric_keys if m not in SKIP_METRIC_KEYS}
+    if problem == "CRP-D":
+        metric_keys.discard("time")
     available_metrics = [m for m in preferred if m in metric_keys]
     for m in sorted(metric_keys):
         if m not in available_metrics:
             available_metrics.append(m)
+    if problem == "CRP-D" and metric == "time":
+        metric = "relocations"
     if metric not in available_metrics and available_metrics:
         metric = available_metrics[0]
 

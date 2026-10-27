@@ -74,12 +74,6 @@ export function Compare({ catalog, active = true }: CompareProps) {
     void loadFolders(problem)
   }, [active, problem])
 
-  useEffect(() => {
-    if (table?.available_metrics?.length && !table.available_metrics.includes(metric)) {
-      setMetric(table.available_metrics[0])
-    }
-  }, [table, metric])
-
   const toggle = (algorithm: string) => {
     setSelected((prev) =>
       prev.includes(algorithm)
@@ -214,8 +208,14 @@ export function Compare({ catalog, active = true }: CompareProps) {
     const raw = table?.available_metrics?.length
       ? table.available_metrics
       : ['relocations', 'crane_time', 'time', 'steps']
-    return raw.filter((m) => !hidden.has(m))
-  }, [table])
+    return raw.filter((m) => !hidden.has(m) && !(problem === 'CRP-D' && m === 'time'))
+  }, [problem, table])
+
+  useEffect(() => {
+    if (metricOptions.length && !metricOptions.includes(metric)) {
+      setMetric(metricOptions[0])
+    }
+  }, [metric, metricOptions])
 
   return (
     <main className="page compare-page">

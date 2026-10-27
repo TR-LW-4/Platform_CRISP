@@ -3,6 +3,10 @@ Aggregate saved benchmark runs by size class (mean / std).
 
 Does not touch algorithm logic: consumes result JSON written by ``save_run``.
 Caserta files use ``data{H}-{w}-{id}.dat``; Zhu uses parent folder ``H-S-N``.
+
+For exact solvers that report ``optimal_proven`` (1.0 / 0.0 per instance), each
+class additionally gets an ``n_opt`` metric = number of instances proven
+optimal, comparable to the ``#opt`` column in the Tanaka / Jin papers.
 """
 
 from __future__ import annotations
@@ -17,7 +21,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 # Skip non-scalar / non-numeric noise, and low-value display metrics.
 # retrievals ≈ N (often constant); total_moves = relocations + retrievals.
 SKIP_METRIC_KEYS = frozenset({
-    "optimal_proven",
+    "optimal_proven",  # replaced by the per-class count ``n_opt``
+    "jin_time_limit_sec",  # constant solver setting, not a result
     "progress",
     "retrievals",
     "total_moves",
@@ -84,7 +89,7 @@ def _class_from_layout_path(path: Path) -> Optional[Tuple[str, str, Dict[str, in
     Return ``(source, label, dims)`` or ``None``.
 
     * Caserta: source=caserta, label=\"3×3\", dims={h, w}
-    * Zhu:     source=zhu,     label=\"5-8-39\", dims={h, s, n}
+    * Zhu:     source=zhu,     label=\"5-8-39\", dims={h, s, n_dim}
     """
     parsed = _parse_caserta_filename(path)
     if parsed is not None:
@@ -243,25 +248,28 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
     {
       "classes": [
         {
-          "source": "caserta",
-          "label": "3×3",
-          "h": 3, "w": 3,
-          "n": 40,
+          "source": "zhu",
+          "label": "3-6-15",
+          "h": 3, "s": 6, "n_dim": 15,
+          "n": 100,
+          "n_opt": 100,            # only for solvers reporting optimal_proven
           "metrics": {
             "relocations": {"mean": ..., "std": ...},
+            "n_opt": {"mean": 100.0, "std": 0.0},
             ...
           }
         },
         ...
       ],
       "ungrouped": 0,
-      "total_runs": 40,
+      "total_runs": 100,
     }
     """
     buckets: Dict[Tuple[str, str], Dict[str, Any]] = {}
     metric_values: Dict[Tuple[str, str], Dict[str, List[float]]] = defaultdict(
         lambda: defaultdict(list)
     )
+    opt_values: Dict[Tuple[str, str], List[float]] = defaultdict(list)
     ungrouped = 0
     total = 0
 
@@ -290,6 +298,9 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
         metrics = data.get("metrics") or {}
         if not isinstance(metrics, Mapping):
             continue
+        raw_opt = metrics.get("optimal_proven")
+        if isinstance(raw_opt, (int, float)) and not isinstance(raw_opt, bool):
+            opt_values[key].append(1.0 if float(raw_opt) >= 0.5 else 0.0)
         for name, raw in metrics.items():
             if name in _SKIP_METRIC_KEYS:
                 continue
@@ -310,6 +321,11 @@ def summarize_run_dicts(runs: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
                 "mean": round(mean, 6),
                 "std": round(std, 6),
             }
+        if key in opt_values:
+            n_opt = int(sum(opt_values[key]))
+            meta["n_opt"] = n_opt
+            out_metrics["n_opt"] = {"mean": float(n_opt), "std": 0.0}
+            n = max(n, len(opt_values[key]))
         meta["n"] = n
         meta["metrics"] = out_metrics
         classes.append(meta)
