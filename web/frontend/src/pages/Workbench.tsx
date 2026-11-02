@@ -610,6 +610,11 @@ export function Workbench({
                 || !algorithm
                 || (usingLayout && resolvedCount <= 0)
               }
+              title={
+                usingLayout && resolvedCount <= 0
+                  ? 'Select stack counts (w / S) and click "Add to instance list" first.'
+                  : undefined
+              }
               onClick={start}
             >
               {usingLayout

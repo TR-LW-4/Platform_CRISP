@@ -155,6 +155,15 @@ def stable_result_stem(
                 f"{_objective_result_suffix(prob_config)}"
             )
 
+        if len(path.parent.name) == 4 and path.parent.name.isdigit():
+            s = int(path.parent.name[:2])
+            t = int(path.parent.name[2:])
+            safe_stem = re.sub(r"[^\w.\-]+", "_", path.stem)
+            return (
+                f"ku_T{t}_S{s}_{safe_stem}"
+                f"{_objective_result_suffix(prob_config)}"
+            )
+
         # Unknown layout filename: still stable per path basename.
         safe = re.sub(r"[^\w.\-]+", "_", path.stem)
         return f"layout_{safe}{_objective_result_suffix(prob_config)}"

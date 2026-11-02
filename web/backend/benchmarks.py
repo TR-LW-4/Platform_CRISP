@@ -35,6 +35,7 @@ from core.benchmarks.stow import (
 )
 
 BENCH_PROBLEMS = frozenset({"CRP-R", "CRP-U"})
+CASERTA_SUPPORTED_PROBLEMS = frozenset({"CRP-R", "CRP-U", "CRP-Online (2026 Paper)"})
 BENCH_DUP_PROBLEMS = frozenset({"CRP-D"})
 BENCH_STOW_PROBLEMS = frozenset({"CRP-Stow"})
 # These problems only accept Caserta / Zhu / ZhuDup files — no random layouts.
@@ -42,6 +43,7 @@ NO_RANDOM_PROBLEMS = BENCH_PROBLEMS | BENCH_DUP_PROBLEMS
 
 SOURCE_RANDOM = "random"
 SOURCE_CASERTA = "caserta"
+SOURCE_KU = "ku_arthanari"
 SOURCE_ZHU = "zhu"
 SOURCE_ZHU_DUP = "zhu_dup"
 SOURCE_STOW = "crp_stow"
@@ -71,6 +73,62 @@ def stow_root() -> Path:
     )
 
 
+def ku_root() -> Path:
+    candidates = [
+        _project_root() / "crp_online" / "data" / "ku_arthanari",
+        _project_root() / "benchmark" / "ku_arthanari",
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+def index_ws_by_height_ku(root: Path) -> Tuple[List[int], Dict[str, List[int]]]:
+    ws_by_h: Dict[int, List[int]] = {}
+    if root.is_dir():
+        for sub in root.iterdir():
+            if sub.is_dir() and len(sub.name) == 4 and sub.name.isdigit():
+                w = int(sub.name[:2])
+                h = int(sub.name[2:])
+                ws_by_h.setdefault(h, []).append(w)
+    heights = sorted(ws_by_h.keys())
+    ws_dict = {str(h): sorted(set(ws_by_h[h])) for h in heights}
+    return heights, ws_dict
+
+
+def collect_paths_from_ku_queue(root: Path, queue: Sequence[Mapping[str, Any]]) -> List[Path]:
+    paths: List[Path] = []
+    seen = set()
+    for block in queue:
+        h = int(block.get("h", 0))
+        for w in block.get("ws", []):
+            folder = root / f"{int(w):02d}{h:02d}"
+            if folder.is_dir():
+                for f in sorted(folder.glob("*.txt")):
+                    if f not in seen:
+                        seen.add(f)
+                        paths.append(f)
+    return paths
+
+
+def problem_config_for_ku_txt(layout_path: Path, problem_values: Mapping[str, Any]):
+    from core.base_problem import ProblemConfig
+    from core.benchmark_keys import LAYOUT_FILE_EXTRA_KEY
+    from crp_online.io.ku_loader import parse_ku_file
+    inst = parse_ku_file(layout_path)
+    extra = dict(problem_values.get("extra") or {})
+    extra[LAYOUT_FILE_EXTRA_KEY] = str(layout_path)
+    return ProblemConfig(
+        num_bays=1,
+        num_rows=inst.num_stacks,
+        max_tiers=inst.num_tiers,
+        num_containers=inst.num_containers,
+        seed=int(problem_values.get("seed", 0)),
+        extra=extra,
+    )
+
+
 def available_for_problem(problem_name: str) -> Dict[str, Any]:
     """Return selectable instance sources and indexes for one problem."""
     sources: List[Dict[str, Any]] = []
@@ -81,7 +139,7 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
             "available": True,
         })
 
-    if problem_name in BENCH_PROBLEMS:
+    if problem_name in CASERTA_SUPPORTED_PROBLEMS:
         ws_by_height = index_ws_by_height(caserta_root())
         heights = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
         sources.append({
@@ -110,6 +168,20 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
             "caption": (
                 "Folders named H-S-N. Select height H and one or more (S, N) "
                 "scales; every .txt in each selected folder is included."
+            ),
+        })
+
+    if problem_name == "CRP-Online (2026 Paper)":
+        ku_h, ku_ws = index_ws_by_height_ku(ku_root())
+        sources.append({
+            "id": SOURCE_KU,
+            "label": "Ku & Arthanari Benchmark",
+            "available": bool(ku_h),
+            "heights": ku_h,
+            "ws_by_height": ku_ws,
+            "caption": (
+                "CRPTW benchmark with time windows (24 scenarios, 720 instances). "
+                "Select Tier height T (3-6) and Stack count S (5-10)."
             ),
         })
 
@@ -231,6 +303,8 @@ def resolve_paths(
     """Materialize layout paths from a GUI instance queue."""
     if source == SOURCE_CASERTA:
         paths = collect_paths_from_hw_queue(caserta_root(), _normalize_hw_queue(queue))
+    elif source == SOURCE_KU:
+        paths = collect_paths_from_ku_queue(ku_root(), _normalize_hw_queue(queue))
     elif source == SOURCE_ZHU:
         paths = collect_paths_from_zhu_queue(zhu_root(), _normalize_sn_queue(queue))
     elif source == SOURCE_ZHU_DUP:
@@ -261,6 +335,8 @@ def problem_config_for_layout(
     params = dict(problem_values)
     if source == SOURCE_ZHU_DUP:
         return problem_config_for_zhu_dup_txt(layout_path, params)
+    if source == SOURCE_KU:
+        return problem_config_for_ku_txt(layout_path, params)
     if source == SOURCE_ZHU:
         return problem_config_for_zhu_txt(layout_path, params)
     if source == SOURCE_STOW:
@@ -271,6 +347,7 @@ def problem_config_for_layout(
 def source_tag(source: str) -> str:
     return {
         SOURCE_CASERTA: "caserta_batch",
+        SOURCE_KU: "ku_arthanari_batch",
         SOURCE_ZHU: "zhu_batch",
         SOURCE_ZHU_DUP: "zhu_dup_batch",
         SOURCE_STOW: "crp_stow_batch",
@@ -285,8 +362,12 @@ def validate_source_for_problem(problem_name: str, source: str) -> None:
                 "(Caserta/Zhu for CRP-R/U, ZhuDup for CRP-D)"
             )
         return
-    if source in {SOURCE_CASERTA, SOURCE_ZHU} and problem_name not in BENCH_PROBLEMS:
-        raise ValueError(f"{source} benchmark requires CRP-R or CRP-U")
+    if source in {SOURCE_CASERTA, SOURCE_ZHU} and problem_name not in CASERTA_SUPPORTED_PROBLEMS:
+        raise ValueError(
+            f"{source} benchmark requires CRP-R, CRP-U, or CRP-Online (2026 Paper)"
+        )
+    if source == SOURCE_KU and problem_name != "CRP-Online (2026 Paper)":
+        raise ValueError("ku_arthanari benchmark requires CRP-Online (2026 Paper)")
     if source == SOURCE_ZHU_DUP and problem_name not in BENCH_DUP_PROBLEMS:
         raise ValueError("zhu_dup benchmark requires CRP-D")
     if source == SOURCE_STOW and problem_name not in BENCH_STOW_PROBLEMS:
@@ -294,6 +375,7 @@ def validate_source_for_problem(problem_name: str, source: str) -> None:
     if source not in {
         SOURCE_RANDOM,
         SOURCE_CASERTA,
+        SOURCE_KU,
         SOURCE_ZHU,
         SOURCE_ZHU_DUP,
         SOURCE_STOW,

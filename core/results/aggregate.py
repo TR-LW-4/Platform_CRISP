@@ -109,6 +109,12 @@ def _class_from_layout_path(path: Path) -> Optional[Tuple[str, str, Dict[str, in
     if folder is not None:
         h, s, n = folder
         return "zhu", f"{h}-{s}-{n}", {"h": h, "s": s, "n_dim": n}
+
+    if len(path.parent.name) == 4 and path.parent.name.isdigit():
+        s = int(path.parent.name[:2])
+        t = int(path.parent.name[2:])
+        return "ku_arthanari", f"T={t} · S={s}", {"h": t, "s": s, "w": s}
+
     return None
 
 

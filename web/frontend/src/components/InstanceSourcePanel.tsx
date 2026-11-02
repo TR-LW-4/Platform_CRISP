@@ -98,7 +98,7 @@ export function InstanceSourcePanel({
   }, [activeSource, alpha, source])
 
   const heights = useMemo(() => {
-    if (source === 'caserta' || source === 'crp_stow') {
+    if (source === 'caserta' || source === 'crp_stow' || source === 'ku_arthanari') {
       return activeSource?.heights ?? []
     }
     return snIndex?.heights ?? []
@@ -118,7 +118,7 @@ export function InstanceSourcePanel({
   }, [heights, height])
 
   const wsOptions = useMemo(() => {
-    if (source !== 'caserta' || height === '' || !activeSource?.ws_by_height) return []
+    if ((source !== 'caserta' && source !== 'ku_arthanari') || height === '' || !activeSource?.ws_by_height) return []
     return activeSource.ws_by_height[String(height)] ?? []
   }, [activeSource, height, source])
 
@@ -173,8 +173,14 @@ export function InstanceSourcePanel({
 
   const addToQueue = () => {
     if (height === '') return
-    if (source === 'caserta') {
-      if (!selectedWs.length) return
+    if (source === 'caserta' || source === 'ku_arthanari') {
+      if (!selectedWs.length) {
+        setError(
+          `Please click on at least one stack count (${source === 'ku_arthanari' ? 'S' : 'w'}) chip above, then click "Add to instance list".`
+        )
+        return
+      }
+      setError('')
       const next = queue.map((block) => ({ ...block, ws: [...(block.ws ?? [])] }))
       const existing = next.find((block) => block.h === height)
       if (existing) {
@@ -298,7 +304,7 @@ export function InstanceSourcePanel({
         <>
           <label className="field">
             <span>
-              {source === 'crp_stow' ? 'Minimum vessel height A' : 'Height H'}
+              {source === 'crp_stow' ? 'Minimum vessel height A' : source === 'ku_arthanari' ? 'Tier height T' : 'Height H'}
             </span>
             <select
               value={height === '' ? '' : String(height)}
@@ -316,9 +322,33 @@ export function InstanceSourcePanel({
             </select>
           </label>
 
-          {source === 'caserta' ? (
+          {source === 'caserta' || source === 'ku_arthanari' ? (
             <fieldset className="multi-select" disabled={disabled}>
-              <legend>Stack counts w</legend>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <legend style={{ margin: 0 }}>{source === 'ku_arthanari' ? 'Stack counts S' : 'Stack counts w'}</legend>
+                <button
+                  type="button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#2563eb',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                  }}
+                  onClick={() => {
+                    setError('')
+                    if (selectedWs.length === wsOptions.length) {
+                      setSelectedWs([])
+                    } else {
+                      setSelectedWs([...wsOptions])
+                    }
+                  }}
+                >
+                  {selectedWs.length === wsOptions.length ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
               <div className="chip-grid">
                 {wsOptions.map((w) => {
                   const checked = selectedWs.includes(w)
@@ -328,6 +358,7 @@ export function InstanceSourcePanel({
                         type="checkbox"
                         checked={checked}
                         onChange={() => {
+                          setError('')
                           setSelectedWs((current) =>
                             checked
                               ? current.filter((item) => item !== w)
@@ -335,7 +366,7 @@ export function InstanceSourcePanel({
                           )
                         }}
                       />
-                      w={w}
+                      {source === 'ku_arthanari' ? `S=${w}` : `w=${w}`}
                     </label>
                   )
                 })}
@@ -418,9 +449,9 @@ export function InstanceSourcePanel({
               {queue.map((block, index) => (
                 <li key={`${block.h}-${index}`}>
                   <span>
-                    {source === 'crp_stow' ? 'A' : 'H'}={block.h}
+                    {source === 'crp_stow' ? 'A' : source === 'ku_arthanari' ? 'T' : 'H'}={block.h}
                     {block.ws
-                      ? ` · w=${block.ws.join(',')}`
+                      ? ` · ${source === 'ku_arthanari' ? 'S' : 'w'}=${block.ws.join(',')}`
                       : block.stow_classes
                         ? ` · ${block.stow_classes
                             .map((item) => (

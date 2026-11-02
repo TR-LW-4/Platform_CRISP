@@ -1,0 +1,30 @@
+- + / - DIFF SH * / DIFF RI + DIFF EMP / * SH + SH SH / / RI DIFF + DIFF DIFF + * * - EMP SH * RI DIFF + EMP / RI DIFF / / RI SH / / RI DIFF + DIFF DIFF 
++ * + * * SH DIFF * RI DIFF * * RI RI * DIFF RI * * SH / SH EMP / / SH EMP * RI RI - + * * EMP DIFF * RI DIFF * SH * RI RI / SH DIFF 
++ + EMP * + RI SH / * DIFF SH / RI DIFF - * + / DIFF DIFF / DIFF EMP * / RI EMP + DIFF RI * / / DIFF DIFF + EMP DIFF + / SH RI - RI RI 
+- * / * / SH RI * DIFF SH - SH + RI SH * * + RI DIFF / DIFF EMP RI / + + / EMP EMP + SH SH * * RI DIFF + DIFF DIFF - / * DIFF SH * RI RI - + RI EMP + EMP DIFF 
+- * * RI * + SH SH / SH RI - / * DIFF DIFF RI / SH SH / + / + DIFF SH + DIFF EMP / RI - RI DIFF DIFF 
++ - + * * DIFF SH - DIFF EMP * - RI DIFF * RI SH * + DIFF + SH SH + SH SH * * - RI SH + DIFF DIFF * RI + SH - SH RI 
++ + / / * EMP SH - EMP EMP / - RI DIFF + SH RI * + * EMP DIFF RI / * RI DIFF - RI DIFF * * RI * / SH EMP / DIFF RI * / SH EMP / DIFF RI 
+- / + - * EMP RI / SH EMP * * SH SH * DIFF DIFF RI / / - * SH SH + RI DIFF / * RI EMP * DIFF DIFF + EMP DIFF 
+- / - * * RI DIFF * SH DIFF + * DIFF RI * RI DIFF + / SH * SH SH / * RI RI SH + / + / SH DIFF - EMP EMP DIFF * RI DIFF 
+- / - * RI DIFF + / DIFF RI * RI RI - + * DIFF EMP / DIFF RI * + DIFF RI / RI SH * / * SH + DIFF RI * SH RI * SH RI 
++ - + * RI - DIFF RI * * EMP RI - EMP DIFF / / + SH RI / RI EMP - + DIFF EMP / RI EMP - + * RI - DIFF RI * * EMP RI - EMP DIFF / * SH - RI DIFF / RI * SH DIFF 
++ * * * RI SH - DIFF RI / * DIFF DIFF * RI DIFF - * * * RI SH * SH DIFF / + DIFF DIFF * RI RI / / + SH DIFF + DIFF EMP * * DIFF DIFF + RI EMP 
+- - * + / RI DIFF RI * - DIFF SH / DIFF RI / SH DIFF / * * + DIFF RI / SH EMP * * DIFF DIFF SH RI 
+- - / - + RI DIFF SH + * EMP SH / SH DIFF - * * RI EMP - DIFF EMP / / DIFF SH * RI RI * / * + DIFF DIFF / SH DIFF - / DIFF DIFF + RI RI * / DIFF / RI DIFF / RI / EMP SH 
++ * * RI * DIFF SH / * DIFF SH * RI RI - / * RI + SH DIFF / + DIFF DIFF * SH RI / / / RI DIFF * SH RI + + SH DIFF - EMP SH 
++ / / DIFF / - DIFF RI / EMP RI + / DIFF RI - - RI EMP DIFF - - RI * / DIFF RI * SH RI * SH RI 
++ * + / + SH SH / RI DIFF + - SH RI - SH DIFF * * / RI SH * SH SH + / DIFF EMP / DIFF SH - * * * SH DIFF / RI SH - / DIFF EMP / RI SH / + DIFF SH - + DIFF SH - SH RI 
+- + * / / DIFF RI RI * * DIFF SH * RI SH * RI - / DIFF RI * EMP DIFF * + / SH DIFF / DIFF RI / + + SH DIFF EMP * RI SH 
++ - / * * RI DIFF + RI DIFF / DIFF RI * / * RI SH + RI EMP * / DIFF RI * DIFF DIFF + RI / / * EMP DIFF * EMP DIFF - - RI DIFF + RI EMP 
++ * * - / SH RI - DIFF DIFF RI - - / SH EMP RI DIFF / / - RI RI * RI / RI RI - / SH EMP + + EMP SH DIFF 
+- - * - DIFF / RI DIFF / * SH SH / RI DIFF DIFF / / * SH SH / RI - DIFF RI + + + EMP SH + SH EMP + + EMP DIFF / SH RI 
+- / / * DIFF RI / RI * SH DIFF - / * RI RI / SH SH * DIFF EMP * RI - RI * / SH RI - EMP DIFF 
++ / * SH EMP * + - RI DIFF * RI DIFF - DIFF RI - * RI * RI EMP * - + SH EMP - DIFF RI * / DIFF RI / SH EMP 
+- / * * + DIFF RI / SH EMP + * SH DIFF SH RI - * / + RI RI * RI SH / / DIFF EMP * DIFF DIFF * RI EMP 
++ - + * * RI DIFF * RI SH / * RI RI + RI RI / - DIFF * RI EMP - * SH RI + SH DIFF / * - + SH EMP - RI EMP * + SH SH * RI DIFF / - - SH EMP * EMP SH / - EMP DIFF / RI SH 
++ * * EMP EMP / * EMP RI / EMP EMP + * * * RI SH / DIFF RI * + SH SH / DIFF RI - * * EMP RI - DIFF RI / / EMP RI + DIFF EMP 
+- - + * * EMP EMP RI / + EMP SH - RI DIFF * / * EMP SH + DIFF SH + / SH EMP / EMP EMP / * * - DIFF RI + SH SH * RI - EMP DIFF - * * EMP RI RI / DIFF * RI SH 
++ / / - / DIFF SH * DIFF SH * / EMP DIFF * RI RI / - + SH SH / DIFF SH * * SH DIFF RI * / - EMP * DIFF RI + - RI DIFF + RI RI + * RI EMP + / SH EMP / RI SH 
+- / * - * DIFF SH + EMP RI SH / RI DIFF + * / RI - SH RI * DIFF RI * / SH * DIFF DIFF SH 
++ + / + * SH RI * DIFF SH - / RI DIFF / RI SH - / + SH EMP - RI DIFF + * RI DIFF RI / / / / RI SH EMP EMP / * EMP / EMP DIFF - * SH DIFF DIFF 

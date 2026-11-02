@@ -36,9 +36,25 @@ python main.py bench-summary --problem "CRP-R" --algo "Caserta (2012) HEUR" --li
 
 import sys
 import os
+from typing import Any
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
+
+
+class ProblemFactory:
+    """Picklable callable for multiprocessing subprocess workers on Windows."""
+    def __init__(self, pcls: type, cfg: Any):
+        self.pcls = pcls
+        self.cfg = cfg
+
+    def __call__(self) -> Any:
+        return self.pcls(config=self.cfg)
 
 
 def cmd_web(host: str, port: int):
@@ -106,8 +122,7 @@ def cmd_test():
         q = mp.Queue()
         ev = mp.Event()
 
-        def factory(_p=pcls, _c=cfg):
-            return _p(config=_c)
+        factory = ProblemFactory(pcls, cfg)
 
         proc = mp.Process(target=algo.train, args=(factory, q, ev), daemon=True)
         proc.start()
@@ -148,8 +163,7 @@ def cmd_run(problem: str, algo: str, iterations: int):
     q     = mp.Queue()
     ev    = mp.Event()
 
-    def factory(_p=pcls, _c=cfg_p):
-        return _p(config=_c)
+    factory = ProblemFactory(pcls, cfg_p)
 
     print(f"\nRunning {algo} on {problem} for {iterations} iterations...")
     proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
@@ -264,8 +278,7 @@ def cmd_layout_run(
 
     import multiprocessing as mp
 
-    def factory():
-        return pcls(config=prob_cfg)
+    factory = ProblemFactory(pcls, prob_cfg)
 
     q = mp.Queue()
     ev = mp.Event()
