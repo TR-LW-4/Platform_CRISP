@@ -1,8 +1,5 @@
 """
-JovanovicVoss2014Chain
-<2014> <heuristic> <restricted> <single-bay> <CRP-R>
-Chain look-ahead over Min–Max destination choice
-use_chain_f --- True --- Enable Chain-F full-stack correction
+
 
 ------------------------------- Reference --------------------------------
 R. Jovanović, S. Voß,

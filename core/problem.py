@@ -12,13 +12,13 @@ from .container import Container
 class ProblemConfig:
 
     # ── Yard geometry ────────────────────────────────────────────── #
-    num_bays:   int   = 4
-    num_rows:   int   = 2
-    max_tiers:  int   = 3
+    num_bays:   int   
+    num_rows:   int   
+    max_tiers:  int   
 
 
     # ── Containers ───────────────────────────────────────────────── #
-    num_containers: int  = 12
+    num_containers: int 
     
    
     extra: Dict[str, Any] = field(default_factory=dict)
@@ -26,13 +26,6 @@ class ProblemConfig:
 
 
 class BaseProblem(ABC):
-
-    # ── Metadata (override in subclasses) ─────────────────────────── #
-    name:         str  = "BaseProblem"
-    description:  str  = ""
-    tags:         List[str] = []
-    metric_names: List[str] = ["relocations"]
-
 
     def __init__(
         self,
@@ -49,17 +42,3 @@ class BaseProblem(ABC):
 
         self.containers: List[Container] = []
 
-
-# Preferred key on ``ProblemConfig.extra`` (absolute path to layout file).
-LAYOUT_FILE_EXTRA_KEY = "layout_file_path"
-
-# Legacy key (still read for backward compatibility).
-_LEGACY_LAYOUT_EXTRA_KEY = "caserta_dat_path"
-
-
-def layout_path_from_extra(extra: Dict[str, Any]) -> Optional[str]:
-    """Return layout file path string, or ``None``."""
-    if not extra:
-        return None
-    p = extra.get(LAYOUT_FILE_EXTRA_KEY) or extra.get(_LEGACY_LAYOUT_EXTRA_KEY)
-    return str(p) if p else None
