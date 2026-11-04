@@ -373,8 +373,13 @@ class JovanovicACO_rBRP(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
+            "seed": {
+                "type": "int", "default": 0, "min": 0, "max": 9999,
+                "label": "Random seed",
+                "help": "RNG seed for the ant colony.",
+            },
             "n_iterations": {
                 "type": "int", "default": 5000, "min": 100, "max": 50000,
                 "label": "ACO iterations",

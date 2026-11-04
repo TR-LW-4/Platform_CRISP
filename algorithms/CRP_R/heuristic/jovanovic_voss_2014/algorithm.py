@@ -109,7 +109,7 @@ class JovanovicVoss2014Chain(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "use_chain_f": {
                 "type":    "bool",

@@ -141,8 +141,13 @@ class CasertaLAH(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
+            "seed": {
+                "type": "int", "default": 0, "min": 0, "max": 9999,
+                "label": "Random seed",
+                "help": "RNG seed for the randomised look-ahead.",
+            },
             "n_restarts": {
                 "type":    "int",
                 "default": 200,

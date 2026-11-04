@@ -113,55 +113,53 @@ class Tanaka2018BB(BaseAlgorithm):
 
     def train(self, problem_factory: Callable, result_queue: mp.Queue, stop_event: mp.Event) -> None:
         cfg_a       = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         extra       = cfg_a.extra or {}
         t_limit     = int(extra.get("tanaka2018_time_limit_sec", 600))
         all_metrics: List[Dict[str, float]] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            trace_layout(f"Tanaka2018BB.train: seed {seed + 1}/{n_seeds}")
+        trace_layout(f"Tanaka2018BB.train: ")
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            text = yard_to_tanaka_instance(env.config, env.yard)
-            n_reloc, optimal, _dbg = self._run_bb(text, max_tiers=env.config.max_tiers, time_limit_sec=t_limit)
+        text = yard_to_tanaka_instance(env.config, env.yard)
+        n_reloc, optimal, _dbg = self._run_bb(text, max_tiers=env.config.max_tiers, time_limit_sec=t_limit)
 
-            metrics = {
-                "relocations":     float(n_reloc),
-                "steps":           float(n_reloc),
-                "time":            0.0,
-                "optimal_proven":  1.0 if optimal else 0.0,
-                "tanaka2018_time_limit_sec": float(t_limit),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
+        metrics = {
+            "relocations":     float(n_reloc),
+            "steps":           float(n_reloc),
+            "time":            0.0,
+            "optimal_proven":  1.0 if optimal else 0.0,
+            "tanaka2018_time_limit_sec": float(t_limit),
+        }
+        all_metrics.append(metrics)
+        primary = float(n_reloc)
 
-            if primary < self._best_metric:
-                self._best_solution = []
+        if primary < self._best_metric:
+            self._best_solution = []
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
         if all_metrics:
             agg = {k: float(np.mean([m[k] for m in all_metrics if k in m])) for k in all_metrics[0]}
-            self._push(result_queue, step=n_seeds, metric=self._best_metric, metrics=agg, progress=1.0)
+            self._push(result_queue, step=1, metric=self._best_metric, metrics=agg, progress=1.0)
 
     def get_best_solution(self) -> Optional[List[int]]:
         return self._best_solution
 
     @classmethod
     def config_schema(cls) -> Dict[str, Any]:
-        base = super().config_schema()
+        base = {}
         base.update({
             "tanaka2018_time_limit_sec": {
                 "type": "int", "default": 600, "min": 1, "max": 86400,

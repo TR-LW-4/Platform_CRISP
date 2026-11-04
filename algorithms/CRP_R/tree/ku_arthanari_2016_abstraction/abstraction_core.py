@@ -19,6 +19,7 @@ from typing import Callable, Dict, Iterator, List, Optional, Tuple
 State = Tuple[Tuple[int, ...], ...]
 
 PDBLevels = Dict[int, Dict[State, int]]
+MovePath = Tuple[Tuple[int, int], ...]
 
 
 # ================================================================ #
@@ -292,7 +293,12 @@ def _confirmed_relocations(state: State) -> int:
     return total
 
 
-def _greedy_probe(state: State, target: int, n_total: int, max_tiers: int) -> int:
+def _greedy_probe(
+    state: State,
+    target: int,
+    n_total: int,
+    max_tiers: int,
+) -> Tuple[int, MovePath, bool]:
     """
     Cheap initial upper bound (self-contained "PR1"-style probe, per
     Section 3.2's requirement for a starting incumbent): always relocate
@@ -300,6 +306,7 @@ def _greedy_probe(state: State, target: int, n_total: int, max_tiers: int) -> in
     """
     state, target = reduce_state(state, target, n_total)
     reloc = 0
+    path: List[Tuple[int, int]] = []
     guard = n_total * max_tiers * max(len(state), 1) + 16
     while target <= n_total and reloc <= guard:
         loc = _locate(state, target)
@@ -311,9 +318,10 @@ def _greedy_probe(state: State, target: int, n_total: int, max_tiers: int) -> in
             break
         dst = min(elig, key=lambda i: (len(state[i]), i))
         state = move_top(state, ts, dst)
+        path.append((ts, dst))
         reloc += 1
         state, target = reduce_state(state, target, n_total)
-    return reloc
+    return reloc, tuple(path), target > n_total
 
 
 # ================================================================ #
@@ -322,7 +330,7 @@ def _greedy_probe(state: State, target: int, n_total: int, max_tiers: int) -> in
 
 class _SearchContext:
     __slots__ = (
-        "n_total", "max_tiers", "best", "nodes",
+        "n_total", "max_tiers", "best", "best_path", "nodes",
         "cache", "cache_depth", "max_cache_size", "cache_hits",
         "pdb_levels", "pdb_depth", "pdb_hits",
         "stop_event", "deadline", "aborted",
@@ -342,6 +350,7 @@ class _SearchContext:
         self.n_total = n_total
         self.max_tiers = max_tiers
         self.best = float("inf")
+        self.best_path: MovePath = ()
         self.nodes = 0
         self.cache: Dict[State, int] = {}
         self.cache_depth = cache_depth
@@ -368,7 +377,83 @@ def _should_abort(ctx: _SearchContext) -> bool:
     return False
 
 
-def _dfs(state: State, target: int, g: int, depth: int, ctx: _SearchContext) -> None:
+def _pdb_completion(
+    state: State,
+    target: int,
+    ctx: _SearchContext,
+) -> Optional[MovePath]:
+    """Recover one exact physical path from PDB cost labels."""
+    current, current_target = reduce_state(
+        state,
+        target,
+        ctx.n_total,
+    )
+    path: List[Tuple[int, int]] = []
+    guard = ctx.n_total * max(ctx.max_tiers, 1) + 16
+
+    while current_target <= ctx.n_total and len(path) <= guard:
+        remaining = ctx.n_total - current_target + 1
+        level = ctx.pdb_levels.get(remaining)
+        if level is None:
+            return None
+        cost = level.get(abstract_key(current))
+        if cost is None:
+            return None
+
+        location = _locate(current, current_target)
+        if location is None:
+            return None
+        source, _ = location
+        selected = None
+
+        for destination in eligible_dsts(
+            current,
+            source,
+            ctx.max_tiers,
+        ):
+            child = move_top(current, source, destination)
+            child, child_target = reduce_state(
+                child,
+                current_target,
+                ctx.n_total,
+            )
+            child_remaining = ctx.n_total - child_target + 1
+            if child_remaining <= 0:
+                child_cost = 0
+            else:
+                child_level = ctx.pdb_levels.get(child_remaining)
+                child_cost = (
+                    child_level.get(abstract_key(child))
+                    if child_level is not None
+                    else None
+                )
+            if child_cost is not None and 1 + child_cost == cost:
+                selected = (
+                    child,
+                    child_target,
+                    source,
+                    destination,
+                )
+                break
+
+        if selected is None:
+            return None
+        current, current_target, source, destination = selected
+        path.append((source, destination))
+
+    if current_target <= ctx.n_total:
+        return None
+    return tuple(path)
+
+
+def _dfs(
+    state: State,
+    target: int,
+    g: int,
+    depth: int,
+    path: MovePath,
+    ctx: _SearchContext,
+) -> None:
     """
     Bidirectional DFBnB (Fig. 5): forward search with ``CC_n`` node
     caching, cut short by an exact PDB lookup (backward search) once the
@@ -384,6 +469,7 @@ def _dfs(state: State, target: int, g: int, depth: int, ctx: _SearchContext) -> 
     if remaining <= 0:
         if g < ctx.best:
             ctx.best = g
+            ctx.best_path = path
         return
 
     key: Optional[State] = None
@@ -394,10 +480,13 @@ def _dfs(state: State, target: int, g: int, depth: int, ctx: _SearchContext) -> 
         cost = ctx.pdb_levels[remaining].get(key)
         if cost is not None:
             ctx.pdb_hits += 1
-            total = g + cost
-            if total < ctx.best:
-                ctx.best = total
-            return
+            completion = _pdb_completion(state, target, ctx)
+            if completion is not None:
+                total = g + len(completion)
+                if total < ctx.best:
+                    ctx.best = total
+                    ctx.best_path = path + completion
+                return
 
     # ── Lower-bound pruning ─────────────────────────────────────── #
     lb = g + _confirmed_relocations(state)
@@ -418,22 +507,29 @@ def _dfs(state: State, target: int, g: int, depth: int, ctx: _SearchContext) -> 
     if ts is None:
         return  # defensive: should not happen
 
-    children: List[Tuple[int, State]] = []
+    children: List[Tuple[int, int, State]] = []
     for dst in eligible_dsts(state, ts, ctx.max_tiers):
         child = move_top(state, ts, dst)
         child_lb = g + 1 + _confirmed_relocations(child)
-        children.append((child_lb, child))
+        children.append((child_lb, dst, child))
     if not children:
         return  # degenerate instance: no feasible relocation
 
     children.sort(key=lambda t: t[0])
 
-    for child_lb, child in children:
+    for child_lb, destination, child in children:
         if ctx.aborted:
             return
         if child_lb >= ctx.best:
             continue  # prune before descending
-        _dfs(child, target, g + 1, depth + 1, ctx)
+        _dfs(
+            child,
+            target,
+            g + 1,
+            depth + 1,
+            path + ((ts, destination),),
+            ctx,
+        )
 
 
 def solve(
@@ -463,10 +559,15 @@ def solve(
     if remaining0 <= 0:
         return dict(
             best=0, root_lb=0, optimal=True, nodes=1,
-            cache_hits=0, pdb_hits=0, aborted=False,
+            cache_hits=0, pdb_hits=0, aborted=False, path=(),
         )
 
-    initial_ub = _greedy_probe(state0, target0, n_total, max_tiers)
+    initial_ub, initial_path, complete = _greedy_probe(
+        state0,
+        target0,
+        n_total,
+        max_tiers,
+    )
     root_lb = _confirmed_relocations(state0)
 
     ctx = _SearchContext(
@@ -479,9 +580,11 @@ def solve(
         stop_event=stop_event,
         deadline=time.perf_counter() + time_limit_s,
     )
-    ctx.best = float(initial_ub)
+    if complete:
+        ctx.best = float(initial_ub)
+        ctx.best_path = initial_path
 
-    _dfs(state0, target0, 0, 0, ctx)
+    _dfs(state0, target0, 0, 0, (), ctx)
 
     best = int(ctx.best) if ctx.best < float("inf") else -1
     optimal = (not ctx.aborted) and ctx.best < float("inf")
@@ -494,4 +597,5 @@ def solve(
         cache_hits=ctx.cache_hits,
         pdb_hits=ctx.pdb_hits,
         aborted=ctx.aborted,
+        path=ctx.best_path,
     )

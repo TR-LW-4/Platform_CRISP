@@ -36,7 +36,7 @@ def valid_dst_actions(env, mask: Optional[np.ndarray]) -> List[int]:
     if src is None or src.top == target:
         return []
     src_key = (src.bay, src.row)
-    n       = env.action_space.n
+    n       = env.config.num_bays * env.config.num_rows
     cand    = list(range(n)) if mask is None else [int(i) for i in np.where(mask)[0]]
     return [a for a in cand if env._action_to_stack(int(a)) != src_key]
 

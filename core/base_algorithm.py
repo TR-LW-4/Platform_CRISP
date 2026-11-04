@@ -1,57 +1,16 @@
-"""
-Abstract base class for all algorithm implementations.
-
-Design
-------
-- train() runs in a *subprocess* (via multiprocessing) so the GUI stays responsive.
-- Every algorithm sends progress updates through a multiprocessing.Queue.
-- The GUI reads the queue at a fixed interval and refreshes plots.
-- stop_event.set() from the GUI asks the algorithm to terminate gracefully.
-"""
-
 from __future__ import annotations
 
+import inspect
 import multiprocessing as mp
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+    
+#  ProgressRecord 是 _push() 放进队列的那一条记录，里面有步数、目标值、进度和堆场快照。
 
-# ================================================================ #
-#  Algorithm configuration                                           #
-# ================================================================ #
+# PlatEMO/Algorithms/ALGORITHM.m。
 
-@dataclass
-class AlgorithmConfig:
-    """
-    Universal configuration shared by all algorithms.
-    Algorithm subclasses may add their own fields via `extra`.
-    """
-
-    # ── Common ───────────────────────────────────────────────────── #
-    max_iterations: int   = 500
-    seed:           int   = 0     # RNG seed for stochastic algorithms (not multi-instance eval)
-    report_interval: int  = 10    # push to queue every N iterations
-
-    # ── Evolutionary-specific ─────────────────────────────────────── #
-    population_size:   int   = 50
-    crossover_rate:    float = 0.8
-    mutation_rate:     float = 0.1
-    tournament_size:   int   = 3
-    elite_count:       int   = 2
-
-    # ── Extra (algorithm-specific overrides) ──────────────────────── #
-    extra: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        d = {k: v for k, v in self.__dict__.items() if k != "extra"}
-        d.update(self.extra)
-        return d
-
-
-# ================================================================ #
-#  Progress record (what algorithms push to the queue)              #
-# ================================================================ #
 
 @dataclass
 class ProgressRecord:
@@ -65,30 +24,15 @@ class ProgressRecord:
     extra:         Dict[str, Any]     = field(default_factory=dict)
 
 
-# ================================================================ #
-#  Base algorithm                                                    #
-# ================================================================ #
+def trace_layout(msg: str) -> None:
+    if os.environ.get("CRISP_TRACE_LAYOUT"):
+        print(f"[CRISP_TRACE_LAYOUT] {msg}", file=sys.stderr, flush=True)
+
 
 class BaseAlgorithm(ABC):
-    """
-    Abstract base for every algorithm.
-
-    Subclasses must implement
-    ─────────────────────────
-    train(problem_factory, result_queue, stop_event)
-    get_best_solution()
-
-    Class-level metadata (override in subclass)
-    ────────────────────────────────────────────
-    name                : str  – display name in GUI
-    category            : str  – "Exact" | "Evolutionary" | "Heuristic" | ...
-    description         : str
-    compatible_problems : list – problem class *names*; empty = all problems
-    geometry            : str  – "single-bay" | "multi-bay"
-    objectives          : list – what the search minimises; see algorithm_meta
-    fidelity            : str  – "faithful" | "adapted" | "degenerate"
-    """
-
+    
+    
+    
     # ── Metadata (override in subclasses) ─────────────────────────── #
     name:                str       = "BaseAlgorithm"
     category:            str       = "Unknown"
@@ -106,10 +50,6 @@ class BaseAlgorithm(ABC):
         self._best_solution: Optional[List[int]] = None
         self._best_metric:   float               = float("inf")
 
-    # ---------------------------------------------------------------- #
-    # Abstract interface                                                  #
-    # ---------------------------------------------------------------- #
-
     @abstractmethod
     def train(
         self,
@@ -117,29 +57,8 @@ class BaseAlgorithm(ABC):
         result_queue:    mp.Queue,
         stop_event:      mp.Event,
     ) -> None:
-        """
-        Main training loop.  *Runs in a subprocess.*
-
-        Parameters
-        ----------
-        problem_factory : zero-argument callable that returns a fresh problem.
-        result_queue    : put ProgressRecord (or plain dict) here periodically.
-        stop_event      : poll stop_event.is_set() to support user-requested stop.
-
-        Implementations should:
-          - Call problem_factory() to get a fresh environment.
-          - Push a ProgressRecord every self.config.report_interval iterations.
-          - Respect stop_event for clean shutdown.
-        """
-
-    @abstractmethod
-    def get_best_solution(self) -> Optional[List[int]]:
-        """Return the best solution (action sequence) found so far."""
-
-    # ---------------------------------------------------------------- #
-    # Convenience helpers                                                 #
-    # ---------------------------------------------------------------- #
-
+        
+### PlatEMO/Algorithms/ALGORITHM.m
     def _push(
         self,
         q:            mp.Queue,
@@ -167,77 +86,20 @@ class BaseAlgorithm(ABC):
         except Exception:
             pass   # queue full – skip this update
 
-    # ---------------------------------------------------------------- #
-    # Config schema for GUI                                              #
-    # ---------------------------------------------------------------- #
+    def parameter_set(self, *defaults: Any) -> tuple:
+        
+        from web.backend.header_schema import parse_header
 
-    @classmethod
-    def config_schema(cls) -> Dict[str, Dict]:
-        """
-        Return a schema used by the GUI to build parameter widgets.
-        Override to expose algorithm-specific parameters.
-        """
-        return {
-            "max_iterations":  {"type": "int",   "default": 500,    "min": 10,    "max": 100_000},
-            "seed":            {"type": "int",   "default": 0,      "min": 0,     "max": 9999},
-            "report_interval": {"type": "int",   "default": 10,     "min": 1,     "max": 100},
-        }
-
-
-# ================================================================ #
-#  Subprocess launcher (used by GUI)                                 #
-# ================================================================ #
-
-class TrainingSession:
-    """
-    Manages the lifecycle of an algorithm training subprocess.
-
-    Usage (from GUI)
-    ----------------
-    session = TrainingSession(algo, problem_factory)
-    session.start()
-    # poll:
-    records = session.drain()
-    # stop:
-    session.stop()
-    """
-
-    def __init__(
-        self,
-        algorithm:       BaseAlgorithm,
-        problem_factory: Callable,
-        queue_maxsize:   int = 512,
-    ):
-        self.algorithm       = algorithm
-        self.problem_factory = problem_factory
-        self._queue          = mp.Queue(maxsize=queue_maxsize)
-        self._stop_event     = mp.Event()
-        self._process: Optional[mp.Process] = None
-
-    def start(self) -> None:
-        self._process = mp.Process(
-            target=self.algorithm.train,
-            args=(self.problem_factory, self._queue, self._stop_event),
-            daemon=True,
+        text = inspect.getmodule(type(self)).__doc__ or ""
+        names = list(parse_header(text))
+        if len(defaults) != len(names):
+            raise ValueError(
+                f"{type(self).__name__} has {len(names)} header "
+                f"parameters, got {len(defaults)}"
+            )
+        extra = self.config.extra or {}
+        return tuple(
+            extra[name] if name in extra and extra[name] != "" else default
+            for name, default in zip(names, defaults)
         )
-        self._process.start()
 
-    def stop(self) -> None:
-        self._stop_event.set()
-        if self._process and self._process.is_alive():
-            self._process.join(timeout=5)
-            if self._process.is_alive():
-                self._process.terminate()
-
-    def is_running(self) -> bool:
-        return self._process is not None and self._process.is_alive()
-
-    def drain(self) -> List[ProgressRecord]:
-        """Return all available records without blocking."""
-        records = []
-        while True:
-            try:
-                records.append(self._queue.get_nowait())
-            except Exception:
-                break
-        return records

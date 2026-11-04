@@ -147,7 +147,7 @@ class CasertaCM(BaseAlgorithm):
                 env={
                     **os.environ,
                     "CPLUS_INCLUDE_PATH": "",
-                    "CRISP_SEED": str(int(self.config.seed)),
+                    "CRISP_SEED": "0",
                 },
             )
             stdout = result.stdout.strip()
@@ -250,7 +250,7 @@ class CasertaCM(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "delta": {
                 "type":    "int",

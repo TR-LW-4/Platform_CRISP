@@ -200,18 +200,19 @@ def _algorithm_config_from_schema(algo_cls, overrides: dict):
     """Build ``AlgorithmConfig`` from ``config_schema()`` defaults + overrides."""
     from core.base_algorithm import AlgorithmConfig
 
+    from web.backend.header_schema import algorithm_config_schema
+
     params: dict = {}
-    if hasattr(algo_cls, "config_schema"):
-        for aname, spec in algo_cls.config_schema().items():
-            t = spec.get("type", "int")
-            if t == "int":
-                params[aname] = int(spec["default"])
-            elif t == "float":
-                params[aname] = float(spec["default"])
-            elif t == "bool":
-                params[aname] = bool(spec["default"])
-            else:
-                params[aname] = spec["default"]
+    for aname, spec in algorithm_config_schema(algo_cls).items():
+        t = spec.get("type", "int")
+        if t == "int":
+            params[aname] = int(spec["default"])
+        elif t == "float":
+            params[aname] = float(spec["default"])
+        elif t == "bool":
+            params[aname] = bool(spec["default"])
+        else:
+            params[aname] = spec["default"]
     params.update(overrides)
     base_kwargs = {k: v for k, v in params.items() if k in _BASE_ALGO_KEYS}
     cfg = AlgorithmConfig(**base_kwargs)

@@ -200,12 +200,10 @@ def problem_config_for_zhu_dup_txt(
     cfg.num_rows = 1
     cfg.max_tiers = h_cap
     cfg.num_containers = N
-    cfg.num_groups = len(all_groups)
-    cfg.seed = 0
     cfg.extra[LAYOUT_FILE_EXTRA_KEY] = str(path.resolve())
     trace_layout(
         f"problem_config_for_zhu_dup_txt → S={S} N={N} "
-        f"groups={cfg.num_groups} max_tiers={h_cap} path={path}"
+        f"groups={len(all_groups)} max_tiers={h_cap} path={path}"
     )
     return cfg
 

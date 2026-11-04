@@ -72,8 +72,6 @@ class GLAHHeuristic(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg         = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
-        rng_seed    = cfg.seed
         depth       = int(cfg.extra.get("D",        3))
         ftbg_n      = int(cfg.extra.get("n_ftbg",   5))
         nfbg_n      = int(cfg.extra.get("n_nfbg",   5))
@@ -84,100 +82,98 @@ class GLAHHeuristic(BaseAlgorithm):
 
         all_metrics: List[Dict] = []
 
-        for seed_idx in range(n_seeds):
+        if stop_event.is_set():
+            return
+
+        env = problem_factory()
+        env.reset()
+
+        kin          = KinematicsModel.from_config_extra(env.config.extra)
+        initial_yard = copy.deepcopy(env.yard)
+        containers   = list(env.containers)
+        lb_val       = lower_bound_relocations(initial_yard)
+
+        # Build GlahLayout from platform Yard
+        glah_layout = GlahLayout.build_from_yard(initial_yard, containers)
+
+        # ── Phase 1: evaluation heuristic → initial solution ─── #
+        state = GlahState(glah_layout.copy())
+        evaluation_heuristic(state)
+        # best is now set inside state
+        if _should_print_plan(cfg):
+            p1_ops = state.best_ops or state.ops
+            if p1_ops:
+                plan_p1 = ops_to_relocation_plan(p1_ops, glah_layout)
+                _print_plan_moves(plan_p1, "Phase-1 plan (after evaluation_heuristic)")
+
+        # ── Phase 2: greedy + look-ahead ─────────────────────── #
+        la    = Lookahead(depth, ftbg_n, nfbg_n, ftbb_n, nfbb_n, gg_n, gb_n)
+        state2 = GlahState(glah_layout.copy())
+        state2.best_ops   = state.best_ops
+        state2.best_reloc = state.best_reloc
+
+        state2.try_retrievals()
+
+        step_i = 0
+        while not state2.is_empty():
+            lb_now = lower_bound(state2.inst)
+            if lb_now + state2.reloc_count >= state2.best_reloc:
+                print(
+                    "[GLAH] phase2 stop: LB prune  "
+                    f"lb_now={lb_now}  reloc_count={state2.reloc_count}  "
+                    f"best_reloc={state2.best_reloc}",
+                    flush=True,
+                )
+                break
             if stop_event.is_set():
                 break
 
-            env = problem_factory()
-            env.config.seed = rng_seed + seed_idx
-            env.reset()
+            op = la.most_promising_relocation(state2)
+            if op is None:
+                print("[GLAH] phase2 stop: no relocation candidate", flush=True)
+                break
 
-            kin          = KinematicsModel.from_config_extra(env.config.extra)
-            initial_yard = copy.deepcopy(env.yard)
-            containers   = list(env.containers)
-            lb_val       = lower_bound_relocations(initial_yard)
-
-            # Build GlahLayout from platform Yard
-            glah_layout = GlahLayout.build_from_yard(initial_yard, containers)
-
-            # ── Phase 1: evaluation heuristic → initial solution ─── #
-            state = GlahState(glah_layout.copy())
-            evaluation_heuristic(state)
-            # best is now set inside state
-            if _should_print_plan(cfg):
-                p1_ops = state.best_ops or state.ops
-                if p1_ops:
-                    plan_p1 = ops_to_relocation_plan(p1_ops, glah_layout)
-                    _print_plan_moves(plan_p1, "Phase-1 plan (after evaluation_heuristic)")
-
-            # ── Phase 2: greedy + look-ahead ─────────────────────── #
-            la    = Lookahead(depth, ftbg_n, nfbg_n, ftbb_n, nfbb_n, gg_n, gb_n)
-            state2 = GlahState(glah_layout.copy())
-            state2.best_ops   = state.best_ops
-            state2.best_reloc = state.best_reloc
-
+            state2.go_one_step(op)
+            step_i += 1
+            kind = "reloc" if op.is_relocation else "retrieve"
+            print(
+                f"[GLAH] step={step_i}  {kind}  from_stack={op.from_s}  to={op.to_s}  "
+                f"prior={op.gc.priority}  reloc_count={state2.reloc_count}",
+                flush=True,
+            )
             state2.try_retrievals()
 
-            step_i = 0
-            while not state2.is_empty():
-                lb_now = lower_bound(state2.inst)
-                if lb_now + state2.reloc_count >= state2.best_reloc:
-                    print(
-                        "[GLAH] phase2 stop: LB prune  "
-                        f"lb_now={lb_now}  reloc_count={state2.reloc_count}  "
-                        f"best_reloc={state2.best_reloc}",
-                        flush=True,
-                    )
-                    break
-                if stop_event.is_set():
-                    break
+        # ── Phase 3: collect best solution ───────────────────── #
+        best_ops   = state2.best_ops   or state.best_ops
+        best_reloc = state2.best_reloc if state2.best_ops else state.best_reloc
 
-                op = la.most_promising_relocation(state2)
-                if op is None:
-                    print("[GLAH] phase2 stop: no relocation candidate", flush=True)
-                    break
+        if best_ops is None:
+            # fallback: use whatever state2 accumulated
+            best_ops   = state2.ops
+            best_reloc = state2.reloc_count
 
-                state2.go_one_step(op)
-                step_i += 1
-                kind = "reloc" if op.is_relocation else "retrieve"
-                print(
-                    f"[GLAH] step={step_i}  {kind}  from_stack={op.from_s}  to={op.to_s}  "
-                    f"prior={op.gc.priority}  reloc_count={state2.reloc_count}",
-                    flush=True,
-                )
-                state2.try_retrievals()
+        plan = ops_to_relocation_plan(best_ops, glah_layout)
+        if _should_print_plan(cfg):
+            _print_plan_moves(plan, "Final plan (metrics / export)")
 
-            # ── Phase 3: collect best solution ───────────────────── #
-            best_ops   = state2.best_ops   or state.best_ops
-            best_reloc = state2.best_reloc if state2.best_ops else state.best_reloc
+        metrics = _plan_metrics(plan, kin, lb_val)
+        all_metrics.append(metrics)
+        primary = float(best_reloc)
 
-            if best_ops is None:
-                # fallback: use whatever state2 accumulated
-                best_ops   = state2.ops
-                best_reloc = state2.reloc_count
+        if primary <= self._best_metric:
+            self._best_metric   = primary
+            self._best_plan     = plan
+            self._best_solution = _plan_to_action_list(plan, env)
 
-            plan = ops_to_relocation_plan(best_ops, glah_layout)
-            if _should_print_plan(cfg):
-                _print_plan_moves(plan, "Final plan (metrics / export)")
-
-            metrics = _plan_metrics(plan, kin, lb_val)
-            all_metrics.append(metrics)
-            primary = float(best_reloc)
-
-            if primary <= self._best_metric:
-                self._best_metric   = primary
-                self._best_plan     = plan
-                self._best_solution = _plan_to_action_list(plan, env)
-
-            self._push(
-                result_queue,
-                step     = seed_idx + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed_idx + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-                extra    = {"seed": seed_idx, "D": depth},
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+            extra    = {"D": depth},
+        )
 
         if all_metrics:
             agg = {
@@ -186,7 +182,7 @@ class GLAHHeuristic(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -208,7 +204,7 @@ class GLAHHeuristic(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "D": {
                 "type": "int", "default": 3, "min": 1, "max": 6,

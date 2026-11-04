@@ -25,6 +25,7 @@ from core.results.compare import (
     list_result_folders,
 )
 from core.results.store import list_saved_runs, load_run
+from web.backend.header_schema import algorithm_config_schema
 from web.backend.benchmarks import (
     SOURCE_RANDOM,
     available_for_problem,
@@ -127,9 +128,7 @@ def _catalog() -> Dict[str, Any]:
         algorithm_cls = get_algorithm_class(info["name"])
         algorithms.append({
             **json_safe(info),
-            "config_schema": json_safe(
-                algorithm_cls.config_schema() if algorithm_cls is not None else {}
-            ),
+            "config_schema": json_safe(algorithm_config_schema(algorithm_cls)),
             "step_label": getattr(algorithm_cls, "step_label", "Step"),
             "method_group": (
                 _algorithm_method_group(algorithm_cls)
@@ -233,7 +232,7 @@ def start_job(payload: RunInput):
             payload.problem_config,
         )
         algorithm_values = _config_values(
-            algorithm_cls.config_schema(),
+            algorithm_config_schema(algorithm_cls),
             payload.algorithm_config,
         )
         layout_paths = []

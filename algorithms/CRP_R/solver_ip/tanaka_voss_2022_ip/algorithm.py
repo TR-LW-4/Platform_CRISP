@@ -193,7 +193,6 @@ class TanakaVossIP2022(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg_a   = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         extra   = cfg_a.extra or {}
 
         t_limit   = float(extra.get("tanaka2022ip_time_limit_sec", 3600))
@@ -202,101 +201,100 @@ class TanakaVossIP2022(BaseAlgorithm):
 
         all_metrics: List[Dict[str, float]] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            trace_layout(
-                f"TanakaVossIP2022.train: seed {seed + 1}/{n_seeds}  "
-                f"threads={n_threads}  threshold={threshold}"
+        trace_layout(
+            f"TanakaVossIP2022.train: "
+            f"threads={n_threads}  threshold={threshold}"
+        )
+
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
+
+        text = yard_to_tanaka_instance(env.config, env.yard)
+
+        try:
+            n_reloc, optimal, debug, reloc_records = self._run_ip(
+                text,
+                max_tiers     = env.config.max_tiers,
+                time_limit_sec= t_limit,
+                n_threads     = n_threads,
+                threshold     = threshold,
             )
-
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
-
-            text = yard_to_tanaka_instance(env.config, env.yard)
-
-            try:
-                n_reloc, optimal, debug, reloc_records = self._run_ip(
-                    text,
-                    max_tiers     = env.config.max_tiers,
-                    time_limit_sec= t_limit,
-                    n_threads     = n_threads,
-                    threshold     = threshold,
-                )
-            except FileNotFoundError as exc:
-                print(f"[TanakaVossIP2022] {exc}", file=sys.stderr, flush=True)
-                self._push(
-                    result_queue,
-                    step     = seed + 1,
-                    metric   = float("inf"),
-                    metrics  = {"relocations": float("inf"), "binary_missing": 1.0},
-                    progress = (seed + 1) / n_seeds,
-                )
-                continue
-
-            plan = None
-            if n_reloc == 0:
-                plan = sequential_retrieval_plan(env.yard)
-            elif n_reloc is not None and reloc_records:
-                plan = _plan_from_tanaka_relocations(env.yard, reloc_records)
-
-            solver = {
-                "obj": n_reloc,
-                "optimal": optimal,
-                "time_out": False,
-                "n_vars": 0,
-                "n_constrs": 0,
-                "solve_time": 0.0,
-            }
-            if plan is not None:
-                metrics = merge_solver_and_plan_metrics(
-                    solver, env.validate_plan(plan),
-                )
-            else:
-                metrics = merge_solver_and_plan_metrics(
-                    solver,
-                    {
-                        "relocations": float(n_reloc) if n_reloc is not None else float("inf"),
-                        "crane_time": float("inf"),
-                        "time": float("inf") if n_reloc is None else 0.0,
-                        "feasible": 0.0 if n_reloc is None else 1.0,
-                        "completed": 0.0 if n_reloc is None else 1.0,
-                        "validated": 0.0,
-                    },
-                )
-            metrics["tanaka2022ip_time_limit_sec"] = float(t_limit)
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", float("inf")))
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = [
-                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
-                    for m in (plan.movements if plan is not None else [])
-                    if m.to_pos is not None
-                ]
-
+        except FileNotFoundError as exc:
+            print(f"[TanakaVossIP2022] {exc}", file=sys.stderr, flush=True)
             self._push(
                 result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                extra    = {
-                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
-                    "validation_errors": env.get_last_validation_errors(),
-                    "debug_tail": debug,
+                step     = 1,
+                metric   = float("inf"),
+                metrics  = {"relocations": float("inf"), "binary_missing": 1.0},
+                progress = 1.0,
+            )
+            return
+
+        plan = None
+        if n_reloc == 0:
+            plan = sequential_retrieval_plan(env.yard)
+        elif n_reloc is not None and reloc_records:
+            plan = _plan_from_tanaka_relocations(env.yard, reloc_records)
+
+        solver = {
+            "obj": n_reloc,
+            "optimal": optimal,
+            "time_out": False,
+            "n_vars": 0,
+            "n_constrs": 0,
+            "solve_time": 0.0,
+        }
+        if plan is not None:
+            metrics = merge_solver_and_plan_metrics(
+                solver, env.validate_plan(plan),
+            )
+        else:
+            metrics = merge_solver_and_plan_metrics(
+                solver,
+                {
+                    "relocations": float(n_reloc) if n_reloc is not None else float("inf"),
+                    "crane_time": float("inf"),
+                    "time": float("inf") if n_reloc is None else 0.0,
+                    "feasible": 0.0 if n_reloc is None else 1.0,
+                    "completed": 0.0 if n_reloc is None else 1.0,
+                    "validated": 0.0,
                 },
             )
-            print(
-                f"[TanakaVossIP2022] seed={seed}  "
-                f"reloc={metrics.get('relocations')}  "
-                f"crane={metrics.get('crane_time')}  "
-                f"optimal={optimal}  "
-                f"N={len(env.containers)}  S={env.config.num_bays * env.config.num_rows}",
-                file=sys.stderr, flush=True,
-            )
+        metrics["tanaka2022ip_time_limit_sec"] = float(t_limit)
+        all_metrics.append(metrics)
+        primary = float(metrics.get("relocations", float("inf")))
+
+        if primary < self._best_metric:
+            self._best_metric = primary
+            self._best_solution = [
+                (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                for m in (plan.movements if plan is not None else [])
+                if m.to_pos is not None
+            ]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                "validation_errors": env.get_last_validation_errors(),
+                "debug_tail": debug,
+            },
+        )
+        print(
+            f"[TanakaVossIP2022]  "
+            f"reloc={metrics.get('relocations')}  "
+            f"crane={metrics.get('crane_time')}  "
+            f"optimal={optimal}  "
+            f"N={len(env.containers)}  S={env.config.num_bays * env.config.num_rows}",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {
@@ -305,7 +303,7 @@ class TanakaVossIP2022(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -316,7 +314,7 @@ class TanakaVossIP2022(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict[str, Any]:
-        base = super().config_schema()
+        base = {}
         base.update({
             "tanaka2022ip_time_limit_sec": {
                 "type": "float", "default": 3600.0, "min": 1.0, "max": 86400.0,

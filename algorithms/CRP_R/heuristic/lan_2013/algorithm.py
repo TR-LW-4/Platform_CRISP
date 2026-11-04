@@ -115,7 +115,7 @@ class LANHeuristic(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "N": {
                 "type": "int", "default": 1, "min": 1, "max": 1,

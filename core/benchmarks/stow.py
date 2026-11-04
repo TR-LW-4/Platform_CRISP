@@ -110,10 +110,5 @@ def problem_config_for_stow_pro(
     cfg.num_rows = 1
     cfg.max_tiers = int(data["YT"])
     cfg.num_containers = int(data["N"])
-    cfg.num_groups = int(data["VS"])
-    try:
-        cfg.seed = parse_stow_filename(pro_path)[4]
-    except ValueError:
-        cfg.seed = 0
     cfg.extra[LAYOUT_FILE_EXTRA_KEY] = str(pro_path.resolve())
     return cfg

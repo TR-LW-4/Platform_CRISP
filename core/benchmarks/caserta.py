@@ -228,8 +228,6 @@ def problem_config_for_caserta_dat(dat_path: Path, prob_params_no_geom: Dict[str
     cfg.num_rows = 1
     cfg.max_tiers = h_cap
     cfg.num_containers = N
-    cfg.num_groups = 1
-    cfg.seed = 0
     cfg.extra[LAYOUT_FILE_EXTRA_KEY] = str(dat_path.resolve())
     trace_layout(
         "problem_config_for_caserta_dat → "

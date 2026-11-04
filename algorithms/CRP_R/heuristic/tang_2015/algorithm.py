@@ -113,7 +113,7 @@ class TangEtAl2015(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "rule": {
                 "type":    "str",

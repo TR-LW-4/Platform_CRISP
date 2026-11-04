@@ -79,117 +79,113 @@ class FeillletLS(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg      = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         max_iter = int(cfg.extra.get("max_iter", 0))
         init_src = str(cfg.extra.get("init",     "greedy")).lower()
         verbose  = bool(cfg.extra.get("verbose",  False))
 
         all_metrics: List[Dict] = []
 
-        for seed_idx in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.config.seed = cfg.seed + seed_idx
-            env.reset()
+        env = problem_factory()
+        env.reset()
 
-            kin          = KinematicsModel.from_config_extra(env.config.extra)
-            initial_yard = copy.deepcopy(env.yard)
-            containers   = list(env.containers)
-            lb_val       = lower_bound_relocations(initial_yard)
+        kin          = KinematicsModel.from_config_extra(env.config.extra)
+        initial_yard = copy.deepcopy(env.yard)
+        containers   = list(env.containers)
+        lb_val       = lower_bound_relocations(initial_yard)
 
-            # ── Extract bay geometry ─────────────────────────────────── #
-            all_keys = sorted(initial_yard.stacks.keys())
-            W        = len(all_keys)
-            H_max    = initial_yard.max_tiers
-            N        = sum(stk.height for stk in initial_yard.stacks.values())
+        # ── Extract bay geometry ─────────────────────────────────── #
+        all_keys = sorted(initial_yard.stacks.keys())
+        W        = len(all_keys)
+        H_max    = initial_yard.max_tiers
+        N        = sum(stk.height for stk in initial_yard.stacks.values())
 
-            # init_stacks[s] = [bottom..top] priority list, 1-indexed, s=1..W
-            init_stacks: List[Optional[List[int]]] = [None]
-            for key in all_keys:
-                init_stacks.append(
-                    [c.priority for c in initial_yard.stacks[key].containers]
-                )
+        # init_stacks[s] = [bottom..top] priority list, 1-indexed, s=1..W
+        init_stacks: List[Optional[List[int]]] = [None]
+        for key in all_keys:
+            init_stacks.append(
+                [c.priority for c in initial_yard.stacks[key].containers]
+            )
 
-            # ── Phase 1: initial solution ────────────────────────────── #
-            if init_src == "glah":
-                steps = _build_glah_initial(initial_yard, containers, W, all_keys, verbose)
-                if steps is None:
-                    print(
-                        "[FeillletLS] GLAH init failed, falling back to greedy",
-                        flush=True,
-                    )
-                    steps = build_greedy(init_stacks, W, H_max, N)
-            else:
-                steps = build_greedy(init_stacks, W, H_max, N)
-
-            relocs_init = sum(1 for s in steps if s.dst != 0)
-            if verbose:
+        # ── Phase 1: initial solution ────────────────────────────── #
+        if init_src == "glah":
+            steps = _build_glah_initial(initial_yard, containers, W, all_keys, verbose)
+            if steps is None:
                 print(
-                    f"[FeillletLS] seed={seed_idx}  init_relocs={relocs_init}  "
-                    f"lb={lb_val}  source={init_src}",
+                    "[FeillletLS] GLAH init failed, falling back to greedy",
                     flush=True,
                 )
+                steps = build_greedy(init_stacks, W, H_max, N)
+        else:
+            steps = build_greedy(init_stacks, W, H_max, N)
 
-            # ── Phase 2: local search ────────────────────────────────── #
-            it = 0
-            while not stop_event.is_set():
-                improved = False
-                for n in range(1, N + 1):
-                    new_steps = opt_n(n, steps, init_stacks, W, H_max, N)
-                    if new_steps is not None:
-                        old_count = sum(1 for s in steps    if s.dst != 0)
-                        new_count = sum(1 for s in new_steps if s.dst != 0)
-                        if verbose:
-                            print(
-                                f"[FeillletLS] seed={seed_idx}  iter={it}  n={n}  "
-                                f"relocs {old_count}→{new_count}",
-                                flush=True,
-                            )
-                        steps    = new_steps
-                        improved = True
-
-                it += 1
-                if not improved:
-                    break
-                if max_iter > 0 and it >= max_iter:
-                    break
-
-            relocs_final = sum(1 for s in steps if s.dst != 0)
+        relocs_init = sum(1 for s in steps if s.dst != 0)
+        if verbose:
             print(
-                f"[FeillletLS] seed={seed_idx}  iters={it}  "
-                f"init_relocs={relocs_init}  final_relocs={relocs_final}  lb={lb_val}",
+                f"[FeillletLS]  init_relocs={relocs_init}  "
+                f"lb={lb_val}  source={init_src}",
                 flush=True,
             )
 
-            # ── Convert to action list for env ───────────────────────── #
-            action_list = _steps_to_actions(steps, W)
+        # ── Phase 2: local search ────────────────────────────────── #
+        it = 0
+        while not stop_event.is_set():
+            improved = False
+            for n in range(1, N + 1):
+                new_steps = opt_n(n, steps, init_stacks, W, H_max, N)
+                if new_steps is not None:
+                    old_count = sum(1 for s in steps    if s.dst != 0)
+                    new_count = sum(1 for s in new_steps if s.dst != 0)
+                    if verbose:
+                        print(
+                            f"[FeillletLS]  iter={it}  n={n}  "
+                            f"relocs {old_count}→{new_count}",
+                            flush=True,
+                        )
+                    steps    = new_steps
+                    improved = True
 
-            # Build RelocationPlan-compatible metrics by simulating env
-            metrics, plan = _simulate_env(env, action_list, kin, lb_val)
-            all_metrics.append(metrics)
-            primary = float(relocs_final)
+            it += 1
+            if not improved:
+                break
+            if max_iter > 0 and it >= max_iter:
+                break
 
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = action_list
+        relocs_final = sum(1 for s in steps if s.dst != 0)
+        print(
+            f"[FeillletLS]  iters={it}  "
+            f"init_relocs={relocs_init}  final_relocs={relocs_final}  lb={lb_val}",
+            flush=True,
+        )
 
-            self._push(
-                result_queue,
-                step     = seed_idx + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed_idx + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-                extra    = {
-                    "seed":         seed_idx,
-                    "ls_iters":     it,
-                    "init_relocs":  relocs_init,
-                    "final_relocs": relocs_final,
-                    "lower_bound":  lb_val,
-                },
-            )
+        # ── Convert to action list for env ───────────────────────── #
+        action_list = _steps_to_actions(steps, W)
+
+        # Build RelocationPlan-compatible metrics by simulating env
+        metrics, plan = _simulate_env(env, action_list, kin, lb_val)
+        all_metrics.append(metrics)
+        primary = float(relocs_final)
+
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = action_list
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+            extra    = {
+                "ls_iters":     it,
+                "init_relocs":  relocs_init,
+                "final_relocs": relocs_final,
+                "lower_bound":  lb_val,
+            },
+        )
 
         if all_metrics:
             agg = {
@@ -198,7 +194,7 @@ class FeillletLS(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -217,7 +213,7 @@ class FeillletLS(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "max_iter": {
                 "type":    "int",

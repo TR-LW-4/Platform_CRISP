@@ -155,110 +155,108 @@ class BacciBC2020(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg_a   = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         extra   = cfg_a.extra or {}
 
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            trace_layout(f"BacciBC2020.train: seed {seed + 1}/{n_seeds}")
+        trace_layout(f"BacciBC2020.train: ")
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            instance_text = yard_to_bbs_instance(env.config, env.yard)
+        instance_text = yard_to_bbs_instance(env.config, env.yard)
 
-            try:
-                bc_reloc, bbs_reloc, solve_t, stdout = self._run_bc(instance_text)
-            except FileNotFoundError as exc:
-                print(f"[BacciBC2020] {exc}", file=sys.stderr, flush=True)
-                self._push(
-                    result_queue,
-                    step     = seed + 1,
-                    metric   = float("inf"),
-                    metrics  = {"relocations": float("inf"), "binary_missing": 1.0},
-                    progress = (seed + 1) / n_seeds,
-                )
-                continue
-
-            n_cont = len(env.containers)
-            w = env.config.num_bays * env.config.num_rows
-            h = env.config.max_tiers
-            keys = stack_keys(env.yard)
-            pri = priority_to_container_id(env.yard)
-            layouts = parse_bacci_period_layouts(stdout, w, h)
-            plan = None
-            if bc_reloc == 0:
-                plan = sequential_retrieval_plan(env.yard)
-            elif bc_reloc is not None:
-                occupancy = layouts if layouts else {1: occupancy_from_yard(env.yard)}
-                plan = occupancy_stages_to_plan(
-                    occupancy, {}, n_cont, keys, pri, max_tiers=h,
-                )
-
-            solver = {
-                "obj": bc_reloc,
-                "optimal": bool(bc_reloc is not None and solve_t < 3590),
-                "time_out": bool(bc_reloc is not None and solve_t >= 3590),
-                "n_vars": 0,
-                "n_constrs": 0,
-                "solve_time": solve_t,
-            }
-            if plan is not None:
-                metrics = merge_solver_and_plan_metrics(
-                    solver, env.validate_plan(plan),
-                )
-            else:
-                metrics = merge_solver_and_plan_metrics(
-                    solver,
-                    {
-                        "relocations": float(bc_reloc) if bc_reloc is not None else float("inf"),
-                        "crane_time": float("inf"),
-                        "time": float("inf") if bc_reloc is None else 0.0,
-                        "feasible": 0.0 if bc_reloc is None else 1.0,
-                        "completed": 0.0 if bc_reloc is None else 1.0,
-                        "validated": 0.0,
-                    },
-                )
-            metrics["bbs_warm_start"] = (
-                float(bbs_reloc) if bbs_reloc is not None else float("inf")
-            )
-            metrics["optimal_likely"] = (
-                1.0 if bc_reloc is not None and solve_t < 3590 else 0.0
-            )
-            metrics["solve_time_s"] = round(solve_t, 3)
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", float("inf")))
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = [
-                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
-                    for m in (plan.movements if plan is not None else [])
-                    if m.to_pos is not None
-                ]
-
+        try:
+            bc_reloc, bbs_reloc, solve_t, stdout = self._run_bc(instance_text)
+        except FileNotFoundError as exc:
+            print(f"[BacciBC2020] {exc}", file=sys.stderr, flush=True)
             self._push(
                 result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                extra    = {
-                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
-                    "validation_errors": env.get_last_validation_errors(),
+                step     = 1,
+                metric   = float("inf"),
+                metrics  = {"relocations": float("inf"), "binary_missing": 1.0},
+                progress = 1.0,
+            )
+            return
+
+        n_cont = len(env.containers)
+        w = env.config.num_bays * env.config.num_rows
+        h = env.config.max_tiers
+        keys = stack_keys(env.yard)
+        pri = priority_to_container_id(env.yard)
+        layouts = parse_bacci_period_layouts(stdout, w, h)
+        plan = None
+        if bc_reloc == 0:
+            plan = sequential_retrieval_plan(env.yard)
+        elif bc_reloc is not None:
+            occupancy = layouts if layouts else {1: occupancy_from_yard(env.yard)}
+            plan = occupancy_stages_to_plan(
+                occupancy, {}, n_cont, keys, pri, max_tiers=h,
+            )
+
+        solver = {
+            "obj": bc_reloc,
+            "optimal": bool(bc_reloc is not None and solve_t < 3590),
+            "time_out": bool(bc_reloc is not None and solve_t >= 3590),
+            "n_vars": 0,
+            "n_constrs": 0,
+            "solve_time": solve_t,
+        }
+        if plan is not None:
+            metrics = merge_solver_and_plan_metrics(
+                solver, env.validate_plan(plan),
+            )
+        else:
+            metrics = merge_solver_and_plan_metrics(
+                solver,
+                {
+                    "relocations": float(bc_reloc) if bc_reloc is not None else float("inf"),
+                    "crane_time": float("inf"),
+                    "time": float("inf") if bc_reloc is None else 0.0,
+                    "feasible": 0.0 if bc_reloc is None else 1.0,
+                    "completed": 0.0 if bc_reloc is None else 1.0,
+                    "validated": 0.0,
                 },
             )
-            print(
-                f"[BacciBC2020] seed={seed}  N={len(env.containers)}  "
-                f"reloc={metrics.get('relocations')}  "
-                f"crane={metrics.get('crane_time')}  "
-                f"bc={bc_reloc}  bbs={bbs_reloc}  t={solve_t:.1f}s",
-                file=sys.stderr, flush=True,
-            )
+        metrics["bbs_warm_start"] = (
+            float(bbs_reloc) if bbs_reloc is not None else float("inf")
+        )
+        metrics["optimal_likely"] = (
+            1.0 if bc_reloc is not None and solve_t < 3590 else 0.0
+        )
+        metrics["solve_time_s"] = round(solve_t, 3)
+        all_metrics.append(metrics)
+        primary = float(metrics.get("relocations", float("inf")))
+
+        if primary < self._best_metric:
+            self._best_metric = primary
+            self._best_solution = [
+                (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                for m in (plan.movements if plan is not None else [])
+                if m.to_pos is not None
+            ]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                "validation_errors": env.get_last_validation_errors(),
+            },
+        )
+        print(
+            f"[BacciBC2020]  N={len(env.containers)}  "
+            f"reloc={metrics.get('relocations')}  "
+            f"crane={metrics.get('crane_time')}  "
+            f"bc={bc_reloc}  bbs={bbs_reloc}  t={solve_t:.1f}s",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {
@@ -267,7 +265,7 @@ class BacciBC2020(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -278,7 +276,7 @@ class BacciBC2020(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "bacci2020_binary": {
                 "type": "str", "default": "",

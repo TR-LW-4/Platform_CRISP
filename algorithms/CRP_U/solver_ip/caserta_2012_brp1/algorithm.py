@@ -339,125 +339,123 @@ class Caserta2012BRPI(BaseAlgorithm):
         output_flag  = int(extra.get("output_flag", 0))
         ub_method    = str(extra.get("ub_method", "heuristic"))
         max_vars     = int(extra.get("max_vars", 200_000))
-        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            yard = env.yard
-            N    = len(env.containers)
-            W    = env.config.num_bays * env.config.num_rows
-            H    = env.config.max_tiers
+        yard = env.yard
+        N    = len(env.containers)
+        W    = env.config.num_bays * env.config.num_rows
+        H    = env.config.max_tiers
 
-            t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
-            try:
-                import gurobipy  # noqa: F401
-            except ImportError:
-                print("[Caserta2012BRPI] ERROR: gurobipy not installed.",
-                      file=sys.stderr, flush=True)
-                self._push(result_queue, step=seed+1, metric=float("inf"),
-                           metrics={"relocations": float("inf"), "error": 1.0},
-                           progress=(seed+1)/n_seeds)
-                continue
+        try:
+            import gurobipy  # noqa: F401
+        except ImportError:
+            print("[Caserta2012BRPI] ERROR: gurobipy not installed.",
+                  file=sys.stderr, flush=True)
+            self._push(result_queue, step=1, metric=float("inf"),
+                       metrics={"relocations": float("inf"), "error": 1.0},
+                       progress=1.0)
+            return
 
-            stacks      = _stacks_as_lists(yard)
-            initial_pos = _initial_layout(yard, W)
+        stacks      = _stacks_as_lists(yard)
+        initial_pos = _initial_layout(yard, W)
 
-            reloc_ub_heur = _minmax_ub(stacks, N, W, H)
-            if reloc_ub_heur == 0:
-                metrics = {
-                    "relocations": 0.0, "steps": 0.0, "time": 0.0,
-                    "optimal_proven": 1.0, "time_out": 0.0, "n_vars": 0.0,
-                    "n_constrs": 0.0, "solve_time_s": 0.0, "feasible": 1.0,
-                    "T": 0.0, "aborted_too_large": 0.0,
-                }
-                all_metrics.append(metrics)
-                self._push(result_queue, step=seed+1, metric=0.0,
-                           metrics=metrics, progress=(seed+1)/n_seeds,
-                           snapshot=env.get_state_snapshot())
-                continue
-
-            reloc_ub_lemma1 = _lemma1_ub(N, W)
-            if ub_method == "lemma1":
-                reloc_ub = reloc_ub_lemma1
-            else:
-                # min of the two: both are individually valid upper bounds
-                # on the optimal relocation count, so their min still is.
-                reloc_ub = min(reloc_ub_heur, reloc_ub_lemma1) if reloc_ub_lemma1 > 0 else reloc_ub_heur
-
-            T = reloc_ub + N + 1  # "+1": one idle period of slack
-
-            n_vars_est = _estimate_var_count(N, W, H, T)
-            if n_vars_est > max_vars:
-                print(
-                    f"[Caserta2012BRPI] seed={seed}  ABORTED -- estimated "
-                    f"{n_vars_est:,} binary variables exceeds max_vars="
-                    f"{max_vars:,}. Try a smaller instance or raise "
-                    f"extra['max_vars'].",
-                    file=sys.stderr, flush=True,
-                )
-                metrics = {
-                    "relocations": float("inf"), "steps": float("inf"),
-                    "time": float("inf"), "optimal_proven": 0.0,
-                    "time_out": 0.0, "n_vars": float(n_vars_est),
-                    "n_constrs": 0.0, "solve_time_s": 0.0, "feasible": 0.0,
-                    "T": float(T), "aborted_too_large": 1.0,
-                }
-                all_metrics.append(metrics)
-                self._push(result_queue, step=seed+1, metric=float("inf"),
-                           metrics=metrics, progress=(seed+1)/n_seeds)
-                continue
-
-            result = _solve_brp_i(initial_pos, N, W, H, T, time_limit_s, output_flag)
-
-            elapsed = time.perf_counter() - t0
-            n_reloc = result["obj"] if result["obj"] is not None else -1
-            primary = float(max(n_reloc, 0)) if result["obj"] is not None else float("inf")
-
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []
-
+        reloc_ub_heur = _minmax_ub(stacks, N, W, H)
+        if reloc_ub_heur == 0:
             metrics = {
-                "relocations":    float(max(n_reloc, 0)),
-                "steps":          float(max(n_reloc, 0)),
-                "time":           float(max(n_reloc, 0)),
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "time_out":       1.0 if result["time_out"] else 0.0,
-                "n_vars":         float(result["n_vars"]),
-                "n_constrs":      float(result["n_constrs"]),
-                "solve_time_s":   round(elapsed, 4),
-                "feasible":       0.0 if result["obj"] is None else 1.0,
-                "T":              float(T),
-                "aborted_too_large": 0.0,
+                "relocations": 0.0, "steps": 0.0, "time": 0.0,
+                "optimal_proven": 1.0, "time_out": 0.0, "n_vars": 0.0,
+                "n_constrs": 0.0, "solve_time_s": 0.0, "feasible": 1.0,
+                "T": 0.0, "aborted_too_large": 0.0,
             }
             all_metrics.append(metrics)
+            self._push(result_queue, step=1, metric=0.0,
+                       metrics=metrics, progress=1.0,
+                       snapshot=env.get_state_snapshot())
+            return
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        reloc_ub_lemma1 = _lemma1_ub(N, W)
+        if ub_method == "lemma1":
+            reloc_ub = reloc_ub_lemma1
+        else:
+            # min of the two: both are individually valid upper bounds
+            # on the optimal relocation count, so their min still is.
+            reloc_ub = min(reloc_ub_heur, reloc_ub_lemma1) if reloc_ub_lemma1 > 0 else reloc_ub_heur
+
+        T = reloc_ub + N + 1  # "+1": one idle period of slack
+
+        n_vars_est = _estimate_var_count(N, W, H, T)
+        if n_vars_est > max_vars:
             print(
-                f"[Caserta2012BRPI] seed={seed}  N={N} W={W} H={H} T={T}  "
-                f"reloc={n_reloc}  opt={result['optimal']}  "
-                f"vars={result['n_vars']}  t={elapsed:.2f}s",
+                f"[Caserta2012BRPI]  ABORTED -- estimated "
+                f"{n_vars_est:,} binary variables exceeds max_vars="
+                f"{max_vars:,}. Try a smaller instance or raise "
+                f"extra['max_vars'].",
                 file=sys.stderr, flush=True,
             )
+            metrics = {
+                "relocations": float("inf"), "steps": float("inf"),
+                "time": float("inf"), "optimal_proven": 0.0,
+                "time_out": 0.0, "n_vars": float(n_vars_est),
+                "n_constrs": 0.0, "solve_time_s": 0.0, "feasible": 0.0,
+                "T": float(T), "aborted_too_large": 1.0,
+            }
+            all_metrics.append(metrics)
+            self._push(result_queue, step=1, metric=float("inf"),
+                       metrics=metrics, progress=1.0)
+            return
+
+        result = _solve_brp_i(initial_pos, N, W, H, T, time_limit_s, output_flag)
+
+        elapsed = time.perf_counter() - t0
+        n_reloc = result["obj"] if result["obj"] is not None else -1
+        primary = float(max(n_reloc, 0)) if result["obj"] is not None else float("inf")
+
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = []
+
+        metrics = {
+            "relocations":    float(max(n_reloc, 0)),
+            "steps":          float(max(n_reloc, 0)),
+            "time":           float(max(n_reloc, 0)),
+            "optimal_proven": 1.0 if result["optimal"] else 0.0,
+            "time_out":       1.0 if result["time_out"] else 0.0,
+            "n_vars":         float(result["n_vars"]),
+            "n_constrs":      float(result["n_constrs"]),
+            "solve_time_s":   round(elapsed, 4),
+            "feasible":       0.0 if result["obj"] is None else 1.0,
+            "T":              float(T),
+            "aborted_too_large": 0.0,
+        }
+        all_metrics.append(metrics)
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
+        print(
+            f"[Caserta2012BRPI]  N={N} W={W} H={H} T={T}  "
+            f"reloc={n_reloc}  opt={result['optimal']}  "
+            f"vars={result['n_vars']}  t={elapsed:.2f}s",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {k: float(np.mean([mm[k] for mm in all_metrics if k in mm]))
                    for k in all_metrics[0]}
-            self._push(result_queue, step=n_seeds, metric=self._best_metric,
+            self._push(result_queue, step=1, metric=self._best_metric,
                        metrics=agg, progress=1.0)
 
     def get_best_solution(self) -> Optional[List[int]]:
@@ -465,7 +463,7 @@ class Caserta2012BRPI(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "time_limit_s": {
                 "type": "float", "default": 3600.0, "min": 1.0, "max": 86400.0,

@@ -123,45 +123,43 @@ class BacciBBS(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg            = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         time_limit     = float(cfg.extra.get("bbs_time_limit", 5.0))
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            trace_layout(
-                f"BacciBBS.train: seed {seed + 1}/{n_seeds}  "
-                f"time_limit={time_limit}s"
-            )
+        trace_layout(
+            f"BacciBBS.train: "
+            f"time_limit={time_limit}s"
+        )
 
-            env = problem_factory()
-            env.reset(options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            instance_text = yard_to_bbs_instance(env.config, env.yard)
-            relocations, _ = self._run_bbs(instance_text, time_limit)
+        instance_text = yard_to_bbs_instance(env.config, env.yard)
+        relocations, _ = self._run_bbs(instance_text, time_limit)
 
-            metrics = {
-                "relocations": float(relocations),
-                "steps":       float(relocations),
-                "time":        float(relocations),
-                "progress":    1.0,
-            }
-            all_metrics.append(metrics)
+        metrics = {
+            "relocations": float(relocations),
+            "steps":       float(relocations),
+            "time":        float(relocations),
+            "progress":    1.0,
+        }
+        all_metrics.append(metrics)
 
-            if relocations < self._best_metric:
-                self._best_metric   = float(relocations)
-                self._best_solution = []
+        if relocations < self._best_metric:
+            self._best_metric   = float(relocations)
+            self._best_solution = []
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = float(relocations),
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = float(relocations),
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
         if all_metrics:
             agg = {
@@ -170,7 +168,7 @@ class BacciBBS(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -185,7 +183,7 @@ class BacciBBS(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "bbs_time_limit": {
                 "type":    "float",

@@ -78,120 +78,118 @@ class GalleCRPI2018(BaseAlgorithm):
         use_preprocessing = bool(extra.get("use_preprocessing", True))
         memory_limit     = float(extra.get("memory_limit",   8e10))
         output_flag      = int(extra.get("output_flag",      0))
-        n_seeds = 1  # multi-seed eval removed; single run only
 
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            yard = env.yard
-            C    = len(env.containers)
-            cfg_ = env.config
-            S    = cfg_.num_bays * cfg_.num_rows
-            T    = cfg_.max_tiers
+        yard = env.yard
+        C    = len(env.containers)
+        cfg_ = env.config
+        S    = cfg_.num_bays * cfg_.num_rows
+        T    = cfg_.max_tiers
 
-            t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
-            # Guard: Gurobi import check
-            try:
-                import gurobipy  # noqa: F401
-            except ImportError:
-                print(
-                    "[GalleCRPI2018] ERROR: gurobipy not installed. "
-                    "Run:  pip install gurobipy",
-                    file=sys.stderr, flush=True,
-                )
-                self._push(result_queue, step=seed+1, metric=float("inf"),
-                           metrics={"relocations": float("inf"),
-                                    "error": 1.0},
-                           progress=(seed+1)/n_seeds)
-                continue
-
-            result = _solve_ip(
-                yard=yard, C=C, S=S, T=T,
-                time_limit_s=time_limit_s,
-                use_gap=use_gap,
-                use_incumbent=use_incumbent,
-                use_preprocessing=use_preprocessing,
-                memory_limit=memory_limit,
-                output_flag=output_flag,
-            )
-
-            elapsed = time.perf_counter() - t0
-            keys = stack_keys(yard)
-            pri = priority_to_container_id(yard)
-            plan = None
-            if result["obj"] is not None:
-                occupancy = result.get("occupancy") or {1: occupancy_from_yard(yard)}
-                plan = occupancy_stages_to_plan(
-                    occupancy,
-                    result.get("y_vals") or {},
-                    C,
-                    keys,
-                    pri,
-                    max_tiers=T,
-                )
-            if plan is not None:
-                metrics = merge_solver_and_plan_metrics(
-                    result, env.validate_plan(plan),
-                )
-            else:
-                metrics = merge_solver_and_plan_metrics(
-                    result,
-                    {
-                        "relocations": float("inf"),
-                        "crane_time": float("inf"),
-                        "time": float("inf"),
-                        "feasible": 0.0,
-                        "completed": 0.0,
-                        "validated": 1.0,
-                        "validation_conflicts": 1.0,
-                    },
-                )
-            metrics["memory_out"] = 1.0 if result.get("memory_out") else 0.0
-            metrics["solve_time_s"] = round(float(result.get("solve_time") or 0.0), 4)
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", float("inf")))
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = [
-                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
-                    for m in (plan.movements if plan is not None else [])
-                    if m.to_pos is not None
-                ]
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                extra    = {
-                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
-                    "validation_errors": env.get_last_validation_errors(),
-                },
-            )
-
-            status_str = (
-                "optimal" if result["optimal"]
-                else ("time_out" if result["time_out"]
-                      else ("memory_out" if result["memory_out"]
-                            else "no_solution"))
-            )
+        # Guard: Gurobi import check
+        try:
+            import gurobipy  # noqa: F401
+        except ImportError:
             print(
-                f"[GalleCRPI2018] seed={seed}  C={C} S={S} T={T}  "
-                f"relocations={metrics.get('relocations')}  "
-                f"crane={metrics.get('crane_time')}  status={status_str}  "
-                f"vars={result['n_vars']}  constrs={result['n_constrs']}  "
-                f"t={elapsed:.3f}s",
+                "[GalleCRPI2018] ERROR: gurobipy not installed. "
+                "Run:  pip install gurobipy",
                 file=sys.stderr, flush=True,
             )
+            self._push(result_queue, step=1, metric=float("inf"),
+                       metrics={"relocations": float("inf"),
+                                "error": 1.0},
+                       progress=1.0)
+            return
+
+        result = _solve_ip(
+            yard=yard, C=C, S=S, T=T,
+            time_limit_s=time_limit_s,
+            use_gap=use_gap,
+            use_incumbent=use_incumbent,
+            use_preprocessing=use_preprocessing,
+            memory_limit=memory_limit,
+            output_flag=output_flag,
+        )
+
+        elapsed = time.perf_counter() - t0
+        keys = stack_keys(yard)
+        pri = priority_to_container_id(yard)
+        plan = None
+        if result["obj"] is not None:
+            occupancy = result.get("occupancy") or {1: occupancy_from_yard(yard)}
+            plan = occupancy_stages_to_plan(
+                occupancy,
+                result.get("y_vals") or {},
+                C,
+                keys,
+                pri,
+                max_tiers=T,
+            )
+        if plan is not None:
+            metrics = merge_solver_and_plan_metrics(
+                result, env.validate_plan(plan),
+            )
+        else:
+            metrics = merge_solver_and_plan_metrics(
+                result,
+                {
+                    "relocations": float("inf"),
+                    "crane_time": float("inf"),
+                    "time": float("inf"),
+                    "feasible": 0.0,
+                    "completed": 0.0,
+                    "validated": 1.0,
+                    "validation_conflicts": 1.0,
+                },
+            )
+        metrics["memory_out"] = 1.0 if result.get("memory_out") else 0.0
+        metrics["solve_time_s"] = round(float(result.get("solve_time") or 0.0), 4)
+        all_metrics.append(metrics)
+        primary = float(metrics.get("relocations", float("inf")))
+
+        if primary < self._best_metric:
+            self._best_metric = primary
+            self._best_solution = [
+                (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                for m in (plan.movements if plan is not None else [])
+                if m.to_pos is not None
+            ]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                "validation_errors": env.get_last_validation_errors(),
+            },
+        )
+
+        status_str = (
+            "optimal" if result["optimal"]
+            else ("time_out" if result["time_out"]
+                  else ("memory_out" if result["memory_out"]
+                        else "no_solution"))
+        )
+        print(
+            f"[GalleCRPI2018]  C={C} S={S} T={T}  "
+            f"relocations={metrics.get('relocations')}  "
+            f"crane={metrics.get('crane_time')}  status={status_str}  "
+            f"vars={result['n_vars']}  constrs={result['n_constrs']}  "
+            f"t={elapsed:.3f}s",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {
@@ -200,7 +198,7 @@ class GalleCRPI2018(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -215,7 +213,7 @@ class GalleCRPI2018(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "time_limit_s": {
                 "type": "float", "default": 3600.0, "min": 1.0, "max": 86400.0,

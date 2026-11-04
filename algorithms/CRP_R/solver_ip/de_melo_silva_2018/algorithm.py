@@ -72,106 +72,104 @@ class DeMeloSilva2018RBRP(BaseAlgorithm):
         variant      = str(extra.get("variant",      "m1"))
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag  = int(extra.get("output_flag",   0))
-        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            yard  = env.yard
-            C     = len(env.containers)
-            S     = env.config.num_bays * env.config.num_rows
-            H     = env.config.max_tiers
-            G     = C  # unique priorities → G = N
+        yard  = env.yard
+        C     = len(env.containers)
+        S     = env.config.num_bays * env.config.num_rows
+        H     = env.config.max_tiers
+        G     = C  # unique priorities → G = N
 
-            T_ub = _minmax_upper_bound(yard, C, S, H)
-            plan = None
-            result: Dict = {
-                "obj": 0, "optimal": True, "time_out": False,
-                "n_vars": 0, "n_constrs": 0, "solve_time": 0.0,
-            }
-            if T_ub <= 0:
-                plan = sequential_retrieval_plan(yard)
+        T_ub = _minmax_upper_bound(yard, C, S, H)
+        plan = None
+        result: Dict = {
+            "obj": 0, "optimal": True, "time_out": False,
+            "n_vars": 0, "n_constrs": 0, "solve_time": 0.0,
+        }
+        if T_ub <= 0:
+            plan = sequential_retrieval_plan(yard)
+        else:
+            t0 = time.perf_counter()
+            try:
+                import gurobipy  # noqa: F401
+            except ImportError:
+                print("[DeMeloSilva2018RBRP] ERROR: gurobipy not installed.",
+                      file=sys.stderr, flush=True)
+                self._push(result_queue, step=1, metric=float("inf"),
+                           metrics={"relocations": float("inf"), "error": 1.0},
+                           progress=1.0)
+                return
+
+            if variant == "m2":
+                result = _solve_rbrp_m2(yard, C, S, H, G, T_ub,
+                                        time_limit_s, output_flag)
             else:
-                t0 = time.perf_counter()
-                try:
-                    import gurobipy  # noqa: F401
-                except ImportError:
-                    print("[DeMeloSilva2018RBRP] ERROR: gurobipy not installed.",
-                          file=sys.stderr, flush=True)
-                    self._push(result_queue, step=seed+1, metric=float("inf"),
-                               metrics={"relocations": float("inf"), "error": 1.0},
-                               progress=(seed+1)/n_seeds)
-                    continue
+                result = _solve_rbrp_m1(yard, C, S, H, G, T_ub,
+                                        time_limit_s, output_flag)
+            elapsed = time.perf_counter() - t0
+            plan = result.get("plan")
 
-                if variant == "m2":
-                    result = _solve_rbrp_m2(yard, C, S, H, G, T_ub,
-                                            time_limit_s, output_flag)
-                else:
-                    result = _solve_rbrp_m1(yard, C, S, H, G, T_ub,
-                                            time_limit_s, output_flag)
-                elapsed = time.perf_counter() - t0
-                plan = result.get("plan")
-
-            if plan is not None:
-                metrics = merge_solver_and_plan_metrics(
-                    result, env.validate_plan(plan),
-                )
-            else:
-                metrics = merge_solver_and_plan_metrics(
-                    result,
-                    {
-                        "relocations": float("inf"),
-                        "crane_time": float("inf"),
-                        "time": float("inf"),
-                        "feasible": 0.0,
-                        "completed": 0.0,
-                        "validated": 1.0,
-                        "validation_conflicts": 1.0,
-                    },
-                )
-            metrics["T_ub"] = float(max(T_ub, 0))
-            metrics["solve_time_s"] = round(float(result.get("solve_time") or 0.0), 4)
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", float("inf")))
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = [
-                    (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
-                    for m in (plan.movements if plan is not None else [])
-                    if m.to_pos is not None
-                ]
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                extra    = {
-                    "moves": plan_to_moves_extra(plan) if plan is not None else [],
-                    "validation_errors": env.get_last_validation_errors(),
+        if plan is not None:
+            metrics = merge_solver_and_plan_metrics(
+                result, env.validate_plan(plan),
+            )
+        else:
+            metrics = merge_solver_and_plan_metrics(
+                result,
+                {
+                    "relocations": float("inf"),
+                    "crane_time": float("inf"),
+                    "time": float("inf"),
+                    "feasible": 0.0,
+                    "completed": 0.0,
+                    "validated": 1.0,
+                    "validation_conflicts": 1.0,
                 },
             )
-            print(
-                f"[DeMeloSilva2018RBRP/{variant}] seed={seed}  "
-                f"C={C} S={S} H={H} T_ub={T_ub}  "
-                f"reloc={metrics.get('relocations')}  "
-                f"crane={metrics.get('crane_time')}  "
-                f"opt={result.get('optimal')}  "
-                f"t={float(result.get('solve_time') or 0.0):.2f}s",
-                file=sys.stderr, flush=True,
-            )
+        metrics["T_ub"] = float(max(T_ub, 0))
+        metrics["solve_time_s"] = round(float(result.get("solve_time") or 0.0), 4)
+        all_metrics.append(metrics)
+        primary = float(metrics.get("relocations", float("inf")))
+
+        if primary < self._best_metric:
+            self._best_metric = primary
+            self._best_solution = [
+                (m.to_pos[0] - 1) * env.config.num_rows + (m.to_pos[1] - 1)
+                for m in (plan.movements if plan is not None else [])
+                if m.to_pos is not None
+            ]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            extra    = {
+                "moves": plan_to_moves_extra(plan) if plan is not None else [],
+                "validation_errors": env.get_last_validation_errors(),
+            },
+        )
+        print(
+            f"[DeMeloSilva2018RBRP/{variant}]  "
+            f"C={C} S={S} H={H} T_ub={T_ub}  "
+            f"reloc={metrics.get('relocations')}  "
+            f"crane={metrics.get('crane_time')}  "
+            f"opt={result.get('optimal')}  "
+            f"t={float(result.get('solve_time') or 0.0):.2f}s",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {k: float(np.mean([m[k] for m in all_metrics if k in m]))
                    for k in all_metrics[0]}
-            self._push(result_queue, step=n_seeds, metric=self._best_metric,
+            self._push(result_queue, step=1, metric=self._best_metric,
                        metrics=agg, progress=1.0)
 
     def get_best_solution(self) -> Optional[List[int]]:
@@ -179,7 +177,7 @@ class DeMeloSilva2018RBRP(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "variant": {
                 "type": "str", "default": "m1", "options": ["m1", "m2"],
