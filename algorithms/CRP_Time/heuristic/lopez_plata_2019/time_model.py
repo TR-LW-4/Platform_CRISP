@@ -31,7 +31,7 @@ class TimeModel:
 
     @classmethod
     def from_spec(cls, spec) -> "TimeModel":
-        """From a core.objectives.ObjectiveSpec (ObjectiveSpec.from_config(env.config))."""
+        """From a utils.crane_time.ObjectiveSpec (ObjectiveSpec.from_config(env.config))."""
         if spec.time_model not in ("f2", "f2_vertical"):
             raise ValueError(f"López-Plata supports the time models f2 and f2_vertical, not {spec.time_model!r}")
         ts, tpp, hout = (Fraction(str(x)) for x in (spec.stack_s_per_stack, spec.pickup_place_s, spec.outside_height))

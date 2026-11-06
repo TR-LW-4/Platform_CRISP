@@ -21,9 +21,8 @@ from collections import Counter
 from typing import List, Optional, Sequence, Set, Tuple
 
 from algorithms.CRP_Time.utils.bay import target_stack
-from algorithms.CRP_Time.utils.crane_time import move_time
+from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec, move_time
 from algorithms.CRP_Time.utils.plan import replay
-from core.objectives import ObjectiveSpec
 from core.plan import Movement
 
 from .branching import gbh_branches, set_b_branches

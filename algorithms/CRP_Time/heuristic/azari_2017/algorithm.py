@@ -26,13 +26,12 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from algorithms.CRP_Time.utils.bay import read_bay
-from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec, check_objective
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.objectives import ObjectiveSpec
 
 from .csum import csum
 from .gbh import gbh
