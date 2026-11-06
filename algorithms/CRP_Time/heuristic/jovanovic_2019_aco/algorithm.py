@@ -25,21 +25,19 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
-import copy
 import multiprocessing as mp
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
 from algorithms.CRP_Time.utils.bay import read_bay
-from algorithms.CRP_Time.utils.crane_time import check_objective
+from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec, check_objective, evaluate
 from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.params import parameters
 from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
+from algorithms.CRP_Time.utils.trace import trace_layout
 from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from core.layout_trace import trace_layout
-from core.objectives import KinematicsModel, ObjectiveSpec, evaluate_plan_objectives
 
 from .ant import build_solution, decode, start
 from .greedy import greedy
@@ -103,11 +101,8 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             # ── Set up environment ────────────────────────────────────── #
             env = problem_factory()
             stacks_init, positions = read_bay(env)
-            initial_yard = copy.deepcopy(env.yard)
             objective_spec = ObjectiveSpec.from_config(env.config)
             check_objective(objective_spec, self.name, ("crane_time", "relocations"))
-            # Only for the legacy RMGC metric of the shared evaluator.
-            kinematics = KinematicsModel.from_config_extra(env.config.extra)
 
             n_total  = int(env.config.num_containers)
             n_stacks = len(stacks_init)
@@ -115,15 +110,13 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
             timer.start()
             ant0     = start(stacks_init, positions, int(env.config.max_tiers), objective_spec)
 
-            def evaluate(solution):
+            def evaluate_solution(solution):
                 plan = replay(stacks_init, positions, decode(solution, stacks_init, n_total))
-                return plan, evaluate_plan_objectives(
-                    plan, objective_spec, kinematics=kinematics, initial_yard=initial_yard,
-                )
+                return plan, evaluate(plan, objective_spec)
 
             # ── Greedy warm-start and pheromone initialisation ─────── #
             S_best = greedy(stacks_init, n_total, int(env.config.max_tiers), max_moves)
-            best_cost = float(evaluate(S_best)[1]["objective_value"])
+            best_cost = float(evaluate_solution(S_best)[1]["objective_value"])
             pheromone, tau_min = initial(best_cost, ant0.lb, n_total, n_stacks, max_moves)
 
             iters_no_improve = 0
@@ -162,7 +155,7 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
                             result_queue,
                             step     = seed + 1,
                             metric   = float(best_cost),
-                            metrics  = evaluate(S_best)[1],
+                            metrics  = evaluate_solution(S_best)[1],
                             progress = min(frac, (seed + 1) / n_seeds),
                         )
 

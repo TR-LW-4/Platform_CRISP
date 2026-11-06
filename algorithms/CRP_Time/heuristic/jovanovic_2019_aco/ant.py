@@ -20,9 +20,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from algorithms.CRP_Time.utils.crane_time import move_time
+from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec, move_time
 from algorithms.CRP_Time.utils.located import min_due, non_located
-from core.objectives import ObjectiveSpec
 from core.plan import Movement
 
 from .lower_bound import lb_container, lb_time

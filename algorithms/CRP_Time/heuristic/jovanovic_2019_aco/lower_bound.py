@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from typing import List
 
+from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec
 from algorithms.CRP_Time.utils.located import non_located
-from core.objectives import ObjectiveSpec
 
 
 def lb_container(s: int, t: int, nw: bool, spec: ObjectiveSpec) -> float:
