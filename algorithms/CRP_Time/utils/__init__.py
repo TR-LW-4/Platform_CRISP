@@ -4,11 +4,12 @@ Utility functions shared by the CRP-Time algorithms, in the role of PlatEMO's
 
 bay        read_bay, target_stack, free_destinations
 located    min_due, non_located, well_placed
-crane_time check_objective, move_time
+crane_time ObjectiveSpec, check_objective, move_time, evaluate
 plan       replay, actions, saved_moves
 finish     finish
 params     parameters
 timer      Stopwatch
+trace      trace_layout
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.

@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Tuple
 
-from core.objectives import ObjectiveSpec, objective_value
 from core.plan import RelocationPlan
+
+from .crane_time import ObjectiveSpec, objective_value
 
 
 def finish(problem_factory: Callable, plan: RelocationPlan, spec: ObjectiveSpec,

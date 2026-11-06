@@ -8,12 +8,15 @@ algorithm's header and its config_schema().
 from __future__ import annotations
 
 import copy
+import dataclasses
 import importlib
+import json
 import queue
 import re
 import threading
 import time
 import unittest
+from pathlib import Path
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
@@ -37,6 +40,7 @@ from core.results.store import moves_from_records
 from problems.CRP_MO import CRP_MO
 from problems.CRP_Time import CRP_Time
 
+from . import crane_time as ct
 from .bay import free_destinations, read_bay, target_stack
 from .crane_time import check_objective, move_time
 from .finish import finish
@@ -51,6 +55,10 @@ ALGORITHMS = [
     ("algorithms.CRP_Time.heuristic.lopez_plata_2019.algorithm", "LopezPlata2019Heuristic"),
 ]
 HEADER_PARAMETER = re.compile(r"^(\w+)\s+---\s+(\S+)\s+---\s+\S")
+REPO = Path(__file__).resolve().parents[3]
+CAMPAIGN = REPO / "docs" / "validation" / "data" / "final_campaign_20261029" / "campaign.json"
+CAMPAIGN_SUFFIXES = {"f2": "f2-95e623c7", "f2vert": "f2_vertical-a1a2ce5e", "practice": "f2_vertical-a758c5ac"}
+GEOMETRY = ("num_bays", "num_rows", "max_tiers", "num_containers", "layout_file_path")
 
 
 def _env(name="data3-5-1.dat", **values):
@@ -136,6 +144,56 @@ class TestCraneTime(unittest.TestCase):
                             ("crane_time", "relocations"))
         with self.assertRaisesRegex(ValueError, "weighted"):
             check_objective(ObjectiveSpec(mode="weighted"), "A", ("crane_time", "relocations"))
+
+
+class TestEvaluate(unittest.TestCase):
+    """utils.crane_time is a copy of the platform evaluator in core/objectives.py without the legacy RMGC time."""
+
+    def test_copies_equal_the_platform(self):
+        self.assertEqual(ct.PRACTICE_PARAMETERS, PRACTICE_PARAMETERS)
+        defaults = {k: s["default"] for k, s in CRP_Time.config_schema().items() if "default" in s}
+        for model in ("f2", "f2_vertical", "f2_vertical_practice"):
+            values = CRP_Time.resolve_values({**defaults, "time_model": model})
+            config = _env("data4-6-7.dat", **values).config
+            self.assertEqual(dataclasses.asdict(ct.ObjectiveSpec.from_config(config)),
+                             dataclasses.asdict(ObjectiveSpec.from_config(config)))
+            self.assertEqual(ct.is_practice(values), is_practice(values))
+
+    def test_refuses_a_plan_without_tiers(self):
+        for move in (Movement(1, (1, 1), None), Movement(2, (1, 1), (2, 1), from_tier=2)):
+            plan = RelocationPlan()
+            plan.add(move)
+            with self.assertRaisesRegex(ValueError, r"evaluate: move 0 \(container \d\) has no tiers"):
+                ct.evaluate(plan, ct.ObjectiveSpec())
+
+    @unittest.skipUnless(CAMPAIGN.is_file(), "final campaign not on this machine")
+    def test_equals_the_evaluator_on_campaign_plans(self):
+        """Saved final plans of the final campaign, instances 1 and 23 of every class, three algorithms, f2,
+        f2vert and the practice preset: the platform's metrics without the RMGC time, in the same order and
+        bit-equal, and the saved relocations and crane time."""
+        start = json.loads(CAMPAIGN.read_text(encoding="utf-8"))["start"]
+        n = 0
+        for preset, suffix in CAMPAIGN_SUFFIXES.items():
+            for idx in ("01", "23"):
+                for path in sorted((REPO / "results" / "CRP-Time").glob(f"*/caserta_*_{idx}_obj-crane_time-{suffix}.json")):
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    with self.subTest(preset=preset, file=f"{path.parent.name}/{path.name}"):
+                        self.assertGreaterEqual(data["timestamp"], start)
+                        pc = data["prob_config"]
+                        config = problem_config_for_caserta_dat(
+                            DEFAULT_CASERTA_DIR / Path(pc["layout_file_path"]).name,
+                            {k: v for k, v in pc.items() if k not in GEOMETRY})
+                        plan = plan_from_json(data["moves"])
+                        want = evaluate_plan_objectives(plan, ObjectiveSpec.from_config(config),
+                                                        kinematics=KinematicsModel.from_config_extra(config.extra))
+                        del want["crane_time_rmgc"]
+                        got = ct.evaluate(plan, ct.ObjectiveSpec.from_config(config))
+                        self.assertEqual(list(got.items()), list(want.items()))
+                        self.assertEqual((got["relocations"], got["crane_time"]),
+                                         (data["metrics"]["relocations"], data["metrics"]["crane_time"]))
+                        self.assertEqual("crane_time_f2" in got, preset != "practice")
+                    n += 1
+        self.assertEqual(n, 3 * 3 * 5 * 2)
 
 
 class TestPlan(unittest.TestCase):
