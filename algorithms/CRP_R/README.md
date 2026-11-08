@@ -43,7 +43,7 @@ tree searches.
 
 - `kim_hong_2006/` — ENAR; also listed for CRP-Time via `compatible_problems`.
 - `caserta_2009_lah/` — look-ahead heuristic.
-- `caserta_2011_cm/` — corridor method.
+- `cm/` — corridor method.
 - `caserta_2012/` — min-priority HEUR; also listed for CRP-Time.
 - `lan_2013/` — Petering & Hussein LA-N; also listed for CRP-Time.
 - `tang_2015/` — H1/H2.

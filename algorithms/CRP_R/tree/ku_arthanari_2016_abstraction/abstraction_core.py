@@ -16,6 +16,8 @@ import itertools
 import time
 from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
+from algorithms.CRP_R.bound.lb1 import lb1
+
 State = Tuple[Tuple[int, ...], ...]
 
 PDBLevels = Dict[int, Dict[State, int]]
@@ -277,20 +279,8 @@ def build_pdb(
 # ================================================================ #
 
 def _confirmed_relocations(state: State) -> int:
-    """
-    "Confirmed relocations" lower bound (Kim & Hong 2006, Section 2.1 /
-    Zhu et al. 2012's LB1): count containers sitting above a
-    smaller-priority container in the same stack.  Reimplemented locally
-    per this platform's independence convention.
-    """
-    total = 0
-    for stack in state:
-        min_below: Optional[int] = None
-        for v in stack:
-            if min_below is not None and v > min_below:
-                total += 1
-            min_below = v if min_below is None else min(min_below, v)
-    return total
+    """LB1: containers sitting above a smaller priority in the same stack."""
+    return lb1(state)
 
 
 def _greedy_probe(

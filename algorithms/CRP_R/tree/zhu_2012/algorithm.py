@@ -1,73 +1,93 @@
 """
-Zhu2012IDAStarR
+Zhu iterative deepening A* for CRP-R
 <2012> <exact> <restricted> <single-bay> <CRP-R>
-Iterative deepening A* with LB3 / PR4
-time_limit_s --- 300 --- Per-instance wall-clock limit (s)
-lb_mode --- LB3 --- Lower bound: LB1 / LB2 / LB3
-probe_mode --- PR4 --- Probe heuristic: PR1–PR4
+time_limit --- 300.0 --- Per-instance wall-clock limit (s)
+lb_mode --- LB3 --- Lower bound: LB1, LB2, or LB3
+probe_mode --- PR4 --- Probe heuristic: PR1, PR2, PR3, or PR4
 
-Reference
----------
+------------------------------- Reference --------------------------------
 W. Zhu, H. Qin, A. Lim, H. Zhang,
 "Iterative deepening A* algorithms for the container relocation problem",
 IEEE Transactions on Automation Science and Engineering 9 (2012) 710–722.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-from algorithms.common.tree import TreeSolver
-from algorithms.common.tree.components import (
-    LB1,
-    LB2,
-    LB3,
-    PR1,
-    PR2,
-    PR3,
-    PR4,
-    PRPlus,
-    PRRollout,
-    RestrictedCRPSpace,
-    SingleMove,
-)
-from algorithms.common.tree.strategies import IDAStar
+import multiprocessing as mp
+from typing import Callable, Optional
+
+from web.backend.header_schema import parse_header
+
+from .search import search
 
 
-class Zhu2012IDAStarR(TreeSolver):
-    """Zhu et al. IDA*-R using the public solver API."""
+class Zhu2012IDAStarR:
 
-    name = "Zhu et al. (2012) IDA*-R"
-    category = "Exact"
-    description = "Zhu et al. (2012) IDA*-R using TreeSolver."
-    compatible_problems = ["CRP-R"]
-    geometry = "single-bay"
-    objectives = ["relocations"]
-    fidelity = "faithful"
+    def __init__(self, config=None):
+        self.config = config
+        self._best_solution = None
 
-    _LB_TYPES = {
-        LB1.name: LB1,
-        LB2.name: LB2,
-        LB3.name: LB3,
-    }
-    _LB_MODES = tuple(_LB_TYPES)
-    _PROBE_MODES = (PR1, PR2, PR3, PR4)
+    def _take(self, header, name, cast):
+        extra = getattr(self.config, "extra", None) or {}
+        if name in extra and extra[name] not in (None, ""):
+            return cast(extra[name])
+        return cast(header[name]["default"])
 
-    def build_search(self) -> IDAStar:
-        """Compose the paper's IDA*-R configuration."""
-        # Header order: time_limit_s, lb_mode, probe_mode.
-        _, lb_mode, probe_mode = self.parameter_set("300", "LB3", "PR4")
-        lb_mode = str(lb_mode)
-        probe_mode = str(probe_mode)
+    def train(
+        self,
+        problem_factory: Callable,
+        result_queue: mp.Queue,
+        stop_event: mp.Event,
+    ) -> None:
+        header = parse_header(__doc__ or "")
+        time_limit = self._take(header, "time_limit", float)
+        lb_mode = self._take(header, "lb_mode", str)
+        probe_mode = self._take(header, "probe_mode", str)
+        env = problem_factory()
+        stacks = [
+            [int(container.priority) for container in stack.containers]
+            for _, stack in sorted(env.yard.stacks.items())
+        ]
+        n_total = int(env.config.num_containers)
+        max_tiers = int(env.config.max_tiers)
+        report_marks = 50
+        reported = -1
 
-        if lb_mode not in self._LB_MODES:
-            lb_mode = LB3.name
-        if probe_mode not in self._PROBE_MODES:
-            probe_mode = PR4
+        def report(elapsed: float, cost: int) -> None:
+            nonlocal reported
+            mark = min(int(elapsed / time_limit * report_marks), report_marks - 1)
+            if mark == reported:
+                return
+            reported = mark
+            result_queue.put({
+                "step": mark + 1,
+                "metric": float(cost),
+                "progress": min(elapsed / time_limit, 1.0),
+            })
 
-        space = RestrictedCRPSpace()
-        return IDAStar(
-            state_space=space,
-            branching=SingleMove(space),
-            lower_bound=self._LB_TYPES[lb_mode](space),
-            upper_bound=PRPlus(space),
-            frontier_probe=PRRollout(space, probe_mode),
+        solution, cost = search(
+            stacks,
+            n_total,
+            max_tiers,
+            time_limit,
+            lb_mode=lb_mode,
+            probe_mode=probe_mode,
+            stop=stop_event.is_set,
+            on_progress=report,
         )
+        self._best_solution = solution
+        result_queue.put({
+            "step": report_marks,
+            "metric": None if cost is None else float(cost),
+            "progress": 1.0,
+            "solution": solution,
+        })
+
+    def get_best_solution(self) -> Optional[list]:
+        return self._best_solution
