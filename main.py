@@ -19,6 +19,10 @@ python main.py run --problem "CRP-R" --algo "Caserta (2012) HEUR"
 python main.py layout-run --problem "CRP-R" --algo "Caserta (2012) HEUR" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat
 
+# Optimise the tier-dependent crane-time model instead of f2 (CRP-Time only)
+python main.py layout-run --problem "CRP-Time" --algo "Lee–Lee (2010) Retrieval" \\
+    --layout benchmark/Caserta_dataset/data5-5-1.dat --time-model f2_vertical
+
 # Same, but print LA-N move-by-move trace on stderr (--trace-lan or export CRISP_TRACE_LAN=1)
 python main.py layout-run --problem "CRP-R" --algo "LA-N Look-Ahead" \\
     --layout benchmark/Caserta_dataset/data3-3-1.dat --trace-lan
@@ -36,6 +40,8 @@ python main.py bench-summary --problem "CRP-R" --algo "Caserta (2012) HEUR" --li
 
 import sys
 import os
+from functools import partial
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -72,12 +78,15 @@ def cmd_test():
     )
     from core.base_problem import ProblemConfig
     from core.base_algorithm import AlgorithmConfig
+    from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, problem_config_for_caserta_dat
     import multiprocessing as mp
 
     _PREFERRED = ("Caserta (2012) HEUR", "Kim–Hong (2006) ENAR")
 
     print("\n=== Smoke Test ===")
     cfg = ProblemConfig(num_bays=3, num_rows=2, max_tiers=3, num_containers=8, num_groups=2)
+    # CRP-Time rejects random layouts, so it runs on a small Caserta instance.
+    time_cfg = problem_config_for_caserta_dat(DEFAULT_CASERTA_DIR / "data3-3-1.dat", {})
     for pname in list_problems():
         pcls = get_problem_class(pname)
         if pcls is None:
@@ -106,8 +115,9 @@ def cmd_test():
         q = mp.Queue()
         ev = mp.Event()
 
-        def factory(_p=pcls, _c=cfg):
-            return _p(config=_c)
+        # partial() instead of a closure: Windows spawns workers and must
+        # pickle this factory, which cannot reach a function-local object.
+        factory = partial(pcls, config=time_cfg if pname == "CRP-Time" else cfg)
 
         proc = mp.Process(target=algo.train, args=(factory, q, ev), daemon=True)
         proc.start()
@@ -141,6 +151,12 @@ def cmd_run(problem: str, algo: str, iterations: int):
     if acls is None:
         print(f"Unknown algorithm: {algo}")
         return
+    if problem == "CRP-Time":
+        print(
+            "CRP-Time does not use random layouts; run it on a layout file with "
+            'python main.py layout-run --problem "CRP-Time" --layout <file>'
+        )
+        return
 
     cfg_p = ProblemConfig()
     cfg_a = AlgorithmConfig(max_iterations=iterations, report_interval=max(1, iterations // 20))
@@ -148,8 +164,7 @@ def cmd_run(problem: str, algo: str, iterations: int):
     q     = mp.Queue()
     ev    = mp.Event()
 
-    def factory(_p=pcls, _c=cfg_p):
-        return _p(config=_c)
+    factory = partial(pcls, config=cfg_p)
 
     print(f"\nRunning {algo} on {problem} for {iterations} iterations...")
     proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
@@ -185,18 +200,19 @@ def _algorithm_config_from_schema(algo_cls, overrides: dict):
     """Build ``AlgorithmConfig`` from ``config_schema()`` defaults + overrides."""
     from core.base_algorithm import AlgorithmConfig
 
+    from web.backend.header_schema import algorithm_config_schema
+
     params: dict = {}
-    if hasattr(algo_cls, "config_schema"):
-        for aname, spec in algo_cls.config_schema().items():
-            t = spec.get("type", "int")
-            if t == "int":
-                params[aname] = int(spec["default"])
-            elif t == "float":
-                params[aname] = float(spec["default"])
-            elif t == "bool":
-                params[aname] = bool(spec["default"])
-            else:
-                params[aname] = spec["default"]
+    for aname, spec in algorithm_config_schema(algo_cls).items():
+        t = spec.get("type", "int")
+        if t == "int":
+            params[aname] = int(spec["default"])
+        elif t == "float":
+            params[aname] = float(spec["default"])
+        elif t == "bool":
+            params[aname] = bool(spec["default"])
+        else:
+            params[aname] = spec["default"]
     params.update(overrides)
     base_kwargs = {k: v for k, v in params.items() if k in _BASE_ALGO_KEYS}
     cfg = AlgorithmConfig(**base_kwargs)
@@ -212,6 +228,7 @@ def cmd_layout_run(
     save: bool,
     timeout: float,
     trace_lan: bool = False,
+    time_model: Optional[str] = None,
 ):
     """
     Run *one* registered algorithm on *one* Caserta (.dat) or Zhu (.txt) layout file.
@@ -248,12 +265,20 @@ def cmd_layout_run(
         print(f"Unknown algorithm: {algo!r}  (try: python main.py list)")
         return
 
+    # objective_mode travels with time_model because the saved-result identity
+    # is keyed off it; CRP-Time forces "crane_time" as its only mode anyway.
+    prob_params = (
+        {"time_model": time_model, "objective_mode": "crane_time"}
+        if time_model
+        else {}
+    )
+
     suffix = p.suffix.lower()
     if suffix == ".txt":
-        prob_cfg = problem_config_for_zhu_txt(p, {})
+        prob_cfg = problem_config_for_zhu_txt(p, prob_params)
         src_tag = "cli_zhu_txt"
     elif suffix == ".dat":
-        prob_cfg = problem_config_for_caserta_dat(p, {})
+        prob_cfg = problem_config_for_caserta_dat(p, prob_params)
         src_tag = "cli_caserta_dat"
     else:
         print("Expected a `.dat` (Caserta) or `.txt` (Zhu) layout file.")
@@ -263,23 +288,37 @@ def cmd_layout_run(
     inst = acls(config=cfg_a)
 
     import multiprocessing as mp
+    import queue
+    import time
 
-    def factory():
-        return pcls(config=prob_cfg)
+    factory = partial(pcls, config=prob_cfg)
 
     q = mp.Queue()
     ev = mp.Event()
     proc = mp.Process(target=inst.train, args=(factory, q, ev), daemon=True)
     proc.start()
-    proc.join(timeout=timeout)
+    # Drain while waiting: a child blocked on a full queue pipe cannot exit.
+    records = []
+    deadline = time.monotonic() + timeout
+    while proc.is_alive() and time.monotonic() < deadline:
+        try:
+            records.append(q.get(timeout=0.2))
+        except queue.Empty:
+            pass
     ev.set()
     if proc.is_alive():
         proc.terminate()
         proc.join(timeout=5)
         print("ERROR: train subprocess timed out or did not exit cleanly.")
         return
+    if proc.exitcode != 0:
+        print(
+            f"ERROR: train subprocess crashed (exit code {proc.exitcode}); "
+            "its traceback is on stderr. Any records it pushed describe an "
+            "incomplete run, so no metrics are reported."
+        )
+        return
 
-    records = []
     while not q.empty():
         records.append(q.get_nowait())
 
@@ -310,6 +349,7 @@ def cmd_layout_run(
         ]
         algo_params = cfg_a.to_dict()
         prob_save = {
+            **prob_cfg.extra,
             LAYOUT_FILE_EXTRA_KEY: str(p),
             "source": src_tag,
         }
@@ -451,6 +491,15 @@ if __name__ == "__main__":
         help='Algorithm display name (see: python main.py list), e.g. "Caserta (2012) HEUR"',
     )
     layout_parser.add_argument(
+        "--time-model",
+        choices=["f2", "f2_vertical", "rmgc_current"],
+        help=(
+            "CRP-Time crane-time model the search minimises: Voß–Schwarze f2 "
+            "(default), f2vert with tier-dependent pickup/place-down, or the "
+            "legacy multi-bay RMGC model. Other problems ignore it."
+        ),
+    )
+    layout_parser.add_argument(
         "--save",
         action="store_true",
         help="Also write results/<problem>/<algo>/…json like the web workbench",
@@ -518,6 +567,7 @@ if __name__ == "__main__":
             args.save,
             args.timeout,
             trace_lan=args.trace_lan,
+            time_model=args.time_model,
         )
     elif args.command == "results":
         cmd_results(args.limit, args.verbose)

@@ -1,10 +1,9 @@
 """
-Zhu2012IDAStarR
+Zhu iterative deepening A* for CRP-R
 <2012> <exact> <restricted> <single-bay> <CRP-R>
-Iterative deepening A* with LB3 / PR4
-time_limit_s --- 300 --- Per-instance wall-clock limit (s)
-lb_mode --- LB3 --- Lower bound: LB1 / LB2 / LB3
-probe_mode --- PR4 --- Probe heuristic: PR1–PR4
+time_limit --- 300.0 --- Per-instance wall-clock limit (s)
+lb_mode --- LB3 --- Lower bound: LB1, LB2, or LB3
+probe_mode --- PR4 --- Probe heuristic: PR1, PR2, PR3, or PR4
 
 ------------------------------- Reference --------------------------------
 W. Zhu, H. Qin, A. Lim, H. Zhang,
@@ -21,174 +20,74 @@ paper listed in the Reference section.
 from __future__ import annotations
 
 import multiprocessing as mp
-import sys
-import time
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Optional
 
-import numpy as np
+from web.backend.header_schema import parse_header
 
-from core.base_algorithm import BaseAlgorithm, AlgorithmConfig
-from core.yard import Yard
-
-from .ida_core import LB1, LB2, LB3, PR1, PR2, PR3, PR4, ida_star_restricted, state_from_stacks
+from .search import search
 
 
-# ================================================================ #
-#  Yard -> lightweight state conversion                              #
-# ================================================================ #
+class Zhu2012IDAStarR:
 
-def _yard_to_stacks(yard: Yard) -> List[List[int]]:
-    """Return [[priority, ...], ...] bottom -> top, ordered by (bay, row)."""
-    stack_list = sorted(yard.stacks.values(), key=lambda s: (s.bay, s.row))
-    return [[c.priority for c in st.containers] for st in stack_list]
+    def __init__(self, config=None):
+        self.config = config
+        self._best_solution = None
 
-
-# ================================================================ #
-#  BaseAlgorithm subclass                                            #
-# ================================================================ #
-
-class Zhu2012IDAStarR(BaseAlgorithm):
-
-    name                = "Zhu et al. (2012) IDA*-R"
-    category            = "Exact"
-    description         = "Zhu et al. (IEEE T-ASE 2012) iterative deepening A*."
-    compatible_problems = ["CRP-R"]
-    geometry            = "single-bay"
-    objectives          = ["relocations"]
-    fidelity            = "faithful"
-    _LB_MODES    = (LB1, LB2, LB3)
-    _PROBE_MODES = (PR1, PR2, PR3, PR4)
-
-    def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
-        super().__init__(config)
-
-    # ---------------------------------------------------------------- #
-    # Train                                                              #
-    # ---------------------------------------------------------------- #
+    def _take(self, header, name, cast):
+        extra = getattr(self.config, "extra", None) or {}
+        if name in extra and extra[name] not in (None, ""):
+            return cast(extra[name])
+        return cast(header[name]["default"])
 
     def train(
         self,
         problem_factory: Callable,
-        result_queue:    mp.Queue,
-        stop_event:      mp.Event,
+        result_queue: mp.Queue,
+        stop_event: mp.Event,
     ) -> None:
-        cfg        = self.config
-        extra      = cfg.extra or {}
-        time_limit = float(extra.get("time_limit_s", 300.0))
-        lb_mode    = str(extra.get("lb_mode", LB3))
-        probe_mode = str(extra.get("probe_mode", PR4))
-        if lb_mode not in self._LB_MODES:
-            lb_mode = LB3
-        if probe_mode not in self._PROBE_MODES:
-            probe_mode = PR4
+        header = parse_header(__doc__ or "")
+        time_limit = self._take(header, "time_limit", float)
+        lb_mode = self._take(header, "lb_mode", str)
+        probe_mode = self._take(header, "probe_mode", str)
+        env = problem_factory()
+        stacks = [
+            [int(container.priority) for container in stack.containers]
+            for _, stack in sorted(env.yard.stacks.items())
+        ]
+        n_total = int(env.config.num_containers)
+        max_tiers = int(env.config.max_tiers)
+        report_marks = 50
+        reported = -1
 
-        n_seeds = 1  # multi-seed eval removed; single run only
-        all_metrics: List[Dict] = []
+        def report(elapsed: float, cost: int) -> None:
+            nonlocal reported
+            mark = min(int(elapsed / time_limit * report_marks), report_marks - 1)
+            if mark == reported:
+                return
+            reported = mark
+            result_queue.put({
+                "step": mark + 1,
+                "metric": float(cost),
+                "progress": min(elapsed / time_limit, 1.0),
+            })
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
-
-            t_start = time.perf_counter()
-
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
-
-            n_total = len(env.containers)
-            max_tiers = env.config.max_tiers
-            state0 = state_from_stacks(_yard_to_stacks(env.yard))
-
-            result = ida_star_restricted(
-                state0, 1, n_total, max_tiers,
-                lb_mode=lb_mode, probe_mode=probe_mode,
-                time_limit_s=time_limit, stop_event=stop_event,
-            )
-
-            t_elapsed = time.perf_counter() - t_start
-            n_reloc = result["best"]
-
-            metrics: Dict = {
-                "relocations":    float(n_reloc),
-                "steps":          float(n_reloc),
-                "time":           float(n_reloc),
-                "nodes_explored": float(result["nodes"]),
-                "root_lower_bound": float(result["root_lb"]),
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "solve_time_s":   round(t_elapsed, 4),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
-
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []  # move list not tracked (state-space search)
-
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-
-            print(
-                f"[Zhu2012IDAStarR] seed={seed}  relocations={n_reloc}  "
-                f"optimal={result['optimal']}  nodes={result['nodes']}  "
-                f"t={t_elapsed:.3f}s",
-                file=sys.stderr,
-                flush=True,
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step     = n_seeds,
-                metric   = self._best_metric,
-                metrics  = agg,
-                progress = 1.0,
-            )
-
-    def get_best_solution(self) -> Optional[List[int]]:
-        return self._best_solution
-
-    # ---------------------------------------------------------------- #
-    # Config schema (for GUI / API)                                      #
-    # ---------------------------------------------------------------- #
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "time_limit_s": {
-                "type": "float", "default": 300.0, "min": 1.0, "max": 86400.0,
-                "label": "Time limit (s)",
-                "help": (
-                    "Per-seed wall-clock time limit. The paper uses a strict "
-                    "1 s budget per instance under practical time constraints; "
-                    "a larger budget increases the chance of proving optimality."
-                ),
-            },
-            "lb_mode": {
-                "type": "str", "default": LB3, "choices": list(cls._LB_MODES),
-                "label": "Lower bound",
-                "help": (
-                    "LB1 (Kim & Hong 2006) / LB2 / LB3 (Zhu 2012, Eqs. 1-4). "
-                    "LB3 dominates LB2 dominates LB1 but costs more per node; "
-                    "the paper recommends LB3 for larger instances."
-                ),
-            },
-            "probe_mode": {
-                "type": "str", "default": PR4, "choices": list(cls._PROBE_MODES),
-                "label": "Probe heuristic",
-                "help": (
-                    "Greedy heuristic (PR1-PR4, Section V-B.1) used to "
-                    "complete promising frontier nodes during search."
-                ),
-            },
+        solution, cost = search(
+            stacks,
+            n_total,
+            max_tiers,
+            time_limit,
+            lb_mode=lb_mode,
+            probe_mode=probe_mode,
+            stop=stop_event.is_set,
+            on_progress=report,
+        )
+        self._best_solution = solution
+        result_queue.put({
+            "step": report_marks,
+            "metric": None if cost is None else float(cost),
+            "progress": 1.0,
+            "solution": solution,
         })
-        return base
+
+    def get_best_solution(self) -> Optional[list]:
+        return self._best_solution

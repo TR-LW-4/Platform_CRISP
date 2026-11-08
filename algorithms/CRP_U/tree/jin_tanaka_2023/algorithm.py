@@ -169,45 +169,43 @@ class JinTanaka2023ForCRPU(BaseAlgorithm):
         stop_event: mp.Event,
     ) -> None:
         cfg_a   = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         extra   = cfg_a.extra or {}
         t_limit = int(extra.get("jin_time_limit_sec", 600))
 
         all_metrics: List[Dict[str, float]] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            trace_layout(f"JinTanaka2023ForCRPU.train: seed {seed + 1}/{n_seeds}")
+        trace_layout(f"JinTanaka2023ForCRPU.train: ")
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            instance_text = yard_to_jin_instance(env.config, env.yard)
-            n_reloc, optimal, _dbg = self._run_solver(instance_text, t_limit)
+        instance_text = yard_to_jin_instance(env.config, env.yard)
+        n_reloc, optimal, _dbg = self._run_solver(instance_text, t_limit)
 
-            metrics = {
-                "relocations":       float(n_reloc),
-                "steps":             float(n_reloc),
-                "time":              float(n_reloc),
-                "optimal_proven":    1.0 if optimal else 0.0,
-                "jin_time_limit_sec": float(t_limit),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
+        metrics = {
+            "relocations":       float(n_reloc),
+            "steps":             float(n_reloc),
+            "time":              float(n_reloc),
+            "optimal_proven":    1.0 if optimal else 0.0,
+            "jin_time_limit_sec": float(t_limit),
+        }
+        all_metrics.append(metrics)
+        primary = float(n_reloc)
 
-            if primary < self._best_metric:
-                self._best_solution = []
+        if primary < self._best_metric:
+            self._best_solution = []
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
         if all_metrics:
             agg = {
@@ -216,7 +214,7 @@ class JinTanaka2023ForCRPU(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = agg.get("relocations", 0.0),
                 metrics  = agg,
                 progress = 1.0,

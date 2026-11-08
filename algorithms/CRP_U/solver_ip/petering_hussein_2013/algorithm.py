@@ -58,156 +58,147 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
     ) -> None:
         cfg = self.config
         extra = cfg.extra or {}
-        n_seeds = 1  # multi-seed eval removed; single run only
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag = int(extra.get("output_flag", 0))
         enforce_safety = bool(extra.get("enforce_adjacent_height", False))
         verbose = bool(extra.get("verbose", False))
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            initial_yard = env.yard
-            stack_keys = sorted(initial_yard.stacks.keys())
-            stacks = [
-                [container.priority for container in initial_yard.stacks[key].containers]
-                for key in stack_keys
-            ]
-            C = len(env.containers)
-            S = len(stack_keys)
-            H = env.config.max_tiers
+        initial_yard = env.yard
+        stack_keys = sorted(initial_yard.stacks.keys())
+        stacks = [
+            [container.priority for container in initial_yard.stacks[key].containers]
+            for key in stack_keys
+        ]
+        C = len(env.containers)
+        S = len(stack_keys)
+        H = env.config.max_tiers
 
-            # Section 3.2 of the paper sets W to the number of moves in the
-            # feasible LA-1 solution, avoiding unnecessary variables.
-            try:
-                horizon = _la1_move_upper_bound(stacks, H)
-            except RuntimeError as exc:
-                self._report_error(
-                    result_queue,
-                    seed,
-                    n_seeds,
-                    f"LA-1 failed to produce a horizon upper bound: {exc}",
-                )
-                continue
-
-            try:
-                import gurobipy  # noqa: F401
-            except ImportError:
-                self._report_error(
-                    result_queue,
-                    seed,
-                    n_seeds,
-                    "gurobipy is not installed",
-                )
-                continue
-
-            started = time.perf_counter()
-            try:
-                result = solve_brp_iii(
-                    stacks=stacks,
-                    max_height=H,
-                    horizon=horizon,
-                    time_limit_s=time_limit_s,
-                    output_flag=output_flag,
-                    enforce_adjacent_height=enforce_safety,
-                )
-            except Exception as exc:
-                self._report_error(
-                    result_queue,
-                    seed,
-                    n_seeds,
-                    f"Gurobi/BRP-III failed: {exc}",
-                )
-                continue
-            elapsed = time.perf_counter() - started
-
-            raw_moves = result.get("moves")
-            if raw_moves is None:
-                metrics = {
-                    "relocations": float("inf"),
-                    "steps": float("inf"),
-                    "time": float("inf"),
-                    "total_moves": float("inf"),
-                    "feasible": 0.0,
-                    "optimal_proven": 0.0,
-                    "time_out": 1.0 if result.get("time_out") else 0.0,
-                    "horizon_W": float(horizon),
-                    "n_vars": float(result.get("n_vars", 0)),
-                    "n_constrs": float(result.get("n_constrs", 0)),
-                    "solve_time_s": round(elapsed, 4),
-                }
-                all_metrics.append(metrics)
-                self._push(
-                    result_queue,
-                    step=seed + 1,
-                    metric=float("inf"),
-                    metrics=metrics,
-                    progress=(seed + 1) / n_seeds,
-                    snapshot=env.get_state_snapshot(),
-                    extra={"seed": seed, "error": result.get("error")},
-                )
-                continue
-
-            plan = _moves_to_plan(raw_moves, stack_keys, env.containers)
-            plan_metrics = env.evaluate_plan(plan)
-            feasible = (
-                bool(plan_metrics.get("feasible", 0.0))
-                and _validate_model_moves(raw_moves, stacks, H)
+        # Section 3.2 of the paper sets W to the number of moves in the
+        # feasible LA-1 solution, avoiding unnecessary variables.
+        try:
+            horizon = _la1_move_upper_bound(stacks, H)
+        except RuntimeError as exc:
+            self._report_error(
+                result_queue,
+                f"LA-1 failed to produce a horizon upper bound: {exc}",
             )
-            n_relocations = int(result["relocations"])
-            action_list = _plan_to_actions(plan, stack_keys)
-            primary = float(n_relocations) if feasible else float("inf")
+            return
 
+        try:
+            import gurobipy  # noqa: F401
+        except ImportError:
+            self._report_error(
+                result_queue,
+                "gurobipy is not installed",
+            )
+            return
+
+        started = time.perf_counter()
+        try:
+            result = solve_brp_iii(
+                stacks=stacks,
+                max_height=H,
+                horizon=horizon,
+                time_limit_s=time_limit_s,
+                output_flag=output_flag,
+                enforce_adjacent_height=enforce_safety,
+            )
+        except Exception as exc:
+            self._report_error(
+                result_queue,
+                f"Gurobi/BRP-III failed: {exc}",
+            )
+            return
+        elapsed = time.perf_counter() - started
+
+        raw_moves = result.get("moves")
+        if raw_moves is None:
             metrics = {
-                "relocations": float(n_relocations),
-                "steps": float(result["total_moves"]),
-                "time": float(n_relocations),
-                "total_moves": float(result["total_moves"]),
-                "feasible": 1.0 if feasible else 0.0,
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "time_out": 1.0 if result["time_out"] else 0.0,
-                "objective_last_retrieval": float(result["obj"]),
+                "relocations": float("inf"),
+                "steps": float("inf"),
+                "time": float("inf"),
+                "total_moves": float("inf"),
+                "feasible": 0.0,
+                "optimal_proven": 0.0,
+                "time_out": 1.0 if result.get("time_out") else 0.0,
                 "horizon_W": float(horizon),
-                "n_vars": float(result["n_vars"]),
-                "n_constrs": float(result["n_constrs"]),
+                "n_vars": float(result.get("n_vars", 0)),
+                "n_constrs": float(result.get("n_constrs", 0)),
                 "solve_time_s": round(elapsed, 4),
             }
             all_metrics.append(metrics)
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = action_list
-
             self._push(
                 result_queue,
-                step=seed + 1,
-                metric=primary,
+                step=1,
+                metric=float("inf"),
                 metrics=metrics,
-                progress=(seed + 1) / n_seeds,
+                progress=1.0,
                 snapshot=env.get_state_snapshot(),
-                extra={
-                    "seed": seed,
-                    "horizon_W": horizon,
-                    "total_moves": result["total_moves"],
-                    "relocations": n_relocations,
-                    "optimal": result["optimal"],
-                },
+                extra={"error": result.get("error")},
             )
+            return
 
-            if verbose:
-                print(
-                    f"[PeteringHussein2013BRPIII] seed={seed} C={C} S={S} "
-                    f"H={H} W={horizon} reloc={n_relocations} "
-                    f"moves={result['total_moves']} optimal={result['optimal']} "
-                    f"feasible={feasible} t={elapsed:.2f}s",
-                    file=sys.stderr,
-                    flush=True,
-                )
+        plan = _moves_to_plan(raw_moves, stack_keys, env.containers)
+        plan_metrics = env.evaluate_plan(plan)
+        feasible = (
+            bool(plan_metrics.get("feasible", 0.0))
+            and _validate_model_moves(raw_moves, stacks, H)
+        )
+        n_relocations = int(result["relocations"])
+        action_list = _plan_to_actions(plan, stack_keys)
+        primary = float(n_relocations) if feasible else float("inf")
+
+        metrics = {
+            "relocations": float(n_relocations),
+            "steps": float(result["total_moves"]),
+            "time": float(n_relocations),
+            "total_moves": float(result["total_moves"]),
+            "feasible": 1.0 if feasible else 0.0,
+            "optimal_proven": 1.0 if result["optimal"] else 0.0,
+            "time_out": 1.0 if result["time_out"] else 0.0,
+            "objective_last_retrieval": float(result["obj"]),
+            "horizon_W": float(horizon),
+            "n_vars": float(result["n_vars"]),
+            "n_constrs": float(result["n_constrs"]),
+            "solve_time_s": round(elapsed, 4),
+        }
+        all_metrics.append(metrics)
+
+        if primary < self._best_metric:
+            self._best_metric = primary
+            self._best_solution = action_list
+
+        self._push(
+            result_queue,
+            step=1,
+            metric=primary,
+            metrics=metrics,
+            progress=1.0,
+            snapshot=env.get_state_snapshot(),
+                extra={
+                    "horizon_W": horizon,
+                "total_moves": result["total_moves"],
+                "relocations": n_relocations,
+                "optimal": result["optimal"],
+            },
+        )
+
+        if verbose:
+            print(
+                f"[PeteringHussein2013BRPIII] C={C} S={S} "
+                f"H={H} W={horizon} reloc={n_relocations} "
+                f"moves={result['total_moves']} optimal={result['optimal']} "
+                f"feasible={feasible} t={elapsed:.2f}s",
+                file=sys.stderr,
+                flush=True,
+            )
 
         if all_metrics:
             successful_metrics = [
@@ -232,7 +223,7 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
                 }
                 self._push(
                     result_queue,
-                    step=n_seeds,
+                    step=1,
                     metric=self._best_metric,
                     metrics=aggregate,
                     progress=1.0,
@@ -241,8 +232,6 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
     def _report_error(
         self,
         result_queue: mp.Queue,
-        seed: int,
-        n_seeds: int,
         message: str,
     ) -> None:
         print(
@@ -252,15 +241,15 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
         )
         self._push(
             result_queue,
-            step=seed + 1,
+            step=1,
             metric=float("inf"),
             metrics={
                 "relocations": float("inf"),
                 "feasible": 0.0,
                 "error": 1.0,
             },
-            progress=(seed + 1) / n_seeds,
-            extra={"seed": seed, "error_message": message},
+            progress=1.0,
+            extra={"error_message": message},
         )
 
     def get_best_solution(self) -> Optional[List[int]]:
@@ -268,7 +257,7 @@ class PeteringHussein2013BRPIII(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "time_limit_s": {
                 "type": "float",

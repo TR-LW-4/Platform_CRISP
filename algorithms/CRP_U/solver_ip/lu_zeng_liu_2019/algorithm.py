@@ -78,7 +78,6 @@ class LuZengLiu2019BRP(BaseAlgorithm):
     ) -> None:
         cfg          = self.config
         extra        = cfg.extra or {}
-        n_seeds = 1  # multi-seed eval removed; single run only
         mode         = str(extra.get("mode",          "IS*"))
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag  = int(extra.get("output_flag",   0))
@@ -86,144 +85,142 @@ class LuZengLiu2019BRP(BaseAlgorithm):
 
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset()
+        env = problem_factory()
+        env.reset()
 
-            initial_yard = copy.deepcopy(env.yard)
-            all_keys = sorted(initial_yard.stacks.keys())
-            W        = len(all_keys)
-            H        = initial_yard.max_tiers
-            stacks   = [
-                [c.priority for c in initial_yard.stacks[k].containers]
-                for k in all_keys
-            ]
-            n = sum(len(s) for s in stacks)
+        initial_yard = copy.deepcopy(env.yard)
+        all_keys = sorted(initial_yard.stacks.keys())
+        W        = len(all_keys)
+        H        = initial_yard.max_tiers
+        stacks   = [
+            [c.priority for c in initial_yard.stacks[k].containers]
+            for k in all_keys
+        ]
+        n = sum(len(s) for s in stacks)
 
-            t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
-            # ── Compute LB4 (always) ──────────────────────────────── #
-            lb4_val = compute_lb4(stacks, n, W, H)
-            all_lbs = compute_all_lower_bounds(stacks, n, W, H)
+        # ── Compute LB4 (always) ──────────────────────────────── #
+        lb4_val = compute_lb4(stacks, n, W, H)
+        all_lbs = compute_all_lower_bounds(stacks, n, W, H)
 
-            if verbose:
-                print(
-                    f"[LuZengLiu2019] seed={seed}  n={n} W={W} H={H}  "
-                    f"LB1={all_lbs['LB1']} LB2={all_lbs['LB2']} "
-                    f"LB3={all_lbs['LB3']} LB4={all_lbs['LB4']}",
-                    flush=True,
-                )
+        if verbose:
+            print(
+                f"[LuZengLiu2019]  n={n} W={W} H={H}  "
+                f"LB1={all_lbs['LB1']} LB2={all_lbs['LB2']} "
+                f"LB3={all_lbs['LB3']} LB4={all_lbs['LB4']}",
+                flush=True,
+            )
 
-            if mode == "LB4-only":
-                metrics = _lb4_only_metrics(all_lbs)
-                self._push(
-                    result_queue,
-                    step     = seed + 1,
-                    metric   = float(lb4_val),
-                    metrics  = metrics,
-                    progress = (seed + 1) / n_seeds,
-                    snapshot = env.get_state_snapshot(),
-                    extra    = {"seed": seed, "mode": mode, **all_lbs},
-                )
-                all_metrics.append(metrics)
-                continue
-
-            # ── MIP solve ─────────────────────────────────────────── #
-            try:
-                import gurobipy  # noqa: F401
-            except ImportError:
-                print(
-                    "[LuZengLiu2019] ERROR: gurobipy not installed. "
-                    "Use mode='LB4-only' to run without Gurobi.",
-                    file=sys.stderr, flush=True,
-                )
-                self._push(
-                    result_queue,
-                    step=seed + 1, metric=float("inf"),
-                    metrics={"relocations": float("inf"), "error": 1.0},
-                    progress=(seed + 1) / n_seeds,
-                )
-                continue
-
-            if mode == "BRP-m3":
-                T_ub = minmax_ub(stacks, n, W, H)
-                result = solve_brp_m3(
-                    stacks, n, W, H,
-                    L=lb4_val, T=max(T_ub, lb4_val),
-                    time_limit_s=time_limit_s,
-                    output_flag=output_flag,
-                )
-                n_relocs = result["obj"]
-                ops = result.get("ops")
-                optimal = result["optimal"]
-                iters = 1
-
-            elif mode == "IS":
-                result = run_is(
-                    stacks, n, W, H,
-                    time_limit_s=time_limit_s,
-                    output_flag=output_flag,
-                )
-                n_relocs = result["obj"]
-                ops = result.get("ops")
-                optimal = result["optimal"]
-                iters = result["iterations"]
-
-            else:  # IS*
-                result = run_is_star(
-                    stacks, n, W, H,
-                    time_limit_s=time_limit_s,
-                    output_flag=output_flag,
-                )
-                n_relocs = result["obj"]
-                ops = result.get("ops")
-                optimal = result["optimal"]
-                iters = result["iterations"]
-
-            elapsed = time.perf_counter() - t0
-
-            # ── Convert ops to env action list ─────────────────────── #
-            action_list = _ops_to_actions(ops, W) if ops else []
-
-            # ── Simulate env for standard metrics ─────────────────── #
-            metrics = _simulate_env(env, action_list, lb4_val, n_relocs, optimal,
-                                    elapsed, iters, all_lbs, mode)
-            all_metrics.append(metrics)
-
-            primary = float(n_relocs) if n_relocs is not None else float("inf")
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = action_list
-
-            if verbose:
-                print(
-                    f"[LuZengLiu2019/{mode}] seed={seed}  "
-                    f"reloc={n_relocs}  lb4={lb4_val}  opt={optimal}  "
-                    f"iters={iters}  t={elapsed:.2f}s",
-                    flush=True,
-                )
-
+        if mode == "LB4-only":
+            metrics = _lb4_only_metrics(all_lbs)
             self._push(
                 result_queue,
-                step     = seed + 1,
-                metric   = primary,
+                step     = 1,
+                metric   = float(lb4_val),
                 metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
+                progress = 1.0,
                 snapshot = env.get_state_snapshot(),
-                extra    = {
-                    "seed":        seed,
-                    "mode":        mode,
-                    "relocations": n_relocs,
-                    "lb4":         lb4_val,
-                    "optimal":     optimal,
-                    "iterations":  iters,
-                    "solve_time":  round(elapsed, 4),
-                    **all_lbs,
-                },
+                extra    = {"mode": mode, **all_lbs},
             )
+            all_metrics.append(metrics)
+            return
+
+        # ── MIP solve ─────────────────────────────────────────── #
+        try:
+            import gurobipy  # noqa: F401
+        except ImportError:
+            print(
+                "[LuZengLiu2019] ERROR: gurobipy not installed. "
+                "Use mode='LB4-only' to run without Gurobi.",
+                file=sys.stderr, flush=True,
+            )
+            self._push(
+                result_queue,
+                step=1, metric=float("inf"),
+                metrics={"relocations": float("inf"), "error": 1.0},
+                progress=1.0,
+            )
+            return
+
+        if mode == "BRP-m3":
+            T_ub = minmax_ub(stacks, n, W, H)
+            result = solve_brp_m3(
+                stacks, n, W, H,
+                L=lb4_val, T=max(T_ub, lb4_val),
+                time_limit_s=time_limit_s,
+                output_flag=output_flag,
+            )
+            n_relocs = result["obj"]
+            ops = result.get("ops")
+            optimal = result["optimal"]
+            iters = 1
+
+        elif mode == "IS":
+            result = run_is(
+                stacks, n, W, H,
+                time_limit_s=time_limit_s,
+                output_flag=output_flag,
+            )
+            n_relocs = result["obj"]
+            ops = result.get("ops")
+            optimal = result["optimal"]
+            iters = result["iterations"]
+
+        else:  # IS*
+            result = run_is_star(
+                stacks, n, W, H,
+                time_limit_s=time_limit_s,
+                output_flag=output_flag,
+            )
+            n_relocs = result["obj"]
+            ops = result.get("ops")
+            optimal = result["optimal"]
+            iters = result["iterations"]
+
+        elapsed = time.perf_counter() - t0
+
+        # ── Convert ops to env action list ─────────────────────── #
+        action_list = _ops_to_actions(ops, W) if ops else []
+
+        # ── Simulate env for standard metrics ─────────────────── #
+        metrics = _simulate_env(env, action_list, lb4_val, n_relocs, optimal,
+                                elapsed, iters, all_lbs, mode)
+        all_metrics.append(metrics)
+
+        primary = float(n_relocs) if n_relocs is not None else float("inf")
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = action_list
+
+        if verbose:
+            print(
+                f"[LuZengLiu2019/{mode}]  "
+                f"reloc={n_relocs}  lb4={lb4_val}  opt={optimal}  "
+                f"iters={iters}  t={elapsed:.2f}s",
+                flush=True,
+            )
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+            extra    = {
+                "mode":        mode,
+                "relocations": n_relocs,
+                "lb4":         lb4_val,
+                "optimal":     optimal,
+                "iterations":  iters,
+                "solve_time":  round(elapsed, 4),
+                **all_lbs,
+            },
+        )
 
         if all_metrics:
             agg = {
@@ -232,7 +229,7 @@ class LuZengLiu2019BRP(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step=n_seeds, metric=self._best_metric,
+                step=1, metric=self._best_metric,
                 metrics=agg, progress=1.0,
             )
 
@@ -249,7 +246,7 @@ class LuZengLiu2019BRP(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "mode": {
                 "type":    "str",

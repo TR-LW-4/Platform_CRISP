@@ -89,7 +89,6 @@ class TricoireHeuristic(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg         = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         mode        = str(cfg.extra.get("mode",         "SmSEQ-2"))
         cond_mode   = str(cfg.extra.get("condensation", "improved"))
         width       = int(cfg.extra.get("width",        100))
@@ -98,70 +97,67 @@ class TricoireHeuristic(BaseAlgorithm):
 
         all_metrics: List[Dict] = []
 
-        for seed_idx in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.config.seed = cfg.seed + seed_idx
-            env.reset()
+        env = problem_factory()
+        env.reset()
 
-            kin          = KinematicsModel.from_config_extra(env.config.extra)
-            initial_yard = copy.deepcopy(env.yard)
-            lb_val       = lower_bound_relocations(initial_yard)
+        kin          = KinematicsModel.from_config_extra(env.config.extra)
+        initial_yard = copy.deepcopy(env.yard)
+        lb_val       = lower_bound_relocations(initial_yard)
 
-            # ── Extract yard geometry ───────────────────────────────── #
-            all_keys = sorted(initial_yard.stacks.keys())
-            W        = len(all_keys)
-            H_max    = initial_yard.max_tiers
+        # ── Extract yard geometry ───────────────────────────────── #
+        all_keys = sorted(initial_yard.stacks.keys())
+        W        = len(all_keys)
+        H_max    = initial_yard.max_tiers
 
-            # ── Build BRPState ──────────────────────────────────────── #
-            init_state = BRPState.from_yard(initial_yard, all_keys, H_max)
+        # ── Build BRPState ──────────────────────────────────────── #
+        init_state = BRPState.from_yard(initial_yard, all_keys, H_max)
 
-            # ── Run selected algorithm ──────────────────────────────── #
-            result_state = solve_brp(
-                init_state,
-                mode        = mode,
-                width       = width,
-                hub_width   = hub_width,
-                condensation = cond_mode,
+        # ── Run selected algorithm ──────────────────────────────── #
+        result_state = solve_brp(
+            init_state,
+            mode        = mode,
+            width       = width,
+            hub_width   = hub_width,
+            condensation = cond_mode,
+        )
+
+        relocs = result_state.n_relocations
+        if verbose:
+            print(
+                f"[Tricoire2018]  mode={mode}  "
+                f"relocations={relocs}  lb={lb_val}",
+                flush=True,
             )
 
-            relocs = result_state.n_relocations
-            if verbose:
-                print(
-                    f"[Tricoire2018] seed={seed_idx}  mode={mode}  "
-                    f"relocations={relocs}  lb={lb_val}",
-                    flush=True,
-                )
+        # ── Convert ops to env actions ──────────────────────────── #
+        action_list = _ops_to_actions(result_state.ops, W)
 
-            # ── Convert ops to env actions ──────────────────────────── #
-            action_list = _ops_to_actions(result_state.ops, W)
+        # ── Simulate through env to get standard metrics ─────────── #
+        metrics = _simulate_env(env, action_list, lb_val)
+        all_metrics.append(metrics)
 
-            # ── Simulate through env to get standard metrics ─────────── #
-            metrics = _simulate_env(env, action_list, lb_val)
-            all_metrics.append(metrics)
+        primary = float(relocs)
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = action_list
 
-            primary = float(relocs)
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = action_list
-
-            self._push(
-                result_queue,
-                step     = seed_idx + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed_idx + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-                extra    = {
-                    "seed":        seed_idx,
-                    "mode":        mode,
-                    "relocations": relocs,
-                    "lower_bound": lb_val,
-                    "condensation": cond_mode,
-                },
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+            extra    = {
+                "mode":        mode,
+                "relocations": relocs,
+                "lower_bound": lb_val,
+                "condensation": cond_mode,
+            },
+        )
 
         if all_metrics:
             agg = {
@@ -170,7 +166,7 @@ class TricoireHeuristic(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -189,7 +185,7 @@ class TricoireHeuristic(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "mode": {
                 "type":    "str",

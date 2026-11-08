@@ -111,63 +111,61 @@ class Zhu2012IDAStarU(BaseAlgorithm):
         if probe_mode not in self._PROBE_MODES:
             probe_mode = PU2
 
-        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            t_start = time.perf_counter()
+        t_start = time.perf_counter()
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            n_total = len(env.containers)
-            max_tiers = env.config.max_tiers
-            state0 = state_from_stacks(_yard_to_stacks(env.yard))
+        n_total = len(env.containers)
+        max_tiers = env.config.max_tiers
+        state0 = state_from_stacks(_yard_to_stacks(env.yard))
 
-            result = ida_star_unrestricted(
-                state0, 1, n_total, max_tiers,
-                lb_mode=lb_mode, probe_mode=probe_mode, use_map=use_map,
-                time_limit_s=time_limit, stop_event=stop_event,
-            )
+        result = ida_star_unrestricted(
+            state0, 1, n_total, max_tiers,
+            lb_mode=lb_mode, probe_mode=probe_mode, use_map=use_map,
+            time_limit_s=time_limit, stop_event=stop_event,
+        )
 
-            t_elapsed = time.perf_counter() - t_start
-            n_reloc = result["best"]
+        t_elapsed = time.perf_counter() - t_start
+        n_reloc = result["best"]
 
-            metrics: Dict = {
-                "relocations":    float(n_reloc),
-                "steps":          float(n_reloc),
-                "time":           float(n_reloc),
-                "nodes_explored": float(result["nodes"]),
-                "root_lower_bound": float(result["root_lb"]),
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "solve_time_s":   round(t_elapsed, 4),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
+        metrics: Dict = {
+            "relocations":    float(n_reloc),
+            "steps":          float(n_reloc),
+            "time":           float(n_reloc),
+            "nodes_explored": float(result["nodes"]),
+            "root_lower_bound": float(result["root_lb"]),
+            "optimal_proven": 1.0 if result["optimal"] else 0.0,
+            "solve_time_s":   round(t_elapsed, 4),
+        }
+        all_metrics.append(metrics)
+        primary = float(n_reloc)
 
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []  # move list not tracked (state-space search)
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = []  # move list not tracked (state-space search)
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
-            print(
-                f"[Zhu2012IDAStarU] seed={seed}  relocations={n_reloc}  "
-                f"optimal={result['optimal']}  nodes={result['nodes']}  "
-                f"t={t_elapsed:.3f}s",
-                file=sys.stderr,
-                flush=True,
-            )
+        print(
+            f"[Zhu2012IDAStarU]  relocations={n_reloc}  "
+            f"optimal={result['optimal']}  nodes={result['nodes']}  "
+            f"t={t_elapsed:.3f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
         if all_metrics:
             agg = {
@@ -176,7 +174,7 @@ class Zhu2012IDAStarU(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -191,7 +189,7 @@ class Zhu2012IDAStarU(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "time_limit_s": {
                 "type": "float", "default": 300.0, "min": 1.0, "max": 86400.0,

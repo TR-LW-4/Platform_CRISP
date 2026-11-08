@@ -143,7 +143,6 @@ class ForsterBortfeldt2012(BaseAlgorithm):
         cfg    = self.config
         extra  = cfg.extra if cfg.extra else {}
 
-        n_seeds = 1  # multi-seed eval removed; single run only
         time_limit    = float(extra.get("time_limit_s",       15.0))
         n_succ        = int  (extra.get("n_succ",              5))
         cm_threshold  = int  (extra.get("cm_stop_threshold", 150))
@@ -152,64 +151,62 @@ class ForsterBortfeldt2012(BaseAlgorithm):
 
         all_metrics: List[Dict] = []
 
-        for seed_idx in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.config.seed = cfg.seed + seed_idx
-            env.reset()
+        env = problem_factory()
+        env.reset()
 
-            layout, S = _build_layout(env)
+        layout, S = _build_layout(env)
 
-            if layout.is_empty():
-                metrics = {"relocations": 0.0, "steps": 0.0}
-                all_metrics.append(metrics)
-                self._push(
-                    result_queue,
-                    step     = seed_idx + 1,
-                    metric   = 0.0,
-                    metrics  = metrics,
-                    progress = (seed_idx + 1) / n_seeds,
-                )
-                continue
-
-            ops, n_relocs = run_tree_search(
-                layout,
-                time_limit        = time_limit,
-                n_succ            = n_succ,
-                cm_stop_threshold = cm_threshold,
-                max_flg_bb        = max_flg_bb,
-                max_gg            = max_gg,
-            )
-
-            actions = _ops_to_actions(ops, S)
-
-            # Replay on env to collect official metrics
-            env.reset()
-            for action in actions:
-                if stop_event.is_set():
-                    break
-                _, _, terminated, truncated, _ = env.step(action)
-                if terminated or truncated:
-                    break
-
-            metrics = env.get_metrics()
+        if layout.is_empty():
+            metrics = {"relocations": 0.0, "steps": 0.0}
             all_metrics.append(metrics)
-
-            primary = float(metrics.get("relocations", n_relocs))
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = actions[:]
-
             self._push(
                 result_queue,
-                step     = seed_idx + 1,
-                metric   = primary,
+                step     = 1,
+                metric   = 0.0,
                 metrics  = metrics,
-                progress = (seed_idx + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
+                progress = 1.0,
             )
+            return
+
+        ops, n_relocs = run_tree_search(
+            layout,
+            time_limit        = time_limit,
+            n_succ            = n_succ,
+            cm_stop_threshold = cm_threshold,
+            max_flg_bb        = max_flg_bb,
+            max_gg            = max_gg,
+        )
+
+        actions = _ops_to_actions(ops, S)
+
+        # Replay on env to collect official metrics
+        env.reset()
+        for action in actions:
+            if stop_event.is_set():
+                break
+            _, _, terminated, truncated, _ = env.step(action)
+            if terminated or truncated:
+                break
+
+        metrics = env.get_metrics()
+        all_metrics.append(metrics)
+
+        primary = float(metrics.get("relocations", n_relocs))
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = actions[:]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
 
         if all_metrics:
             agg = {
@@ -218,7 +215,7 @@ class ForsterBortfeldt2012(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -237,7 +234,7 @@ class ForsterBortfeldt2012(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "time_limit_s": {
                 "type": "float", "default": 15.0, "min": 1.0, "max": 300.0,

@@ -456,87 +456,85 @@ class DeMeloSilva2018BRP(BaseAlgorithm):
         variant      = str(extra.get("variant",      "m1"))
         time_limit_s = float(extra.get("time_limit_s", 3600.0))
         output_flag  = int(extra.get("output_flag",   0))
-        n_seeds = 1  # multi-seed eval removed; single run only
         all_metrics: List[Dict] = []
 
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
+        if stop_event.is_set():
+            return
 
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
+        env = problem_factory()
+        env.reset(options={"skip_auto_retrieve": True})
 
-            yard = env.yard
-            C    = len(env.containers)
-            S    = env.config.num_bays * env.config.num_rows
-            H    = env.config.max_tiers
-            G    = C  # unique priorities
+        yard = env.yard
+        C    = len(env.containers)
+        S    = env.config.num_bays * env.config.num_rows
+        H    = env.config.max_tiers
+        G    = C  # unique priorities
 
-            T_ub = _minmax_ub(yard, C, S, H)
-            if T_ub <= 0:
-                T_ub = 1
+        T_ub = _minmax_ub(yard, C, S, H)
+        if T_ub <= 0:
+            T_ub = 1
 
-            t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
-            try:
-                import gurobipy  # noqa: F401
-            except ImportError:
-                print("[DeMeloSilva2018BRP] ERROR: gurobipy not installed.",
-                      file=sys.stderr, flush=True)
-                self._push(result_queue, step=seed+1, metric=float("inf"),
-                           metrics={"relocations": float("inf"), "error": 1.0},
-                           progress=(seed+1)/n_seeds)
-                continue
+        try:
+            import gurobipy  # noqa: F401
+        except ImportError:
+            print("[DeMeloSilva2018BRP] ERROR: gurobipy not installed.",
+                  file=sys.stderr, flush=True)
+            self._push(result_queue, step=1, metric=float("inf"),
+                       metrics={"relocations": float("inf"), "error": 1.0},
+                       progress=1.0)
+            return
 
-            if variant == "m2":
-                result = _solve_brp_m2(yard, C, S, H, G, T_ub,
-                                       time_limit_s, output_flag)
-            else:
-                result = _solve_brp_m1(yard, C, S, H, G, T_ub,
-                                       time_limit_s, output_flag)
+        if variant == "m2":
+            result = _solve_brp_m2(yard, C, S, H, G, T_ub,
+                                   time_limit_s, output_flag)
+        else:
+            result = _solve_brp_m1(yard, C, S, H, G, T_ub,
+                                   time_limit_s, output_flag)
 
-            elapsed  = time.perf_counter() - t0
-            n_reloc  = result["obj"] if result["obj"] is not None else -1
-            primary  = float(max(n_reloc, 0)) if result["obj"] is not None else float("inf")
+        elapsed  = time.perf_counter() - t0
+        n_reloc  = result["obj"] if result["obj"] is not None else -1
+        primary  = float(max(n_reloc, 0)) if result["obj"] is not None else float("inf")
 
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = []
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = []
 
-            metrics: Dict = {
-                "relocations":    float(max(n_reloc, 0)),
-                "steps":          float(max(n_reloc, 0)),
-                "time":           float(max(n_reloc, 0)),
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "time_out":       1.0 if result["time_out"] else 0.0,
-                "T_ub":           float(T_ub),
-                "n_vars":         float(result["n_vars"]),
-                "n_constrs":      float(result["n_constrs"]),
-                "solve_time_s":   round(elapsed, 4),
-                "feasible":       0.0 if result["obj"] is None else 1.0,
-            }
-            all_metrics.append(metrics)
+        metrics: Dict = {
+            "relocations":    float(max(n_reloc, 0)),
+            "steps":          float(max(n_reloc, 0)),
+            "time":           float(max(n_reloc, 0)),
+            "optimal_proven": 1.0 if result["optimal"] else 0.0,
+            "time_out":       1.0 if result["time_out"] else 0.0,
+            "T_ub":           float(T_ub),
+            "n_vars":         float(result["n_vars"]),
+            "n_constrs":      float(result["n_constrs"]),
+            "solve_time_s":   round(elapsed, 4),
+            "feasible":       0.0 if result["obj"] is None else 1.0,
+        }
+        all_metrics.append(metrics)
 
-            self._push(
-                result_queue,
-                step     = seed + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-            )
-            print(
-                f"[DeMeloSilva2018BRP/{variant}] seed={seed}  "
-                f"C={C} S={S} H={H} T_ub={T_ub}  "
-                f"reloc={n_reloc}  opt={result['optimal']}  "
-                f"t={elapsed:.2f}s",
-                file=sys.stderr, flush=True,
-            )
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+        )
+        print(
+            f"[DeMeloSilva2018BRP/{variant}]  "
+            f"C={C} S={S} H={H} T_ub={T_ub}  "
+            f"reloc={n_reloc}  opt={result['optimal']}  "
+            f"t={elapsed:.2f}s",
+            file=sys.stderr, flush=True,
+        )
 
         if all_metrics:
             agg = {k: float(np.mean([m[k] for m in all_metrics if k in m]))
                    for k in all_metrics[0]}
-            self._push(result_queue, step=n_seeds, metric=self._best_metric,
+            self._push(result_queue, step=1, metric=self._best_metric,
                        metrics=agg, progress=1.0)
 
     def get_best_solution(self) -> Optional[List[int]]:
@@ -544,7 +542,7 @@ class DeMeloSilva2018BRP(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "variant": {
                 "type": "str", "default": "m1", "options": ["m1", "m2"],

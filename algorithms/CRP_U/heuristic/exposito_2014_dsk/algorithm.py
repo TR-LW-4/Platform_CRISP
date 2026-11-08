@@ -71,66 +71,61 @@ class ExpositoDSK(BaseAlgorithm):
         stop_event:      mp.Event,
     ) -> None:
         cfg     = self.config
-        n_seeds = 1  # multi-seed eval removed; single run only
         alpha   = int(cfg.extra.get("alpha", 1))
-        base_seed = cfg.seed
 
         all_metrics: List[Dict] = []
 
-        for seed_idx in range(n_seeds):
-            if stop_event.is_set():
+        if stop_event.is_set():
+            return
+
+        env = problem_factory()
+        env.reset()
+
+        rng = random.Random(0)
+
+        solution: List[int] = []
+        done = False
+        step_i = 0
+
+        while not done:
+            action = dsk_select_action(env, alpha=alpha, rng=rng)
+            if action is None:
+                # No valid move — should not happen on a non-done env
                 break
 
-            env = problem_factory()
-            env.config.seed = base_seed + seed_idx
-            env.reset()
+            _, _, done, _, _ = env.step(action)
 
-            # Each seed gets its own RNG so runs are independent
-            rng = random.Random(base_seed + seed_idx * 997)
-
-            solution: List[int] = []
-            done = False
-            step_i = 0
-
-            while not done:
-                action = dsk_select_action(env, alpha=alpha, rng=rng)
-                if action is None:
-                    # No valid move — should not happen on a non-done env
-                    break
-
-                _, _, done, _, _ = env.step(action)
-
-                step_i += 1
-                src_i = action // env._num_stacks()
-                dst_i = action  % env._num_stacks()
-                src_key = env._action_to_stack(src_i)
-                dst_key = env._action_to_stack(dst_i)
-                m = env.get_metrics()
-                print(
-                    f"[DSK] seed={seed_idx}  step={step_i}"
-                    f"  src={src_key}→dst={dst_key}"
-                    f"  relocations={m['relocations']}  steps={m['steps']}",
-                    flush=True,
-                )
-                solution.append(action)
-
-            metrics = env.get_metrics()
-            all_metrics.append(metrics)
-            primary = float(metrics.get("relocations", 0.0))
-
-            if primary < self._best_metric:
-                self._best_metric   = primary
-                self._best_solution = solution[:]
-
-            self._push(
-                result_queue,
-                step     = seed_idx + 1,
-                metric   = primary,
-                metrics  = metrics,
-                progress = (seed_idx + 1) / n_seeds,
-                snapshot = env.get_state_snapshot(),
-                extra    = {"seed": seed_idx, "alpha": alpha},
+            step_i += 1
+            src_i = action // env._num_stacks()
+            dst_i = action  % env._num_stacks()
+            src_key = env._action_to_stack(src_i)
+            dst_key = env._action_to_stack(dst_i)
+            m = env.get_metrics()
+            print(
+                f"[DSK]  step={step_i}"
+                f"  src={src_key}→dst={dst_key}"
+                f"  relocations={m['relocations']}  steps={m['steps']}",
+                flush=True,
             )
+            solution.append(action)
+
+        metrics = env.get_metrics()
+        all_metrics.append(metrics)
+        primary = float(metrics.get("relocations", 0.0))
+
+        if primary < self._best_metric:
+            self._best_metric   = primary
+            self._best_solution = solution[:]
+
+        self._push(
+            result_queue,
+            step     = 1,
+            metric   = primary,
+            metrics  = metrics,
+            progress = 1.0,
+            snapshot = env.get_state_snapshot(),
+            extra    = {"alpha": alpha},
+        )
 
         if all_metrics:
             agg = {
@@ -139,7 +134,7 @@ class ExpositoDSK(BaseAlgorithm):
             }
             self._push(
                 result_queue,
-                step     = n_seeds,
+                step     = 1,
                 metric   = self._best_metric,
                 metrics  = agg,
                 progress = 1.0,
@@ -158,7 +153,7 @@ class ExpositoDSK(BaseAlgorithm):
 
     @classmethod
     def config_schema(cls) -> Dict:
-        base = super().config_schema()
+        base = {}
         base.update({
             "alpha": {
                 "type":    "int",

@@ -1,9 +1,11 @@
 """
-KuArthanari2016Abstraction
+Ku and Arthanari abstraction search for CRP-R
 <2016> <exact> <restricted> <single-bay> <CRP-R>
-Abstraction method with pattern-database bidirectional search
-time_limit_s --- 300 --- Per-instance search limit (s)
+time_limit --- 300.0 --- Per-instance wall-clock limit (s)
 pdb_depth --- 5 --- PDB remaining-container depth
+cache_depth --- 20 --- Forward cache depth
+max_cache_size --- 1000000 --- Max forward-cache entries
+pdb_build_time_limit --- 60.0 --- PDB build time limit (s)
 
 ------------------------------- Reference --------------------------------
 D. Ku, T.S. Arthanari,
@@ -20,47 +22,24 @@ paper listed in the Reference section.
 from __future__ import annotations
 
 import multiprocessing as mp
-import sys
-import time
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Optional
 
-import numpy as np
+from web.backend.header_schema import parse_header
 
-from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
-from core.yard import Yard
-
-from .abstraction_core import build_pdb, solve
+from .search import search
 
 
-# ================================================================ #
-#  Yard -> lightweight state conversion                              #
-# ================================================================ #
+class KuArthanari2016Abstraction:
 
-def _yard_to_stacks(yard: Yard) -> List[List[int]]:
-    """Return [[priority, ...], ...] bottom -> top, ordered by (bay, row)."""
-    stack_list = sorted(yard.stacks.values(), key=lambda s: (s.bay, s.row))
-    return [[c.priority for c in st.containers] for st in stack_list]
+    def __init__(self, config=None):
+        self.config = config
+        self._best_solution = None
 
-
-# ================================================================ #
-#  BaseAlgorithm subclass                                            #
-# ================================================================ #
-
-class KuArthanari2016Abstraction(BaseAlgorithm):
-
-    name = "Ku & Arthanari (2016) Abstraction+PDB"
-    category = "Exact"
-    description = "Ku & Arthanari (COR 2016) abstraction + pattern-database search."
-    compatible_problems = ["CRP-R"]
-    geometry = "single-bay"
-    objectives = ["relocations"]
-    fidelity = "faithful"
-    def __init__(self, config: Optional[AlgorithmConfig] = None) -> None:
-        super().__init__(config)
-
-    # ---------------------------------------------------------------- #
-    # Train                                                              #
-    # ---------------------------------------------------------------- #
+    def _take(self, header, name, cast):
+        extra = getattr(self.config, "extra", None) or {}
+        if name in extra and extra[name] not in (None, ""):
+            return cast(extra[name])
+        return cast(header[name]["default"])
 
     def train(
         self,
@@ -68,184 +47,53 @@ class KuArthanari2016Abstraction(BaseAlgorithm):
         result_queue: mp.Queue,
         stop_event: mp.Event,
     ) -> None:
-        cfg = self.config
-        extra = cfg.extra or {}
-        time_limit = float(extra.get("time_limit_s", 300.0))
-        pdb_depth = int(extra.get("pdb_depth", 5))
-        cache_depth = int(extra.get("cache_depth", 20))
-        max_cache_size = int(extra.get("max_cache_size", 1_000_000))
-        pdb_build_time_limit = float(extra.get("pdb_build_time_limit_s", 60.0))
+        header = parse_header(__doc__ or "")
+        time_limit = self._take(header, "time_limit", float)
+        pdb_depth = self._take(header, "pdb_depth", int)
+        cache_depth = self._take(header, "cache_depth", int)
+        max_cache_size = self._take(header, "max_cache_size", int)
+        pdb_build_time_limit = self._take(header, "pdb_build_time_limit", float)
+        env = problem_factory()
+        stacks = [
+            [int(container.priority) for container in stack.containers]
+            for _, stack in sorted(env.yard.stacks.items())
+        ]
+        n_total = int(env.config.num_containers)
+        max_tiers = int(env.config.max_tiers)
+        report_marks = 50
+        reported = -1
 
-        n_seeds = 1  # multi-seed eval removed; single run only
-        all_metrics: List[Dict] = []
+        def report(elapsed: float, cost: int) -> None:
+            nonlocal reported
+            mark = min(int(elapsed / time_limit * report_marks), report_marks - 1)
+            if mark == reported:
+                return
+            reported = mark
+            result_queue.put({
+                "step": mark + 1,
+                "metric": float(cost),
+                "progress": min(elapsed / time_limit, 1.0),
+            })
 
-        # ── Build the PDB once, amortised across every seed (Section 4:
-        # "the time and space requirement for computing the PDB can be
-        # amortised over solving many instances of the problem"). ──── #
-        probe_env = problem_factory()
-        probe_env.config.seed = 0
-        probe_env.reset(seed=0, options={"skip_auto_retrieve": True})
-        n_cols = probe_env.config.num_bays * probe_env.config.num_rows
-        max_tiers_probe = probe_env.config.max_tiers
-
-        t_pdb_start = time.perf_counter()
-        pdb_levels = build_pdb(
-            depth=pdb_depth,
-            n_cols=n_cols,
-            m_tiers=max_tiers_probe,
-            time_limit_s=pdb_build_time_limit,
-            stop_event=stop_event,
+        solution, cost = search(
+            stacks,
+            n_total,
+            max_tiers,
+            time_limit,
+            pdb_depth=pdb_depth,
+            cache_depth=cache_depth,
+            max_cache_size=max_cache_size,
+            pdb_build_time_limit_s=pdb_build_time_limit,
+            stop=stop_event.is_set,
+            on_progress=report,
         )
-        pdb_built_depth = max(pdb_levels.keys()) if pdb_levels else 0
-        t_pdb_elapsed = time.perf_counter() - t_pdb_start
-
-        print(
-            f"[KuArthanari2016Abstraction] PDB built: depth={pdb_built_depth} "
-            f"(requested {pdb_depth}), states={sum(len(v) for v in pdb_levels.values())}, "
-            f"t={t_pdb_elapsed:.3f}s",
-            file=sys.stderr,
-            flush=True,
-        )
-
-        for seed in range(n_seeds):
-            if stop_event.is_set():
-                break
-
-            t_start = time.perf_counter()
-
-            env = problem_factory()
-            env.reset(seed=seed, options={"skip_auto_retrieve": True})
-
-            n_total = len(env.containers)
-            max_tiers = env.config.max_tiers
-            stacks = _yard_to_stacks(env.yard)
-
-            result = solve(
-                stacks, n_total, max_tiers,
-                pdb_levels=pdb_levels,
-                pdb_depth=pdb_built_depth,
-                cache_depth=cache_depth,
-                max_cache_size=max_cache_size,
-                time_limit_s=time_limit,
-                stop_event=stop_event,
-            )
-
-            t_elapsed = time.perf_counter() - t_start
-            n_reloc = result["best"]
-            if n_reloc < 0:
-                n_reloc = int(env.get_metrics().get("relocations", 0.0))
-
-            metrics: Dict = {
-                "relocations": float(n_reloc),
-                "steps": float(n_reloc),
-                "time": float(n_reloc),
-                "nodes_explored": float(result["nodes"]),
-                "root_lower_bound": float(result["root_lb"]),
-                "cache_hits": float(result["cache_hits"]),
-                "pdb_hits": float(result["pdb_hits"]),
-                "pdb_depth_built": float(pdb_built_depth),
-                "optimal_proven": 1.0 if result["optimal"] else 0.0,
-                "solve_time_s": round(t_elapsed, 4),
-            }
-            all_metrics.append(metrics)
-            primary = float(n_reloc)
-
-            if primary < self._best_metric:
-                self._best_metric = primary
-                self._best_solution = []  # move list not tracked (state-space search)
-
-            self._push(
-                result_queue,
-                step=seed + 1,
-                metric=primary,
-                metrics=metrics,
-                progress=(seed + 1) / n_seeds,
-                snapshot=env.get_state_snapshot(),
-            )
-
-            print(
-                f"[KuArthanari2016Abstraction] seed={seed}  relocations={n_reloc}  "
-                f"optimal={result['optimal']}  nodes={result['nodes']}  "
-                f"cache_hits={result['cache_hits']}  pdb_hits={result['pdb_hits']}  "
-                f"t={t_elapsed:.3f}s",
-                file=sys.stderr,
-                flush=True,
-            )
-
-        if all_metrics:
-            agg = {
-                k: float(np.mean([m[k] for m in all_metrics if k in m]))
-                for k in all_metrics[0]
-            }
-            self._push(
-                result_queue,
-                step=n_seeds,
-                metric=self._best_metric,
-                metrics=agg,
-                progress=1.0,
-            )
-
-    def get_best_solution(self) -> Optional[List[int]]:
-        return self._best_solution
-
-    # ---------------------------------------------------------------- #
-    # Config schema (for GUI / API)                                      #
-    # ---------------------------------------------------------------- #
-
-    @classmethod
-    def config_schema(cls) -> Dict:
-        base = super().config_schema()
-        base.update({
-            "time_limit_s": {
-                "type": "float", "default": 300.0, "min": 1.0, "max": 86400.0,
-                "label": "Time limit (s)",
-                "help": (
-                    "Per-seed search time limit (excludes the one-off PDB "
-                    "build, which is amortised across all seeds)."
-                ),
-            },
-            "pdb_depth": {
-                "type": "int", "default": 5, "min": 0, "max": 14,
-                "label": "PDB depth (units)",
-                "help": (
-                    "Number of remaining containers for which the pattern "
-                    "database (Section 4.3) stores exact optimal costs. "
-                    "Reduction factor over the raw state space grows fast "
-                    "with depth (paper's Table 3) but so does build time/"
-                    "memory -- the paper notes ~10-15 units is the practical "
-                    "ceiling; start low (3-6) and increase if build time "
-                    "stays well under pdb_build_time_limit_s."
-                ),
-            },
-            "cache_depth": {
-                "type": "int", "default": 20, "min": 0, "max": 200,
-                "label": "Forward cache depth (CC_n)",
-                "help": (
-                    "Number of levels from the root for which visited nodes "
-                    "are cached by abstract state during the forward search "
-                    "(Section 3.4's CC_n). Large values cache more of the "
-                    "tree at the cost of memory."
-                ),
-            },
-            "max_cache_size": {
-                "type": "int", "default": 1_000_000, "min": 1_000, "max": 20_000_000,
-                "label": "Max forward-cache entries",
-                "help": (
-                    "Upper bound on cached forward-search entries "
-                    "(paper's Pmax_size, used at 20,000,000 in Java; "
-                    "kept smaller by default for a Python process)."
-                ),
-            },
-            "pdb_build_time_limit_s": {
-                "type": "float", "default": 60.0, "min": 1.0, "max": 3600.0,
-                "label": "PDB build time limit (s)",
-                "help": (
-                    "One-off wall-clock budget for building the pattern "
-                    "database before the first seed's search starts. If "
-                    "exceeded, the PDB is truncated to whatever depth "
-                    "finished in time (search still runs correctly, just "
-                    "without the deeper backward-search shortcut)."
-                ),
-            },
+        self._best_solution = solution
+        result_queue.put({
+            "step": report_marks,
+            "metric": None if cost is None else float(cost),
+            "progress": 1.0,
+            "solution": solution,
         })
-        return base
+
+    def get_best_solution(self) -> Optional[list]:
+        return self._best_solution
