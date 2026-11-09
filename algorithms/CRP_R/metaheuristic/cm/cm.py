@@ -18,78 +18,36 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
-import multiprocessing as mp
 import time
-from typing import Callable, Optional
 
 import numpy as np
 
-from web.backend.header_schema import parse_header
+from ...algorithm import Algorithm
 
 from .greedy import greedy
 from .trajectory import trajectory
 
 
-class CM:
+class CM(Algorithm):
 
-    def __init__(self, config=None):
-        self.config = config
-        self._best_solution = None
+    def search(self, problem):
+        delta = self.parameter("delta", 2, int)
+        time_limit = self.parameter("time_limit", 5.0, float)
+        rng = np.random.default_rng(getattr(self.config, "seed", 0))
 
-    def _take(self, header, name, cast):
-        extra = getattr(self.config, "extra", None) or {}
-        if name in extra and extra[name] not in (None, ""):
-            return cast(extra[name])
-        return cast(header[name]["default"])
-
-    def train(
-        self,
-        problem_factory: Callable,
-        result_queue: mp.Queue,
-        stop_event: mp.Event,
-    ) -> None:
-        header = parse_header(__doc__ or "")
-        delta = self._take(header, "delta", int)
-        time_limit = self._take(header, "time_limit", float)
-        seed = getattr(self.config, "seed", 0)
-        rng = np.random.default_rng(seed)
-
-        env = problem_factory()
-        stacks_init = [
-            [int(container.priority) for container in stack.containers]
-            for stack in env.yard.stacks.values()
-        ]
-        n_total = int(env.config.num_containers)
-        max_tiers = int(env.config.max_tiers)
-        best, best_cost = greedy(stacks_init, n_total, max_tiers)
+        stacks = problem.stacks
+        best, best_cost = greedy(stacks, problem.n, problem.max_tiers)
         started = time.process_time()
-        report_marks = 50
-        reported = -1
 
         def expired() -> bool:
-            return stop_event.is_set() or time.process_time() - started >= time_limit
+            return self.stopped() or time.process_time() - started >= time_limit
 
         while not expired():
             best, best_cost = trajectory(
-                stacks_init, n_total, delta, max_tiers, best, best_cost, rng, expired,
+                stacks, problem.n, delta, problem.max_tiers,
+                best, best_cost, rng, expired,
             )
             elapsed = time.process_time() - started
-            mark = min(int(elapsed / time_limit * report_marks), report_marks - 1)
-            if mark != reported:
-                reported = mark
-                result_queue.put({
-                    "step": mark + 1,
-                    "metric": best_cost,
-                    "progress": min(elapsed / time_limit, 1.0),
-                })
+            self.report(min(elapsed / time_limit, 1.0), best_cost)
 
-        self._best_solution = best
-        result_queue.put({
-            "step": report_marks,
-            "metric": best_cost,
-            "progress": 1.0,
-            "solution": best,
-        })
-
-    def get_best_solution(self) -> Optional[list]:
-        return self._best_solution
+        return best, best_cost

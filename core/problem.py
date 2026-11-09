@@ -12,13 +12,12 @@ from .container import Container
 class ProblemConfig:
 
     # ── Yard geometry ────────────────────────────────────────────── #
-    num_bays:   int   
-    num_rows:   int   
-    max_tiers:  int   
-
+    num_bays: int = 4
+    num_rows: int = 1
+    max_tiers: int = 3
 
     # ── Containers ───────────────────────────────────────────────── #
-    num_containers: int 
+    num_containers: int = 0 
     
    
     extra: Dict[str, Any] = field(default_factory=dict)
