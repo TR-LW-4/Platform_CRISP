@@ -19,7 +19,7 @@ Time solver is registered yet.
 | `heuristic/lin_2015/` | priority rule | Lin, Lee & Lee 2015, TRC (also listed for CRP-R) |
 | `heuristic/kim_2016/` | multi-case rule | Kim, Kim & Lee 2016, C&IE |
 | `heuristic/lopez_plata_2019/` | A*-based heuristic | López-Plata et al. 2019, C&IE |
-| `heuristic/unluyurt_2012/` | Difference1 | Ünlüyurt & Aydın 2012 (also listed for CRP-R) |
+| `heuristic/unluyurt_2012/` | Difference1, Difference2 | Ünlüyurt & Aydın 2012 |
 | `heuristic/azari_2017/` | CSUM | Azari, Eskandari & Nourmohammadi 2017 |
 | `heuristic/forster_bortfeldt_2012/` | retrieval tree search | Forster & Bortfeldt 2012 |
 | `heuristic/firmino_2019_rgrasp/` | reactive GRASP | Firmino et al. 2019 |
