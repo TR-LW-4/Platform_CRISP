@@ -4,11 +4,11 @@ Paper: T. Ünlüyurt, C. Aydın, "Improved rehandling strategies for the contain
 
 Code: `algorithms/CRP_Time/heuristic/unluyurt_2012/`
 
-File:line references without a commit of their own point to the code at `f08d64a`, which implements Difference1 only. The new code (Difference1 and Difference2) is `4c3b3d6`; scripts and raw output of §3–§4 are in `docs/validation/data/unluyurt_2012/`.
+File:line references without a commit of their own point to the code at `f08d64a`, which implements Difference1 only. The new code (Difference1 and Difference2) is `4c3b3d6`, with Difference1 also listed for CRP-R since `0465996` (O9); scripts and raw output of §3–§4 are in `docs/validation/data/unluyurt_2012/`.
 
 ## Summary
 
-Status (9 Nov 2026): implemented in `4c3b3d6`. Difference1 and Difference2 are fixed-rule heuristics (Sec. 4.2, p. 386–387): each relocation is decided by three rules on the retrieval orders in the candidate stacks, and Difference2 adds a preference for stacks on the truck-lane side. The old code implemented Difference1 with a deviation: rules 2 and 3 used the earliest-retrieved container of a stack instead of its top container, so rule 3 was never reached (§2, O5). Both heuristics now follow the decisions in §2 and pass all cases of §3. On the 200 campaign instances the corrected Difference1 changes the plan on 151 instances and needs 2.2 % more relocations and 1.0 % more f2 time in total than the old code (§4.1). Difference2 is worse than Difference1 under f2 (+0.45 %) and f2vert (+1.14 %) but better under the paper's own Objective2 (−1.36 %): it saves horizontal distance at the cost of extra relocations, a trade that pays off on these instances only while tpp/ts is below about 15.8 (§4.3). The paper's 8000 instances are not public, so its numerical results cannot be checked (§2, O11). Fig. 6(c) and Fig. 9 were checked against the PDF by Thom; the Fig. 3 layout is taken from the text on p. 382; Fig. 2 was not checked.
+Status (9 Nov 2026): implemented in `4c3b3d6`. Difference1 and Difference2 are fixed-rule heuristics (Sec. 4.2, p. 386–387): each relocation is decided by three rules on the retrieval orders in the candidate stacks, and Difference2 adds a preference for stacks on the truck-lane side. The old code implemented Difference1 with a deviation: rules 2 and 3 used the earliest-retrieved container of a stack instead of its top container, so rule 3 was never reached (§2, O5). Both heuristics now follow the decisions in §2 and pass all cases of §3. On the 200 campaign instances the corrected Difference1 changes the plan on 151 instances and needs 2.2 % more relocations and 1.0 % more f2 time in total than the old code (§4.1). Difference2 is worse than Difference1 under f2 (+0.45 %) and f2vert (+1.14 %) but better under the paper's own Objective2 (−1.36 %): it saves horizontal distance at the cost of extra relocations, a trade that pays off on these instances only while tpp/ts is below about 15.8 (§4.3). The paper's 8000 instances are not public, so its numerical results cannot be checked (§2, O11). At Wei's request (9 Nov 2026) Difference1 is also offered for CRP-R (`0465996`, O9); its plans there equal those under CRP-Time, and the CRP-Time path is unchanged (§4.5). Fig. 6(c) and Fig. 9 were checked against the PDF by Thom; the Fig. 3 layout is taken from the text on p. 382; Fig. 2 was not checked.
 
 ## 1. Specification from the paper
 
@@ -67,8 +67,8 @@ Decided by Thom on 9 Nov 2026. Categories as in the validation workflow: (a) req
 | O5 | Rules 2 and 3 | Use the top container of the candidate stack; rule 1 uses the earliest-retrieved container. | Decision, p. 386 | fixes (c) in the existing code |
 | O6 | No destination available | Raise an explicit error. | Decision; the paper is silent | (b) |
 | O7 | Lane side | The stacks with a lower index than the source stack. | Decision, p. 384 and the f2 model | (a) |
-| O8 | Fixed rule under f2 / f2vert | Accepted as fixed-rule baselines. | Decision | (a) |
-| O9 | Problems | CRP-Time only. | Decision | — |
+| O8 | Fixed rule under f2 / f2vert | Accepted as fixed-rule baselines. | Decision; confirmed by Wei on 9 Nov 2026 | (a) |
+| O9 | Problems | Difference1 for CRP-Time and CRP-R; Difference2 CRP-Time only. Changed on 9 Nov 2026 at Wei's request (first decision: both CRP-Time only). | Decision (Wei) | — |
 | O10 | Within one side and rule level | The rule's own minimisation, then O3. | Assumption; the paper is silent (p. 387) | (b) |
 | O11 | Paper's instances | Not requested from the authors; recorded as a limitation. | Decision | — |
 
@@ -106,9 +106,13 @@ Decided by Thom on 9 Nov 2026. Categories as in the validation workflow: (a) req
 ### O8 — Fixed rules under f2 and f2vert
 - Neither heuristic reads the parameters of the time model: Difference1 decides on retrieval orders only, Difference2 also on stack positions. The plan is the same under f2, f2vert and the practice preset; only the reported main objective differs.
 - They are therefore reported as fixed-rule baselines (`objectives = ["fixed-rule"]`), not as methods that optimise f2 or f2vert.
+- Confirmed by Wei on 9 Nov 2026: follow the paper, both as fixed-rule baselines for CRP-Time.
 
-### O9 — CRP-Time only
-- The existing class is listed for CRP-R and CRP-Time (`algorithm.py:142`). The new classes are CRP-Time only, like the three validated algorithms; the CRP-R menu loses Difference1.
+### O9 — Problems: Difference1 also for CRP-R
+- The existing class is listed for CRP-R and CRP-Time (`algorithm.py:142`). The first decision made both new classes CRP-Time only, like the three validated algorithms (`4c3b3d6`).
+- Changed on 9 Nov 2026 at Wei's request: the corrected Difference1 stays available in the CRP-R menu; Difference2 stays CRP-Time only. The paper proposes Difference1 for Objective1, the number of relocations, and Difference2 for Objective2 (p. 384, 388; Objective1: p. 381).
+- Implementation (`0465996`): one class for both problems (`difference1.py`, `compatible_problems = ["CRP-Time", "CRP-R"]`) and one branch in the shared run loop (`retrieve.py`, `run`). Under CRP-R there is no time model, so the time-model check (`check_objective`) and `utils.finish()` are skipped: `utils.finish()` needs `crane_time_f2`, which CRP-R does not report (a direct run raised `KeyError: 'crane_time_f2'`). Instead `finish_relocations` reports the dict of the problem's `validate_plan` (relocations, `steps` = all moves, `time` = `crane_time` = the platform's RMGC time), raises on an infeasible plan, and the run's metric is the number of relocations. `get_metrics()` is not used: after `validate_plan`, CRP-R's `get_metrics()` reports `steps` and `time` as the number of relocations (`problems/CRP_R.py:377-383`).
+- The rules do not read the problem: the plan is the same under CRP-R and CRP-Time (§4.5). Result files under CRP-R go to `results/CRP-R/Ünlüyurt–Aydın_(2012)_Difference1/caserta_<H>x<W>_<id>.json`, without an objective suffix; that folder did not exist before.
 
 ### O10 — Within one side and rule level
 - Within the lane side or the far side at one rule level, the stack is chosen by the rule's own minimisation (rule 1: earliest Y; rule 2: smallest X − Z; rule 3: smallest difference to the top), then by O3. Distance within a side is not used.
@@ -166,12 +170,13 @@ Constructed cases with the source not in stack 1. Expected under O2 reading (b);
 - Fig. 6(c) (layout checked against the PDF by Thom): six retrievals 6A + 26B = 56; the two relocations before it 2A + 6B = 16.
 
 ### 3.4 Tests
-`algorithms/CRP_Time/heuristic/unluyurt_2012/test_unluyurt.py` (`4c3b3d6`), 8 tests, all passing:
+`algorithms/CRP_Time/heuristic/unluyurt_2012/test_unluyurt.py` (`4c3b3d6`, CRP-R tests added in `0465996`), 11 tests, all passing:
 - the first relocation of every case in §3.1 and §3.2, for both selectors;
 - O6: a `RuntimeError` when no other stack has room, directly and through the problem;
 - a complete plan through the problem on data3-5-1 (container 1 on top at the start): N retrievals in order, `steps` = number of moves, objective = f2;
 - the same plan under f2 and f2vert on data4-6-1 (O8);
-- Objective2 as f2 with tpp = 5 and ts = 1 on the examples of §3.3.
+- Objective2 as f2 with tpp = 5 and ts = 1 on the examples of §3.3;
+- O9: the listed problems of both classes; Difference1 under CRP-R on data3-5-1 and data4-6-1: one record, N retrievals in order, feasible, metric = relocations, `steps` = number of moves, and the same moves and relocations as under CRP-Time (f2); an infeasible plan raises in `finish_relocations`.
 
 ## 4. Behavioural checks
 
@@ -246,3 +251,10 @@ Both classes run through the Workbench on Caserta 3x5 #1 under f2 (`main.py web 
 - The catalog lists both only for CRP-Time, with `relocation_rule` restricted, `objectives` fixed-rule and no parameters. The Workbench shows the tags "Single-bay (2D) | Fixed rule | Restricted relocations" and marks both in the algorithm list with ⚠, the platform's mark for a method that does not optimise the selected objective (`core/algorithm_meta.py`, `assess_compatibility`), as for any fixed rule under crane time.
 - Both jobs end "completed" without errors. The saved results equal a direct run on data3-5-1: Difference1 6 relocations, f2 766.8, f2vert 1469.355, 21 moves; Difference2 7 relocations, f2 792.0, f2vert 1526.715, 22 moves. The saved moves pass `check_plan`.
 - results/ was backed up before the check; afterwards the two new result folders were removed, and results/ is identical to the backup.
+
+### 4.5 Difference1 under CRP-R (9 Nov 2026, `0465996`)
+
+Scripts and output in `docs/validation/data/unluyurt_2012/crp_r/`.
+- CRP-Time path unchanged: before the change (`da85aec`; the algorithm code is unchanged since `4c3b3d6`, `git diff` empty) the final records of both classes on the 200 campaign instances under f2, f2vert and the practice preset were recorded through `train()` with the problem values the web API builds: moves, every metric except `runtime_s`, metric, progress and the yard snapshot. After the change all 1200 records are identical (`bit_identity.py`). All 112 tests in `algorithms/CRP_Time` pass.
+- Difference1 under CRP-R vs CRP-Time on the same 200 instances (`crp_r_vs_time.py`): every plan is feasible, the moves and relocations equal the CRP-Time (f2) records, metric = relocations, `steps` = number of moves, `time` = `crane_time`. Total relocations 4385 under both problems.
+- Workbench (as in §4.4; `crp_r/ui/`): the catalog lists Difference1 for CRP-Time and CRP-R and Difference2 for CRP-Time only; the API refuses an algorithm for a problem it is not listed for (`web/backend/jobs.py:415`). Difference1 under CRP-R on Caserta 3x5 #1 ends "completed" without errors, with the tags "Single-bay (2D) | Fixed rule | Restricted relocations" and the ⚠ mark (a fixed rule does not optimise the relocation count either). Saved: 6 relocations, `steps` 21, `time` = `crane_time` 2705.5 (RMGC); the moves equal the CRP-Time record of data3-5-1 and pass `check_plan`. results/ was backed up before the check; afterwards the new result folder was removed, and results/ is identical to the backup.
