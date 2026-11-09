@@ -1,6 +1,6 @@
 """
 UnluyurtAydinDifference1
-<2012> <heuristic> <time> <single-bay> <CRP-Time>
+<2012> <heuristic> <time> <single-bay> <CRP-Time> <CRP-R>
 Difference1 fixed-rule relocation heuristic
 
 ------------------------------- Reference --------------------------------
@@ -38,7 +38,8 @@ class UnluyurtAydinDifference1(BaseAlgorithm):
         "plan. Not in the paper: ties go to the stack nearest the truck lane, and an empty stack counts as "
         "a container retrieved after all others."
     )
-    compatible_problems = ["CRP-Time"]
+    # CRP-R too (Wei, 9 Nov 2026): Difference1 is the paper's heuristic for the relocation count (O9).
+    compatible_problems = ["CRP-Time", "CRP-R"]
     geometry = "single-bay"
     objectives = ["fixed-rule"]
     fidelity = "faithful"

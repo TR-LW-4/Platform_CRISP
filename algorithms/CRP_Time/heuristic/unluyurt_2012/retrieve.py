@@ -14,7 +14,7 @@ paper listed in the Reference section of difference1.py.
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from algorithms.CRP_Time.utils.bay import read_bay, target_stack
 from algorithms.CRP_Time.utils.crane_time import ObjectiveSpec, check_objective
@@ -22,6 +22,7 @@ from algorithms.CRP_Time.utils.finish import finish
 from algorithms.CRP_Time.utils.plan import actions, replay, saved_moves
 from algorithms.CRP_Time.utils.timer import Stopwatch
 from core.base_algorithm import BaseAlgorithm
+from core.plan import RelocationPlan
 
 Selector = Callable[[int, int, Sequence[Sequence[int]], int, int], Optional[int]]
 
@@ -52,16 +53,37 @@ def retrieve(stacks: Sequence[Sequence[int]], max_tiers: int, select: Selector) 
     return moves
 
 
+def finish_relocations(problem_factory: Callable, plan: RelocationPlan, algorithm: str,
+                       runtime_s: float) -> Tuple[Dict[str, float], Any]:
+    """CRP-R counterpart of utils.finish: the metrics of the final plan, and the problem that validated it.
+
+    The metrics are the dict of the problem's validate_plan (relocations, steps = all moves,
+    time = the platform's RMGC crane time), not get_metrics(), which reports steps and time
+    as the number of relocations under CRP-R. An infeasible plan raises.
+    """
+    env = problem_factory()
+    metrics = env.validate_plan(plan)
+    if not metrics.get("feasible"):
+        raise RuntimeError(f"{algorithm}: plan rejected by validate_plan: "
+                           + "; ".join(env.get_last_validation_errors()))
+    metrics["runtime_s"] = float(runtime_s)
+    return metrics, env
+
+
 def run(algorithm: BaseAlgorithm, select: Selector, problem_factory: Callable,
         result_queue: mp.Queue, stop_event: mp.Event) -> None:
     """train() of both heuristics: read the bay, build the plan with select, and report the
-    metrics of the plan as validated by the problem (finish)."""
+    metrics of the plan as validated by the problem. Under CRP-Time (finish) the metric is the
+    selected crane time; under CRP-R (Difference1 only, O9; finish_relocations) it is the
+    number of relocations."""
     if stop_event.is_set():
         return
     env = problem_factory()
     stacks, positions = read_bay(env)
-    spec = ObjectiveSpec.from_config(env.config)
-    check_objective(spec, algorithm.name)
+    relocations_only = env.name == "CRP-R"
+    if not relocations_only:
+        spec = ObjectiveSpec.from_config(env.config)
+        check_objective(spec, algorithm.name)
 
     timer = Stopwatch()
     timer.start()
@@ -69,7 +91,12 @@ def run(algorithm: BaseAlgorithm, select: Selector, problem_factory: Callable,
     timer.stop()
 
     plan = replay(stacks, positions, moves)
-    metrics, env_final = finish(problem_factory, plan, spec, algorithm.name, timer.elapsed)
+    if relocations_only:
+        metrics, env_final = finish_relocations(problem_factory, plan, algorithm.name, timer.elapsed)
+        metric = float(metrics["relocations"])
+    else:
+        metrics, env_final = finish(problem_factory, plan, spec, algorithm.name, timer.elapsed)
+        metric = float(metrics["objective_value"])
     algorithm._best_solution = actions(plan, env.config.num_rows)
-    algorithm._push(result_queue, step=1, metric=float(metrics["objective_value"]), metrics=metrics,
+    algorithm._push(result_queue, step=1, metric=metric, metrics=metrics,
                     progress=1.0, snapshot=env_final.get_state_snapshot(), extra={"moves": saved_moves(plan)})

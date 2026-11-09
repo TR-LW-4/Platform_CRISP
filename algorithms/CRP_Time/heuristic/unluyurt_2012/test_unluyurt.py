@@ -2,8 +2,9 @@
 Checks for the Difference heuristics (docs/validation/unluyurt_2012.md §3): the
 first relocation of Fig. 9 and of the cases E1-E7 and D1-D4, the error when no
 stack can receive a container (O6), complete plans through the problem, the same
-plan under f2 and f2vert (O8), and Objective2 as f2 with tpp = A = 5 and ts = B = 1
-on the examples of Fig. 3 and Fig. 6(c).
+plan under f2 and f2vert (O8), Difference1 under CRP-R with the same plan as under
+CRP-Time (O9), and Objective2 as f2 with tpp = A = 5 and ts = B = 1 on the examples
+of Fig. 3 and Fig. 6(c).
 
   python -m unittest algorithms.CRP_Time.heuristic.unluyurt_2012.test_unluyurt   (from the repo root)
 
@@ -28,11 +29,12 @@ from algorithms.CRP_Time.utils.plan import replay
 from core.base_algorithm import AlgorithmConfig
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, problem_config_for_caserta_dat
 from core.plan import Movement
+from problems.CRP_R import CRP_R
 from problems.CRP_Time import CRP_Time
 
 from .difference1 import UnluyurtAydinDifference1
 from .difference2 import UnluyurtAydinDifference2
-from .retrieve import retrieve
+from .retrieve import finish_relocations, retrieve
 from .rules import difference1, difference2
 
 # (case, H, stacks bottom to top with stack 1 first, expected stack of Difference1, of Difference2), §3.
@@ -72,10 +74,10 @@ def _config(tmp, stacks, max_tiers=None, time_model="f2"):
     return cfg
 
 
-def _train(cls, cfg):
+def _train(cls, cfg, problem=CRP_Time):
     q = queue.Queue()
     alg = cls(AlgorithmConfig())
-    alg.train(lambda: CRP_Time(config=cfg), q, threading.Event())
+    alg.train(lambda: problem(config=cfg), q, threading.Event())
     records = []
     while not q.empty():
         records.append(q.get_nowait())
@@ -137,6 +139,45 @@ class TestThroughProblem(unittest.TestCase):
             cfg = _config(tmp, [[1, 2], [3, 4]], max_tiers=2)
             with self.assertRaisesRegex(RuntimeError, "no stack can receive container 2"):
                 _train(UnluyurtAydinDifference1, cfg)
+
+
+class TestCrpR(unittest.TestCase):
+    """O9 (Wei, 9 Nov 2026): Difference1 also under CRP-R, with the metrics of validate_plan."""
+
+    @staticmethod
+    def _config(path):
+        defaults = {k: v["default"] for k, v in CRP_R.config_schema().items() if "default" in v}
+        return problem_config_for_caserta_dat(path, defaults)
+
+    def test_listed_problems(self):
+        self.assertEqual(UnluyurtAydinDifference1.compatible_problems, ["CRP-Time", "CRP-R"])
+        self.assertEqual(UnluyurtAydinDifference2.compatible_problems, ["CRP-Time"])
+
+    def test_same_plan_as_under_crp_time(self):
+        for name in ("data3-5-1.dat", "data4-6-1.dat"):
+            path = DEFAULT_CASERTA_DIR / name
+            with self.subTest(instance=name):
+                cfg = self._config(path)
+                records = _train(UnluyurtAydinDifference1, cfg, CRP_R)
+                self.assertEqual(len(records), 1)
+                record, moves = records[0], records[0].extra["moves"]
+                retrievals = [m["container_id"] for m in moves if m["kind"] == "retrieve"]
+                self.assertEqual(retrievals, list(range(1, cfg.num_containers + 1)))
+                self.assertEqual(record.metrics["feasible"], 1.0)
+                self.assertEqual(record.metric, record.metrics["relocations"])
+                self.assertEqual(record.metrics["steps"], len(moves))
+                time = _train(UnluyurtAydinDifference1,
+                              problem_config_for_caserta_dat(path, {"time_model": "f2"}))[0]
+                self.assertEqual(moves, time.extra["moves"])
+                self.assertEqual(record.metrics["relocations"], time.metrics["relocations"])
+
+    def test_infeasible_plan_raises(self):
+        stacks = [[2], [1]]
+        plan = replay(stacks, [(1, 1), (2, 1)], [(0, None)])   # retrieves 2 before 1
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = _config(tmp, stacks)
+            with self.assertRaisesRegex(RuntimeError, "plan rejected by validate_plan: move 0: expected priority 1"):
+                finish_relocations(lambda: CRP_R(config=cfg), plan, "test", 0.0)
 
 
 class TestObjective2(unittest.TestCase):
