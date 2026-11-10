@@ -8,7 +8,7 @@ Scope set by Wei (10 Nov 2026): the C&OR tree search, standalone in CRP-Time, va
 
 ## Summary
 
-Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) done at the F20 commit: criterion not met** (fails at H = n on 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; at H = T + 2 on 5-5, 5-8, 5-9, 6-6; 9 of the 10 failures are fewer relocations than Table 3). Verdict stays "fail". Diagnostics on the failing sizes (§8): no single switch of this implementation removes the failures; the CRP_D implementation passes 6 of the 10 failing size-variants, with more relocations than this implementation. Stopped after the diagnostics.
+Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) done at the F20 commit: criterion not met** (fails at H = n on 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; at H = T + 2 on 5-5, 5-8, 5-9, 6-6; 9 of the 10 failures are fewer relocations than Table 3). Verdict stays "fail". Diagnostics on the failing sizes (§8): no single switch of this implementation removes the failures; the CRP_D implementation passes 6 of the 10 failing size-variants, with more relocations than this implementation; of its code differences, D6 (GG key 0) accounts for most of that gap (§8.5). **Conclusion (§9): not reproduced within tolerance; consistent with an independent implementation.**
 - Step 1 (§3): the Fig. 3 bound is 25 (pass). The CVS labels map to the Caserta files by the stack-count column of Table 2 (F3; the item-count key failed on a misprint). The mean bound is above nrel − LB gap of Table 3 on all sizes; this is a reported discrepancy, not a stop criterion (F5).
 - Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 20 unit tests pass (the 20th for F20). On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
 - Deviation from the printed figure: greedy priority (4) takes the *minimum* of g − lowest group of the target (F9, reading B), where Fig. 4 and p. 304 print "maximum"; decided by Thom after seeing the greedy results of §4.3.
@@ -528,3 +528,41 @@ D2 and D6 are the differences that can change CRP_D's plans on runs without a ti
 ### 8.5 Step 4 completion: D2 and D6 as switches (post hoc)
 
 Written before these runs (Thom, 11 Nov 2026). **Post hoc**, added after the results of §8.3–8.4, to explain the remaining difference between this implementation and CRP_D: D2 (cmStopValue multiplied by |Pm| before the comparison with cmStopThreshold) and D6 (GG key difference 0 for a single-item source or an empty target) as two separate switches on this implementation at 87eb188, on the same 10 failing size-variant cells, 60 s limit, sequential. **Whatever they show, the outcome changes neither the verdict of the main run (§7) nor the main implementation.**
+
+- Switches (`step3_diag.py`): `cmstop_d2` replaces `TreeSearch._determine` by a copy that extends the compound move while cmStopValue · |Pm| < cmStopThreshold; `gg_zero_d6` replaces `productive_moves` by a copy whose GG key uses difference 0 for a missing item below the moved item or a missing top of the target. With the switch off, each copy gives the package's plans and node counts on all 240 runs of 3-3, 3-4 and 4-4 at both heights without a time limit (`cmstop_off`, `gg_off`); with the switch on, 17 (D2) and 3 (D6) of these 240 plans change.
+- Results (`step3_diag_summary.txt`; mean nrel, difference with Table 3 and with the main run):
+
+| H | CVS | Table 3 | main run | 5 CRP_D | 6 D2, post hoc | 7 D6, post hoc |
+|---|---|---|---|---|---|---|
+| n | 4-6 | 13.70 | 13.550 (−0.150) FAIL | 13.575 (−0.125; +0.025) **pass** | 13.525 (−0.175; −0.025) FAIL | 13.625 (−0.075; +0.075) **pass** |
+| n | 5-4 | 15.00 | 15.325 (+0.325) FAIL | 15.375 (+0.375; +0.050) FAIL | 15.225 (+0.225; −0.100) FAIL | 15.325 (+0.325; +0.000) FAIL |
+| n | 5-5 | 18.63 | 18.375 (−0.255) FAIL | 18.600 (−0.030; +0.225) **pass** | 18.500 (−0.130; +0.125) **pass** | 18.475 (−0.155; +0.100) **pass** |
+| n | 5-7 | 23.58 | 23.100 (−0.480) FAIL | 23.175 (−0.405; +0.075) FAIL | 23.150 (−0.430; +0.050) FAIL | 23.200 (−0.380; +0.100) FAIL |
+| n | 5-8 | 26.73 | 26.325 (−0.405) FAIL | 26.550 (−0.180; +0.225) **pass** | 26.300 (−0.430; −0.025) FAIL | 26.500 (−0.230; +0.175) **pass** |
+| n | 6-6 | 29.68 | 29.350 (−0.330) FAIL | 29.325 (−0.355; −0.025) FAIL | 29.200 (−0.480; −0.150) FAIL | 29.475 (−0.205; +0.125) **pass** |
+| T + 2 | 5-5 | 18.80 | 18.600 (−0.200) FAIL | 18.750 (−0.050; +0.150) **pass** | 18.675 (−0.125; +0.075) **pass** | 18.700 (−0.100; +0.100) **pass** |
+| T + 2 | 5-8 | 27.03 | 26.525 (−0.505) FAIL | 26.775 (−0.255; +0.250) **pass** | 26.500 (−0.530; −0.025) FAIL | 26.750 (−0.280; +0.225) FAIL |
+| T + 2 | 5-9 | 30.05 | 29.425 (−0.625) FAIL | 29.800 (−0.250; +0.375) **pass** | 29.325 (−0.725; −0.100) FAIL | 29.900 (−0.150; +0.475) **pass** |
+| T + 2 | 6-6 | 31.13 | 30.100 (−1.030) FAIL | 30.175 (−0.955; +0.075) FAIL | 29.950 (−1.180; −0.150) FAIL | 30.100 (−1.030; +0.000) FAIL |
+
+- All 800 plans valid. D2 changes 92 of 400 instances in both directions (50 below, 42 above the main run), passes 2 of the 10 cells; one run hit the 60 s limit (6-6 at H = n). D6 never gives fewer relocations than the main run (1 below, 45 above), passes 6 of the 10.
+- Against CRP_D, mean |difference of the size means| over the 10 cells: main run 0.148 (max 0.375), D2 0.175 (max 0.475), D6 0.070 (max 0.150). Instances with the same relocations as CRP_D: main run 274 of 400, D2 343, D6 297.
+- Reading: D6 accounts for most of the difference in level between this implementation and CRP_D (its sign and size per cell); D2 brings individual plans closer to CRP_D's without moving the means towards it. The combination of D2 and D6 was not run (no further diagnostics, Thom). The verdict of §7 and the implementation (F12) are unchanged.
+
+## 9. Conclusion (11 Nov 2026)
+
+- **Verdict: fail** against the pre-registered criterion of §5: 13 of 19 sizes pass at H = n and 15 of 19 at H = T + 2 (§7). 9 of the 10 failures are below Table 3 (fewer relocations); only 5-4 at H = n is above.
+- Mean and maximum absolute difference of the size means (relocations):
+
+| Comparison | 10 failing cells | 19 criterion sizes |
+|---|---|---|
+| This implementation vs. Table 3, H = n | 0.324 / 0.480 (6 cells) | 0.146 / 0.480 |
+| This implementation vs. Table 3, H = T + 2 | 0.590 / 1.030 (4 cells) | 0.193 / 1.030 |
+| This implementation vs. Table 3, both | 0.430 / 1.030 | 0.169 / 1.030 (38 cells) |
+| This implementation vs. CRP_D | 0.148 / 0.375 | not available: CRP_D was run on the 10 failing cells only (§8) |
+| CRP_D vs. Table 3 | 0.298 / 0.955 | not available |
+
+- 5-4 at H = n and 6-6 at H = T + 2 are missed in the same direction by every implementation and switch: 5-4 at H = n from +0.225 to +0.375 above Table 3, 6-6 at H = T + 2 from −0.830 to −1.180 below (main run, switches 1–4, D2, D6, CRP_D). The 5-9 row of Table 3 is internally inconsistent: nrel − LB gap = 24.85 is below the mean number of badly placed items (25.10 in Table 2, 25.05 in the files), which no bound of the Proposition allows (§3.3, F5).
+- **Status: not reproduced within tolerance; consistent with an independent implementation.**
+- Correctness evidence: every plan of steps 2–4 is valid under `check_plan` (top items only, removes in order, height ≤ H, bay empty at the end; 1680 plans of the full run, 3200 of the diagnostics); no plan of this implementation is below the lower bound or worse than its greedy start; at H = T + 2 the search equals the exact optimum (IDA*) on 39 of 40 instances of 3-3 and 37 of 40 of 3-4 and is never below it (§4.2); relocations recounted from the plans agree with the reported values on all 400 reruns of the failing sizes (§8.1); 20 unit tests pass.
+- Open for later, outside this validation: F12 (GG key with a missing reference item, group G against 0), which D6 shows to move the means towards Table 3 and CRP_D; and the time-objective integration (Wei, 10 Nov 2026).
