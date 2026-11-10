@@ -1,7 +1,7 @@
 """
 Layouts, item placement and the lower bound of the tree search of Forster &
 Bortfeldt (2012), Sec. 4.1 and 5 (p. 301-303). A layout is a list of stacks,
-each a list of item groups from bottom to top. Decisions F1-F...:
+each a list of item groups from bottom to top. Decisions F1-F19:
 docs/validation/forster_bortfeldt_2012.md §2.
 
 ------------------------------- Copyright --------------------------------
