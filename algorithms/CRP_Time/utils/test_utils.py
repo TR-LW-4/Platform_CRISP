@@ -58,6 +58,9 @@ HEADER_PARAMETER = re.compile(r"^(\w+)\s+---\s+(\S+)\s+---\s+\S")
 REPO = Path(__file__).resolve().parents[3]
 CAMPAIGN = REPO / "docs" / "validation" / "data" / "final_campaign_20261029" / "campaign.json"
 CAMPAIGN_SUFFIXES = {"f2": "f2-95e623c7", "f2vert": "f2_vertical-a1a2ce5e", "practice": "f2_vertical-a758c5ac"}
+# Result folders of the final campaign's three algorithms (results/CRP-Time also holds other campaigns).
+CAMPAIGN_FOLDERS = ("Azari_et_al._(2017)_CSUM", "Jovanović_et_al._(2019)_ACO_(CRP-Time)",
+                    "López-Plata_et_al._(2019)_A∗-Based_Heuristic")
 GEOMETRY = ("num_bays", "num_rows", "max_tiers", "num_containers", "layout_file_path")
 
 
@@ -175,7 +178,8 @@ class TestEvaluate(unittest.TestCase):
         n = 0
         for preset, suffix in CAMPAIGN_SUFFIXES.items():
             for idx in ("01", "23"):
-                for path in sorted((REPO / "results" / "CRP-Time").glob(f"*/caserta_*_{idx}_obj-crane_time-{suffix}.json")):
+                for path in sorted(p for folder in CAMPAIGN_FOLDERS for p in (REPO / "results" / "CRP-Time" / folder)
+                                   .glob(f"caserta_*_{idx}_obj-crane_time-{suffix}.json")):
                     data = json.loads(path.read_text(encoding="utf-8"))
                     with self.subTest(preset=preset, file=f"{path.parent.name}/{path.name}"):
                         self.assertGreaterEqual(data["timestamp"], start)
