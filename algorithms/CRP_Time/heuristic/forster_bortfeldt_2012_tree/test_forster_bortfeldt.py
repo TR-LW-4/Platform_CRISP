@@ -169,12 +169,14 @@ class TestGreedy(unittest.TestCase):
     def test_3_bg_to_empty_stack_with_smallest_group(self):
         self.assertEqual(self.first([[1, 7], [2, 8], [], [3]]), (0, 2, 7))
 
-    def test_4_flg_bb_with_largest_difference_to_lowest_group_of_target(self):
-        # F9: 9 - 2 = 7 onto stack 1 beats 9 - 3 = 6 onto stack 2 (the text, p. 304, would pick stack 2).
-        self.assertEqual(self.first([[1, 9], [2, 8], [3, 7]]), (0, 1, 9))
+    def test_4_flg_bb_with_smallest_difference_to_lowest_group_of_target(self):
+        # F9 (B): 9 - 3 = 6 onto stack 2 beats 9 - 2 = 7 onto stack 1 (Fig. 4 as printed would pick stack 1).
+        self.assertEqual(self.first([[1, 9], [2, 8], [3, 7]]), (0, 2, 9))
+        # (B) and the text (p. 304, max |g - top|) differ: (B) 9 - 4 = 5 onto stack 2; the text |9 - 6| = 3 onto stack 1.
+        self.assertEqual(self.first([[1, 9], [2, 6], [4, 8]]), (0, 2, 9))
 
     def test_fig3_plan_is_valid(self):
-        self.assertEqual(check_plan(FIG3, 6, greedy(Bay.from_stacks(FIG3, 6))), 26)
+        self.assertEqual(check_plan(FIG3, 6, greedy(Bay.from_stacks(FIG3, 6))), 13)
 
 
 class TestProductiveMoves(unittest.TestCase):

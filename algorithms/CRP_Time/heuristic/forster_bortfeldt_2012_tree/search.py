@@ -56,8 +56,8 @@ def greedy(bay: Bay) -> List[Move]:
                 if bge is None or g < bge[0]:
                     bge = (g, m)
             elif before and after and flg:
-                key = g - bay.mins[r][-1]                  # F9
-                if bb_flg is None or key > bb_flg[0]:
+                key = g - bay.mins[r][-1]                  # F9: minimum, against the printed maximum
+                if bb_flg is None or key < bb_flg[0]:
                     bb_flg = (key, m)
         best = bg or bge or bb_flg
         if best is None:
