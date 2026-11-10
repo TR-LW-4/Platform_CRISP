@@ -524,3 +524,7 @@ Equal in both: tie-breaking in donor-then-receiver order (F8/F17), priority (2) 
 D2 and D6 are the differences that can change CRP_D's plans on runs without a time limit; D2 is a deviation of CRP_D from Fig. 6 as printed. Testing either as a switch of this implementation would be a further post-hoc diagnostic (Thom).
 
 - Status: stopped after the diagnostics; the main implementation and the verdict of §7 are unchanged.
+
+### 8.5 Step 4 completion: D2 and D6 as switches (post hoc)
+
+Written before these runs (Thom, 11 Nov 2026). **Post hoc**, added after the results of §8.3–8.4, to explain the remaining difference between this implementation and CRP_D: D2 (cmStopValue multiplied by |Pm| before the comparison with cmStopThreshold) and D6 (GG key difference 0 for a single-item source or an empty target) as two separate switches on this implementation at 87eb188, on the same 10 failing size-variant cells, 60 s limit, sequential. **Whatever they show, the outcome changes neither the verdict of the main run (§7) nor the main implementation.**
