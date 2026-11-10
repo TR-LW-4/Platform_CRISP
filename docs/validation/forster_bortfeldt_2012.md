@@ -8,7 +8,7 @@ Scope set by Wei (10 Nov 2026): the C&OR tree search, standalone in CRP-Time, va
 
 ## Summary
 
-Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) at the F20 commit.**
+Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) done at the F20 commit: criterion not met** (fails at H = n on 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; at H = T + 2 on 5-5, 5-8, 5-9, 6-6; 9 of the 10 failures are fewer relocations than Table 3). Stopped after step 3; diagnostics wait for Thom.
 - Step 1 (§3): the Fig. 3 bound is 25 (pass). The CVS labels map to the Caserta files by the stack-count column of Table 2 (F3; the item-count key failed on a misprint). The mean bound is above nrel − LB gap of Table 3 on all sizes; this is a reported discrepancy, not a stop criterion (F5).
 - Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 20 unit tests pass (the 20th for F20). On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
 - Deviation from the printed figure: greedy priority (4) takes the *minimum* of g − lowest group of the target (F9, reading B), where Fig. 4 and p. 304 print "maximum"; decided by Thom after seeing the greedy results of §4.3.
@@ -388,3 +388,67 @@ Setup: `step3_profile.py`, H = n, 60 s, package as at 3210477. productive_moves,
 - Diagnostic with the tight test (F20, `--f14-tight`, not the implementation): 6-6 #1 0.45 s, 413 nodes; 5-8 #1 0.13 s, 101 nodes; 5-10 #1 0.19 s, 111 nodes; all three trees searched to the end. Checked on the 339 smoke runs that ended before 60 s (`step3_f14_check.py`, no time limit): 339 of 339 plans identical; total wall clock 883.6 s printed against 93.5 s tight (944 677 against 117 966 nodes; longest run 60.14 s against 14.92 s).
 - Verdict. (1) No deviation from Figs. 5–7 as printed: maxMoves (Fig. 5), the pruning test and the recursion with maxMoves − 1 (Fig. 6), the order of the cmStopValue check, and Cm as a list are all as printed. (2) Open interpretation: the pruning test, one move weaker than the purpose stated on p. 305; recorded as F20, not changed. Without a time limit it does not change the plan, but it causes the non-constant slowdown on bays with 8 or more stacks. (3) Constant-factor cost: 0.75–2.7 ms per node (instrumented), with move generation the largest share; with the tight test 1.1–1.8 ms per node. Duplicate compound moves (F21) are as printed and cost little once F20 is applied.
 - Decision (Thom, 10 Nov 2026): F20 adopted as an implementation optimisation, F21 kept as printed (§2.3).
+
+## 7. Step 3 full run (10–11 Nov 2026)
+
+All 840 Caserta instances, H = n (F7) and H = T + 2 (F6), 1680 runs, sequential, time limit 60 s, CRISP 87eb188 (F20), rl Python 3.11.16, parameters of p. 306. Every plan passed `check_plan`; no plan is below the bound or worse than the greedy. The same two idle VS Code python processes as in §6 were present; nothing else ran. Data: `step3_full.jsonl` / `.log`; summary `step3_full_summary.txt` (`step3_summary.py --paper`). Criterion of §5: mean nrel within max(0.10; 1 %) of Table 3 (nrel for H = n, nrel − msh for H = T + 2); 10-6 and 10-10 report only.
+
+H = n, against nrel of Table 3 (p. 307):
+
+| CVS | nrel | Table 3 | diff | tol | verdict | mean s | max s | limit | optimal | exhausted |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3-3 | 4.950 | 4.95 | +0.000 | 0.10 | pass | 0.00 | 0.00 | 0 | 12 | 28 |
+| 3-4 | 6.075 | 6.05 | +0.025 | 0.10 | pass | 0.00 | 0.01 | 0 | 12 | 28 |
+| 3-5 | 6.875 | 6.85 | +0.025 | 0.10 | pass | 0.00 | 0.01 | 0 | 12 | 28 |
+| 3-6 | 8.275 | 8.28 | −0.005 | 0.10 | pass | 0.00 | 0.03 | 0 | 13 | 27 |
+| 3-7 | 9.225 | 9.20 | +0.025 | 0.10 | pass | 0.01 | 0.03 | 0 | 13 | 27 |
+| 3-8 | 10.450 | 10.45 | +0.000 | 0.10 | pass | 0.01 | 0.05 | 0 | 7 | 33 |
+| 4-4 | 9.975 | 9.90 | +0.075 | 0.10 | pass | 0.01 | 0.03 | 0 | 4 | 36 |
+| 4-5 | 12.575 | 12.63 | −0.055 | 0.13 | pass | 0.01 | 0.07 | 0 | 6 | 34 |
+| 4-6 | 13.550 | 13.70 | −0.150 | 0.14 | **FAIL** | 0.03 | 0.10 | 0 | 3 | 37 |
+| 4-7 | 15.750 | 15.78 | −0.030 | 0.16 | pass | 0.04 | 0.11 | 0 | 0 | 40 |
+| 5-4 | 15.325 | 15.00 | +0.325 | 0.15 | **FAIL** | 0.03 | 0.39 | 0 | 0 | 40 |
+| 5-5 | 18.375 | 18.63 | −0.255 | 0.19 | **FAIL** | 0.09 | 0.78 | 0 | 0 | 40 |
+| 5-6 | 21.750 | 21.83 | −0.080 | 0.22 | pass | 0.19 | 1.01 | 0 | 0 | 40 |
+| 5-7 | 23.100 | 23.58 | −0.480 | 0.24 | **FAIL** | 0.24 | 1.98 | 0 | 1 | 39 |
+| 5-8 | 26.325 | 26.73 | −0.405 | 0.27 | **FAIL** | 0.40 | 6.05 | 0 | 0 | 40 |
+| 5-9 | 29.250 | 29.45 | −0.200 | 0.29 | pass | 1.83 | 15.86 | 0 | 0 | 40 |
+| 5-10 | 31.825 | 31.85 | −0.025 | 0.32 | pass | 4.37 | 60.00 | 2 | 0 | 38 |
+| 6-6 | 29.350 | 29.68 | −0.330 | 0.30 | **FAIL** | 2.54 | 22.71 | 0 | 0 | 40 |
+| 6-10 | 43.325 | 43.60 | −0.275 | 0.44 | pass | 34.17 | 60.04 | 15 | 0 | 25 |
+| 10-6 | 92.100 | 75.65 | +16.450 | 0.76 | report only | 60.03 | 60.08 | 40 | 0 | 0 |
+| 10-10 | 122.325 | 116.90 | +5.425 | 1.17 | report only | 60.03 | 60.07 | 40 | 0 | 0 |
+
+H = T + 2, against nrel − msh of Table 3:
+
+| CVS | nrel | Table 3 | diff | tol | verdict | mean s | max s | limit | optimal | exhausted |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3-3 | 5.025 | 4.98 | +0.045 | 0.10 | pass | 0.00 | 0.00 | 0 | 11 | 29 |
+| 3-4 | 6.100 | 6.05 | +0.050 | 0.10 | pass | 0.00 | 0.01 | 0 | 12 | 28 |
+| 3-5 | 6.875 | 6.85 | +0.025 | 0.10 | pass | 0.00 | 0.02 | 0 | 12 | 28 |
+| 3-6 | 8.325 | 8.28 | +0.045 | 0.10 | pass | 0.00 | 0.03 | 0 | 12 | 28 |
+| 3-7 | 9.225 | 9.23 | −0.005 | 0.10 | pass | 0.01 | 0.04 | 0 | 13 | 27 |
+| 3-8 | 10.475 | 10.40 | +0.075 | 0.10 | pass | 0.01 | 0.03 | 0 | 7 | 33 |
+| 4-4 | 10.000 | 9.93 | +0.070 | 0.10 | pass | 0.01 | 0.02 | 0 | 3 | 37 |
+| 4-5 | 12.575 | 12.65 | −0.075 | 0.13 | pass | 0.01 | 0.06 | 0 | 6 | 34 |
+| 4-6 | 13.700 | 13.70 | +0.000 | 0.14 | pass | 0.03 | 0.09 | 0 | 3 | 37 |
+| 4-7 | 15.875 | 15.78 | +0.095 | 0.16 | pass | 0.04 | 0.10 | 0 | 0 | 40 |
+| 5-4 | 15.575 | 15.52 | +0.055 | 0.16 | pass | 0.03 | 0.14 | 0 | 0 | 40 |
+| 5-5 | 18.600 | 18.80 | −0.200 | 0.19 | **FAIL** | 0.06 | 0.26 | 0 | 0 | 40 |
+| 5-6 | 21.900 | 22.08 | −0.180 | 0.22 | pass | 0.18 | 0.95 | 0 | 0 | 40 |
+| 5-7 | 23.350 | 23.58 | −0.230 | 0.24 | pass | 0.21 | 1.18 | 0 | 0 | 40 |
+| 5-8 | 26.525 | 27.03 | −0.505 | 0.27 | **FAIL** | 0.40 | 3.61 | 0 | 0 | 40 |
+| 5-9 | 29.425 | 30.05 | −0.625 | 0.30 | **FAIL** | 1.48 | 11.20 | 0 | 0 | 40 |
+| 5-10 | 32.225 | 32.25 | −0.025 | 0.32 | pass | 4.77 | 60.01 | 2 | 0 | 38 |
+| 6-6 | 30.100 | 31.13 | −1.030 | 0.31 | **FAIL** | 2.42 | 18.54 | 0 | 0 | 40 |
+| 6-10 | 44.150 | 44.48 | −0.330 | 0.44 | pass | 36.92 | 60.05 | 17 | 0 | 23 |
+| 10-6 | 103.925 | 83.03 | +20.895 | 0.83 | report only | 60.02 | 60.04 | 40 | 0 | 0 |
+| 10-10 | 138.925 | 125.38 | +13.545 | 1.25 | report only | 60.03 | 60.08 | 40 | 0 | 0 |
+
+- **Verdict: the criterion is not met.** H = n fails on 4-6, 5-4, 5-5, 5-7, 5-8 and 6-6; H = T + 2 fails on 5-5, 5-8, 5-9 and 6-6; 13 of 19 and 15 of 19 sizes pass. The "fail on 5–9" rule of §5 does not apply (5-9 is not the only failing size).
+- Direction: 9 of the 10 failures are *fewer* relocations than Table 3; only 5-4 at H = n is above it (+0.325; at H = T + 2 the same size is +0.055 against nrel − msh).
+- Reported only: 10-6 and 10-10 are far above Table 3 (+5.4 to +20.9); all 160 of these runs end by the 60 s limit. Table 3 gives a mean time of 45.5 s for 10-6 (p. 307), so the paper's runs mostly ended before the limit.
+- Time-limit hits: 97 of 840 at H = n, 99 of 840 at H = T + 2, all on 5-10, 6-10, 10-6 and 10-10; maximum wall clock 60.08 s. None of the failing sizes has a time-limit hit, so the 600 s no-limit diagnostic of §5, which reruns only the instances that hit the limit, has no instance to rerun.
+- Ended at the bound ("optimal"): 83 of 840 instances at H = n; p. 307 reports 69 of 840 solved to optimality (not part of the criterion).
+- Total wall clock 1.82 h (H = n) + 1.85 h (H = T + 2).
+- Status: stopped after step 3 (criterion not met). Diagnostics of §5 (Fig. 3 g_top reading and greedy reading (C), whole failing sizes) not started; they wait for Thom's go-ahead.
