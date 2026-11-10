@@ -1,5 +1,6 @@
-"""Tables of the final CRP-Time campaign (campaign.py), Markdown and LaTeX: Azari, Jovanović and López-Plata under f2,
-f2vert and the practice preset on the Caserta classes 3x5, 3x7, 4x6, 5x7 and 6x10.
+"""Tables of the CRP-Time campaigns (campaign.py), Markdown and LaTeX: Azari, Jovanović and López-Plata (final
+campaign of 29 Oct 2026) and, from their own campaign, the fixed-rule baselines Ünlüyurt–Aydın Difference1 and
+Difference2, under f2, f2vert and the practice preset on the Caserta classes 3x5, 3x7, 4x6, 5x7 and 6x10.
 
 Per algorithm, time model and class: mean ± standard deviation (n − 1) over the 40 instances of every crane-time
 metric the result files store (f2, f2vert, crane time with acceleration; crane_time, time and objective_value are
@@ -10,9 +11,11 @@ Only campaign results are used: every file read by make_table.load() must be the
 instance and pass campaign.py's done() (written after the archive time in campaign.json, with runtime_s, train_wall_s,
 crane_time_accel and the saved plan, under the block's objective digest), and its algo_config must equal the values
 the campaign ran with. Commit, Python version, archive time and machine come from campaign.json. make_table.py and
-its outputs document the October runs and are not touched.
+its outputs document the October runs and are not touched. Every algorithm comes from the campaign that holds it;
+with only the final campaign the output is that of the three algorithms alone.
 
-  python docs/benchmark/make_campaign_tables.py docs/validation/data/final_campaign_20261029
+  python docs/benchmark/make_campaign_tables.py <campaign> [<campaign> ...]
+  python docs/benchmark/make_campaign_tables.py docs/validation/data/final_campaign_20261029 docs/validation/data/unluyurt_campaign_20261110
 """
 import json
 import re
@@ -25,7 +28,14 @@ from core.benchmarks.caserta import parse_caserta_filename
 
 OUT_DIR = mt.OUT_DIR
 STEM = "crp_time_campaign_tables"
-FOLDERS = dict(zip(cp.FIRST_CAMPAIGN, mt.ALGOS))  # campaign key -> (display name, result folder, LaTeX name)
+FOLDERS = {  # campaign key -> (display name, result folder, LaTeX name)
+    **dict(zip(cp.FIRST_CAMPAIGN, mt.ALGOS)),
+    "unluyurt_d1": ("Ünlüyurt–Aydın (2012) Difference1²", "Ünlüyurt–Aydın_(2012)_Difference1",
+                    r"\"{U}nl\"{u}yurt--Ayd\i{}n (2012) Difference1$^{2}$"),
+    "unluyurt_d2": ("Ünlüyurt–Aydın (2012) Difference2²", "Ünlüyurt–Aydın_(2012)_Difference2",
+                    r"\"{U}nl\"{u}yurt--Ayd\i{}n (2012) Difference2$^{2}$"),
+}
+FIXED_RULE = ("unluyurt_d1", "unluyurt_d2")
 PRESET_LABELS = {"f2": "f2", "f2vert": "f2vert", "practice": "f2vert (practice parameters)"}
 TEX_LABELS = {"f2": "$f_2$", "f2vert": r"$f_2^{\mathrm{vert}}$",
               "practice": r"$f_2^{\mathrm{vert}}$ (practice parameters)"}
@@ -43,6 +53,12 @@ AZARI_FALLBACK = (
     "repetitions); on the other three (6×10 f2 #17 and #30, f2vert #19) the main objective spreads by at most "
     "0.24 %. The limits 3 s + 5 s are the paper's for the Lee & Lee (2010) instances (Azari et al. 2017, p. 316); "
     "applying them to the Caserta instances is our choice, not the paper's."
+)
+
+
+BASELINE_NOTE = (
+    "Fixed-rule baselines, from their own campaign: the destination rules read no time parameter, so the plan is the "
+    "same under all three time models, and its crane time is measured, not optimised."
 )
 
 
@@ -102,31 +118,56 @@ def row(algorithm, preset, cls, runs):
     return cells
 
 
-def tables(campaign, info):
+def owners(campaigns):
+    """[(algorithm, campaign, info)] over the campaigns in the order given; each algorithm in one campaign only."""
+    out = [(a, c, info) for c, info in campaigns for a in cp.campaign_algorithms(info)]
+    assert len({a for a, _, _ in out}) == len(out), "an algorithm is in more than one campaign"
+    return out
+
+
+def tables(campaigns):
     """{preset: rows}, the classes in order and within each class the algorithms in campaign order."""
-    return {p: [row(a, p, c, campaign_runs(campaign, info, a, p, c)) for c in cp.CLASSES for a in cp.campaign_algorithms(info)]
-            for p in cp.PRESETS}
+    return {p: [row(a, p, c, campaign_runs(camp, info, a, p, c)) for c in cp.CLASSES
+                for a, camp, info in owners(campaigns)] for p in cp.PRESETS}
 
 
 def keys(preset):
     return ["class", "algorithm", "n"] + [k for k, _, _ in columns(preset)] + ["limit", "budget"]
 
 
-def write(campaign, info, rows):
+def rel(campaign):
+    return campaign.relative_to(mt.REPO).as_posix() if campaign.is_relative_to(mt.REPO) else campaign.name
+
+
+def campaign_line(info):
+    return (f"commit `{info['commit'][:7]}`, Python {info['python']}, archive time {info['start']}; "
+            f"machine {info['processor']}, {info['cpus']} logical CPUs, {info['platform']}.")
+
+
+def write(campaigns, rows):
+    algorithms = [a for a, _, _ in owners(campaigns)]
+    baselines = [a for a in algorithms if a in FIXED_RULE]
     values = {p: cp.block_values("azari", p)[0] for p in cp.PRESETS}
     models = "; ".join(f"{PRESET_LABELS[p]}: " + ", ".join(f"{k} {values[p][k]:g}" for k in TIME_KEYS)
                        for p in cp.PRESETS)
-    algos = "; ".join(f"{FOLDERS[a][0]}: " + ", ".join(f"{k} {v:g}" for k, v in cp.block_values(a, "f2")[1].items())
-                      for a in cp.campaign_algorithms(info))
-    rel = campaign.relative_to(mt.REPO).as_posix() if campaign.is_relative_to(mt.REPO) else campaign.name
+    algos = "; ".join(f"{FOLDERS[a][0]}: " + (", ".join(f"{k} {v:g}" for k, v in cp.block_values(a, "f2")[1].items())
+                                              or "none") for a in algorithms)
+    if len(campaigns) == 1:
+        source = f"the campaign `{rel(campaigns[0][0])}`"
+        campaign_lines = [f"- **Campaign:** {campaign_line(campaigns[0][1])}"]
+    else:
+        source = "the campaigns " + " and ".join(f"`{rel(c)}`" for c, _ in campaigns)
+        campaign_lines = [f"- **Campaign `{c.name}`** ("
+                          + ", ".join(FOLDERS[a][0].rstrip("²") for a in cp.campaign_algorithms(info)) + "): "
+                          + campaign_line(info) for c, info in campaigns]
     md = [
-        "# CRP-Time final campaign: Azari, Jovanović, López-Plata under f2, f2vert and the practice preset",
+        "# CRP-Time final campaign: Azari, Jovanović, López-Plata under f2, f2vert and the practice preset"
+        + (", with the fixed-rule baselines Ünlüyurt–Aydın Difference1 and Difference2" if baselines else ""),
         "",
-        f"Generated by `docs/benchmark/make_campaign_tables.py` from the campaign `{rel}` (result files in "
+        f"Generated by `docs/benchmark/make_campaign_tables.py` from {source} (result files in "
         "`results/CRP-Time/`); every file is checked to be the campaign's result of its instance.",
         "",
-        f"- **Campaign:** commit `{info['commit'][:7]}`, Python {info['python']}, archive time {info['start']}; "
-        f"machine {info['processor']}, {info['cpus']} logical CPUs, {info['platform']}.",
+        *campaign_lines,
         "- **Runs:** `docs/benchmark/campaign.py`, the web worker of a Workbench batch job, one instance at a time; "
         "every saved plan replayed by `campaign.py check` (restricted BRP, H = T + 2, f2, f2vert and the crane time "
         "with acceleration recomputed).",
@@ -147,11 +188,14 @@ def write(campaign, info, rows):
         head = ["Class", "Algorithm", "n"] + [h for _, h, _ in cols] + ["Time limit hit", "Node budget hit"]
         md += ["", f"## {PRESET_LABELS[p]}", "", "| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
         md += ["| " + " | ".join(r[k] for k in keys(p)) + " |" for r in rows[p]]
-    md += ["", f"¹ {AZARI_NOTE} {AZARI_FALLBACK}"]
+    md += ["", f"¹ {AZARI_NOTE} {AZARI_FALLBACK}"] + (["", f"² {BASELINE_NOTE}"] if baselines else [])
     (OUT_DIR / f"{STEM}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
-    tex = [f"% CRP-Time final campaign, generated by make_campaign_tables.py from {rel} (commit "
-           f"{info['commit'][:7]}); see {STEM}.md for the setup."]
+    tex = [f"% CRP-Time final campaign, generated by make_campaign_tables.py from "
+           + " and ".join(f"{rel(c)} (commit {info['commit'][:7]})" for c, info in campaigns)
+           + f"; see {STEM}.md for the setup."]
+    tex_names = {FOLDERS[a][0]: FOLDERS[a][2] for a in algorithms}
+    baseline_tex = rf" $^{{2}}$ {tex_note(BASELINE_NOTE)}" if baselines else ""
     for p in cp.PRESETS:
         cols = columns(p)
         tex += ["", r"\begin{table}[htbp]", r"\centering", r"\small",
@@ -159,13 +203,14 @@ def write(campaign, info, rows):
                 " & ".join(["Class", "Algorithm", "$n$"] + [h for _, _, h in cols] + ["Limit hit", "Budget hit"])
                 + r" \\", r"\midrule"]
         for i, r in enumerate(rows[p]):
-            if i and i % len(cp.campaign_algorithms(info)) == 0:
+            if i and i % len(algorithms) == 0:
                 tex.append(r"\midrule")
-            name = {FOLDERS[a][0]: FOLDERS[a][2] for a in cp.campaign_algorithms(info)}[r["algorithm"]]
+            name = tex_names[r["algorithm"]]
             tex.append(" & ".join([r["class"].replace("×", r"$\times$"), name]
                                   + [mt.tex_cell(r[k]) for k in keys(p)[2:]]) + r" \\")
         tex += [r"\bottomrule", r"\end{tabular}",
-                r"\par\smallskip\footnotesize * optimised. $^{1}$ " + AZARI_NOTE + " " + tex_note(AZARI_FALLBACK),
+                r"\par\smallskip\footnotesize * optimised. $^{1}$ " + AZARI_NOTE + " " + tex_note(AZARI_FALLBACK)
+                + baseline_tex,
                 rf"\caption{{CRP-Time final campaign under {TEX_LABELS[p]}, Caserta instances, 40 per class: mean "
                 r"$\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; "
                 r"budget hit: instances whose step 1 reached its node budget.}",
@@ -174,13 +219,16 @@ def write(campaign, info, rows):
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         raise SystemExit(__doc__.rsplit("\n\n", 1)[1])
-    campaign = Path(sys.argv[1]).resolve()
-    info = cp.load_campaign(campaign)
-    print(f"campaign {campaign.name}: commit {info['commit'][:7]}, Python {info['python']}, archive {info['start']}")
-    rows = tables(campaign, info)
-    write(campaign, info, rows)
+    campaigns = []
+    for arg in sys.argv[1:]:
+        campaign = Path(arg).resolve()
+        info = cp.load_campaign(campaign)
+        print(f"campaign {campaign.name}: commit {info['commit'][:7]}, Python {info['python']}, archive {info['start']}")
+        campaigns.append((campaign, info))
+    rows = tables(campaigns)
+    write(campaigns, rows)
     print(f"wrote {STEM}.md and {STEM}.tex: " + ", ".join(f"{p} {len(r)} rows" for p, r in rows.items()))
 
 
