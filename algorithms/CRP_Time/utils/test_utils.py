@@ -57,10 +57,10 @@ ALGORITHMS = [
 HEADER_PARAMETER = re.compile(r"^(\w+)\s+---\s+(\S+)\s+---\s+\S")
 REPO = Path(__file__).resolve().parents[3]
 CAMPAIGN = REPO / "docs" / "validation" / "data" / "final_campaign_20261029" / "campaign.json"
+# Campaigns whose result files are in results/ (docs/benchmark/campaign.py); repetitions keep theirs in sub-folders.
+CAMPAIGNS = sorted((REPO / "docs" / "validation" / "data").glob("*/campaign.json"))
+FIRST_CAMPAIGN_SIZE = 3   # a campaign.json without "algorithms": Azari, Jovanović and López-Plata (campaign.py)
 CAMPAIGN_SUFFIXES = {"f2": "f2-95e623c7", "f2vert": "f2_vertical-a1a2ce5e", "practice": "f2_vertical-a758c5ac"}
-# Result folders of the final campaign's three algorithms (results/CRP-Time also holds other campaigns).
-CAMPAIGN_FOLDERS = ("Azari_et_al._(2017)_CSUM", "Jovanović_et_al._(2019)_ACO_(CRP-Time)",
-                    "López-Plata_et_al._(2019)_A∗-Based_Heuristic")
 GEOMETRY = ("num_bays", "num_rows", "max_tiers", "num_containers", "layout_file_path")
 
 
@@ -171,15 +171,17 @@ class TestEvaluate(unittest.TestCase):
 
     @unittest.skipUnless(CAMPAIGN.is_file(), "final campaign not on this machine")
     def test_equals_the_evaluator_on_campaign_plans(self):
-        """Saved final plans of the final campaign, instances 1 and 23 of every class, three algorithms, f2,
-        f2vert and the practice preset: the platform's metrics without the RMGC time, in the same order and
-        bit-equal, and the saved relocations and crane time."""
-        start = json.loads(CAMPAIGN.read_text(encoding="utf-8"))["start"]
+        """Saved final plans of the campaigns in results/ (CAMPAIGNS), instances 1 and 23 of every class, every
+        algorithm of each campaign, f2, f2vert and the practice preset: the platform's metrics without the RMGC
+        time, in the same order and bit-equal, and the saved relocations and crane time. The expected number of
+        files follows from the campaign.json files."""
+        infos = [json.loads(p.read_text(encoding="utf-8")) for p in CAMPAIGNS]
+        start = min(info["start"] for info in infos)
+        algorithms = sum(len(info.get("algorithms", ())) or FIRST_CAMPAIGN_SIZE for info in infos)
         n = 0
         for preset, suffix in CAMPAIGN_SUFFIXES.items():
             for idx in ("01", "23"):
-                for path in sorted(p for folder in CAMPAIGN_FOLDERS for p in (REPO / "results" / "CRP-Time" / folder)
-                                   .glob(f"caserta_*_{idx}_obj-crane_time-{suffix}.json")):
+                for path in sorted((REPO / "results" / "CRP-Time").glob(f"*/caserta_*_{idx}_obj-crane_time-{suffix}.json")):
                     data = json.loads(path.read_text(encoding="utf-8"))
                     with self.subTest(preset=preset, file=f"{path.parent.name}/{path.name}"):
                         self.assertGreaterEqual(data["timestamp"], start)
@@ -197,7 +199,7 @@ class TestEvaluate(unittest.TestCase):
                                          (data["metrics"]["relocations"], data["metrics"]["crane_time"]))
                         self.assertEqual("crane_time_f2" in got, preset != "practice")
                     n += 1
-        self.assertEqual(n, 3 * 3 * 5 * 2)
+        self.assertEqual(n, algorithms * len(CAMPAIGN_SUFFIXES) * 5 * 2)
 
 
 class TestPlan(unittest.TestCase):
