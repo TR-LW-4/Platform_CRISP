@@ -316,6 +316,8 @@ Fixed before any step-3 result (task of 10 Nov 2026 and Thom's additions of 10 N
 - Report per size: mean nrel, difference with the paper, mean and maximum wall clock per instance (F15), the number of instances that hit the 60 s limit, and how many ended by the optimality abort (bound reached), by the limit, or by exhausting the tree.
 - If a size fails: rerun it without a time limit, with the Fig. 3 reading of g_top, and with greedy reading (C) (F9); all diagnostics only, the verdict stays with the main 60 s run.
 - The diagnostic rerun "without time limit" is capped at 600 s per instance (Thom, 10 Nov 2026); the report states how many instances hit the cap.
+- Addition (Thom, 10 Nov 2026, after the full run had started at 87eb188 and before any step-3 result was summarised; only the first three log lines, 3-3 #1–#2, had been read, to confirm the start): the 600 s no-limit diagnostic reruns only those instances of a failing size that hit the 60 s limit, since runs that finished within 60 s are deterministic and would not change. The g_top (Fig. 3) and greedy (C) diagnostics still rerun the whole size.
+- No diagnostic is started without Thom's go-ahead.
 
 ## 6. Step 3 smoke run (10 Nov 2026)
 
