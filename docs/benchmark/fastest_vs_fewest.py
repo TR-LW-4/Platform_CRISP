@@ -44,11 +44,11 @@ def main():
           f"Crane times equal within {TOL:g} s.")
     checked = 0
     for p in cp.PRESETS:
-        fastest, fewest, both = (dict.fromkeys(cp.ALGORITHMS, 0) for _ in range(3))
+        fastest, fewest, both = (dict.fromkeys(cp.FIRST_CAMPAIGN, 0) for _ in range(3))
         agree, ties = {}, 0
         for cls in cp.CLASSES:
             tr = {}
-            for a in cp.ALGORITHMS:
+            for a in cp.FIRST_CAMPAIGN:
                 problem = cp.block_values(a, p)[0]
                 runs = mct.campaign_runs(campaign, info, a, p, cls)
                 for layout in cp.layouts(cls, None):
@@ -57,19 +57,19 @@ def main():
                     checked += 1
             agree[cls] = 0
             for i in sorted({i for _, i in tr}):
-                t = {a: tr[a, i][0] for a in cp.ALGORITHMS}
-                r = {a: tr[a, i][1] for a in cp.ALGORITHMS}
-                fast = [a for a in cp.ALGORITHMS if t[a] - min(t.values()) <= TOL]
+                t = {a: tr[a, i][0] for a in cp.FIRST_CAMPAIGN}
+                r = {a: tr[a, i][1] for a in cp.FIRST_CAMPAIGN}
+                fast = [a for a in cp.FIRST_CAMPAIGN if t[a] - min(t.values()) <= TOL]
                 ties += len(fast) > 1
                 agree[cls] += any(r[a] == min(r.values()) for a in fast)
-                for a in cp.ALGORITHMS:
+                for a in cp.FIRST_CAMPAIGN:
                     fastest[a] += a in fast
                     fewest[a] += r[a] == min(r.values())
                     both[a] += a in fast and r[a] == min(r.values())
         n = 40 * len(cp.CLASSES)
         print(f"\n{mct.PRESET_LABELS[p]}: fastest solution also has the fewest relocations on {sum(agree.values())}/{n}"
               f" instances (time ties {ties}); per class " + ", ".join(f"{c} {v}/40" for c, v in agree.items()))
-        for a in cp.ALGORITHMS:
+        for a in cp.FIRST_CAMPAIGN:
             print(f"  {a:12s} fastest {fastest[a]:3d}, fewest relocations {fewest[a]:3d}, "
                   f"fastest and fewest {both[a]:3d}")
     print(f"\n{checked} result files checked")

@@ -25,7 +25,7 @@ from core.benchmarks.caserta import parse_caserta_filename
 
 OUT_DIR = mt.OUT_DIR
 STEM = "crp_time_campaign_tables"
-FOLDERS = dict(zip(cp.ALGORITHMS, mt.ALGOS))  # campaign key -> (display name, result folder, LaTeX name)
+FOLDERS = dict(zip(cp.FIRST_CAMPAIGN, mt.ALGOS))  # campaign key -> (display name, result folder, LaTeX name)
 PRESET_LABELS = {"f2": "f2", "f2vert": "f2vert", "practice": "f2vert (practice parameters)"}
 TEX_LABELS = {"f2": "$f_2$", "f2vert": r"$f_2^{\mathrm{vert}}$",
               "practice": r"$f_2^{\mathrm{vert}}$ (practice parameters)"}
@@ -104,7 +104,7 @@ def row(algorithm, preset, cls, runs):
 
 def tables(campaign, info):
     """{preset: rows}, the classes in order and within each class the algorithms in campaign order."""
-    return {p: [row(a, p, c, campaign_runs(campaign, info, a, p, c)) for c in cp.CLASSES for a in cp.ALGORITHMS]
+    return {p: [row(a, p, c, campaign_runs(campaign, info, a, p, c)) for c in cp.CLASSES for a in cp.campaign_algorithms(info)]
             for p in cp.PRESETS}
 
 
@@ -117,7 +117,7 @@ def write(campaign, info, rows):
     models = "; ".join(f"{PRESET_LABELS[p]}: " + ", ".join(f"{k} {values[p][k]:g}" for k in TIME_KEYS)
                        for p in cp.PRESETS)
     algos = "; ".join(f"{FOLDERS[a][0]}: " + ", ".join(f"{k} {v:g}" for k, v in cp.block_values(a, "f2")[1].items())
-                      for a in cp.ALGORITHMS)
+                      for a in cp.campaign_algorithms(info))
     rel = campaign.relative_to(mt.REPO).as_posix() if campaign.is_relative_to(mt.REPO) else campaign.name
     md = [
         "# CRP-Time final campaign: Azari, Jovanović, López-Plata under f2, f2vert and the practice preset",
@@ -159,9 +159,9 @@ def write(campaign, info, rows):
                 " & ".join(["Class", "Algorithm", "$n$"] + [h for _, _, h in cols] + ["Limit hit", "Budget hit"])
                 + r" \\", r"\midrule"]
         for i, r in enumerate(rows[p]):
-            if i and i % len(cp.ALGORITHMS) == 0:
+            if i and i % len(cp.campaign_algorithms(info)) == 0:
                 tex.append(r"\midrule")
-            name = {FOLDERS[a][0]: FOLDERS[a][2] for a in cp.ALGORITHMS}[r["algorithm"]]
+            name = {FOLDERS[a][0]: FOLDERS[a][2] for a in cp.campaign_algorithms(info)}[r["algorithm"]]
             tex.append(" & ".join([r["class"].replace("×", r"$\times$"), name]
                                   + [mt.tex_cell(r[k]) for k in keys(p)[2:]]) + r" \\")
         tex += [r"\bottomrule", r"\end{tabular}",

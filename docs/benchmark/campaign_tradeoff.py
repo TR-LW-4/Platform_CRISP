@@ -46,7 +46,7 @@ def table(head, rows):
 
 def part_a(runs, opt):
     rows, diffs = [], []
-    for a in cp.ALGORITHMS:
+    for a in cp.FIRST_CAMPAIGN:
         for k, cls in enumerate(mt.OPT_CLASSES):
             r = runs[a, "f2", cls]
             assert sorted(r) == sorted(opt[cls]), (a, cls)
@@ -78,14 +78,14 @@ def part_b(runs):
         key = MAIN[p]
         rows = []
         for cls in cp.CLASSES:
-            fastest_n = dict.fromkeys(cp.ALGORITHMS, 0)
+            fastest_n = dict.fromkeys(cp.FIRST_CAMPAIGN, 0)
             ties = conflicts = 0
             incr, absolute, zero_min = [], [], []
             for i in sorted(runs["azari", p, cls]):
-                t = {a: runs[a, p, cls][i][key] for a in cp.ALGORITHMS}
-                r = {a: runs[a, p, cls][i]["relocations"] for a in cp.ALGORITHMS}
+                t = {a: runs[a, p, cls][i][key] for a in cp.FIRST_CAMPAIGN}
+                r = {a: runs[a, p, cls][i]["relocations"] for a in cp.FIRST_CAMPAIGN}
                 best = min(t.values())
-                fastest = [a for a in cp.ALGORITHMS if t[a] - best <= TOL]
+                fastest = [a for a in cp.FIRST_CAMPAIGN if t[a] - best <= TOL]
                 ties += len(fastest) > 1
                 for a in fastest:
                     fastest_n[a] += 1
@@ -102,11 +102,11 @@ def part_b(runs):
                          f"{st.mean(absolute):.2f}" if absolute else "–", f"{max(absolute):g}" if absolute else "–",
                          f"{st.mean(incr):.1f}" if incr else "–", f"{max(incr):.1f}" if incr else "–",
                          f"{len(zero_min)} (+{', +'.join(f'{x:g}' for x in zero_min)})" if zero_min else "0"]
-                        + [str(fastest_n[a]) for a in cp.ALGORITHMS]
+                        + [str(fastest_n[a]) for a in cp.FIRST_CAMPAIGN]
                         + [str(ties), f"{int(sum(m['time_limit_hit'] for m in lp.values()))}/40"])
         head = (["Class", "Conflicts", "Mean abs. increase", "Max abs. increase", "Mean rel. increase %",
                  "Max rel. increase %", "r_min = 0 (abs. increase)"]
-                + [f"Fastest: {name(a)}" for a in cp.ALGORITHMS] + ["Time ties", "López-Plata limit hit"])
+                + [f"Fastest: {name(a)}" for a in cp.FIRST_CAMPAIGN] + ["Time ties", "López-Plata limit hit"])
         out += ["", f"### {mct.PRESET_LABELS[p]}", ""] + table(head, rows)
     return out
 
@@ -115,7 +115,7 @@ def part_c(runs):
     out = []
     for other in ("f2vert", "practice"):
         rows = []
-        for a in cp.ALGORITHMS:
+        for a in cp.FIRST_CAMPAIGN:
             for cls in cp.CLASSES:
                 base, run = runs[a, "f2", cls], runs[a, other, cls]
                 d = [run[i]["relocations"] - base[i]["relocations"] for i in sorted(base)]
@@ -136,7 +136,7 @@ def main():
     head = (f"Campaign {campaign.name}: commit {info['commit'][:7]}, Python {info['python']}, archive {info['start']}, "
             f"{info['processor']}. Crane times equal within {TOL:g} s.")
     runs = {(a, p, c): mct.campaign_runs(campaign, info, a, p, c)
-            for a in cp.ALGORITHMS for p in cp.PRESETS for c in cp.CLASSES}
+            for a in cp.FIRST_CAMPAIGN for p in cp.PRESETS for c in cp.CLASSES}
     a_lines, diffs = part_a(runs, mt.exact_opt())
     md = [f"# Final campaign: relocations versus crane time", "", head, "",
           "## A) Validation against the exact f2 optima (f2 runs)", "",

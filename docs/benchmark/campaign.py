@@ -1,5 +1,6 @@
-"""Final CRP-Time benchmark campaign: Azari, Jovanović and López-Plata under f2, f2vert and the practice preset on
-the Caserta classes 3x5, 3x7, 4x6, 5x7 and 6x10 (40 instances each).
+"""CRP-Time benchmark campaigns: the algorithms of a campaign under f2, f2vert and the practice preset on the Caserta
+classes 3x5, 3x7, 4x6, 5x7 and 6x10 (40 instances each). The final campaign of 29 Oct 2026 holds Azari, Jovanović and
+López-Plata; Ünlüyurt–Aydın's Difference1 and Difference2 have a campaign of their own (10 Nov 2026).
 
 Every instance runs through the web worker (web.backend.jobs._worker_main), the function a Workbench batch job runs,
 with the problem and algorithm values built as the web API builds them (_config_values, resolve_values), so the run,
@@ -8,12 +9,13 @@ class by class, one instance at a time; it can be stopped and started again and 
 have no result of this campaign yet. Works on Windows and Linux; on another machine, check out the campaign commit
 and copy benchmark/Caserta_dataset/ (gitignored) into the checkout first.
 
-  python docs/benchmark/campaign.py archive <campaign_dir>
+  python docs/benchmark/campaign.py archive <campaign_dir> [--algorithms a,b]
       copy results/ to <campaign_dir>/results_before/ with an md5 manifest, check the copy, and record the start
-      time, commit and machine in <campaign_dir>/campaign.json (refuses an existing campaign)
+      time, commit, machine and the campaign's algorithms (default: all) in <campaign_dir>/campaign.json (refuses an
+      existing campaign)
   python docs/benchmark/campaign.py run <campaign_dir> <algorithm> <preset> [--classes 3x5,3x7] [--instances 1-10]
-      run one block; refuses when the checkout differs from the recorded commit, the Python version differs from
-      the recorded one, or another run is active
+      run one block; refuses when the algorithm is not one of the campaign's, the checkout differs from the recorded
+      commit, the Python version differs from the recorded one, or another run is active
   python docs/benchmark/campaign.py status <campaign_dir> [<algorithm> <preset>] [--classes ...] [--instances ...]
   python docs/benchmark/campaign.py check <campaign_dir> [<algorithm> <preset>] [--classes ...] [--instances ...]
       replay every saved plan independently against its Caserta file (only the top container of the target's stack
@@ -21,7 +23,8 @@ and copy benchmark/Caserta_dataset/ (gitignored) into the checkout first.
       recompute relocations, f2 (not for the practice preset), f2vert and the crane time with acceleration, and
       compare them with the saved metrics; then list the files under results/ that differ from the manifest
 
-algorithm: azari | jovanovic | lopez_plata. preset: f2 | f2vert | practice.
+algorithm: azari | jovanovic | lopez_plata | unluyurt_d1 | unluyurt_d2. preset: f2 | f2vert | practice.
+status and check cover the campaign's algorithms; a campaign.json without "algorithms" holds the first three.
 An instance counts as done when its result file parses, has the objective suffix of the block, was written after
 the campaign start, and holds runtime_s, train_wall_s, crane_time_accel and the saved plan (files of earlier runs
 have none of the last three). An interrupted instance is run again from the start.
@@ -53,7 +56,10 @@ ALGORITHMS = {
     "azari": "Azari et al. (2017) CSUM",
     "jovanovic": "Jovanović et al. (2019) ACO (CRP-Time)",
     "lopez_plata": "López-Plata et al. (2019) A∗-Based Heuristic",
+    "unluyurt_d1": "Ünlüyurt–Aydın (2012) Difference1",
+    "unluyurt_d2": "Ünlüyurt–Aydın (2012) Difference2",
 }
+FIRST_CAMPAIGN = ("azari", "jovanovic", "lopez_plata")   # algorithms of a campaign.json without "algorithms"
 PRESETS = {"f2": "f2", "f2vert": "f2_vertical", "practice": "f2_vertical_practice"}   # CRP-Time time-model option
 CLASSES = ["3x5", "3x7", "4x6", "5x7", "6x10"]
 DONE_KEYS = ("runtime_s", "train_wall_s", "crane_time_accel")
@@ -159,12 +165,21 @@ def load_campaign(campaign: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def campaign_algorithms(info: dict) -> list:
+    """The algorithms of a campaign, in campaign order."""
+    return list(info.get("algorithms", FIRST_CAMPAIGN))
+
+
 # ------------------------------------------------------------------ archive
 
 def cmd_archive(args) -> None:
     campaign = Path(args.campaign).resolve()
     if (campaign / "campaign.json").exists():
         raise SystemExit(f"{campaign} already holds a campaign; choose another folder")
+    algorithms = args.algorithms.split(",") if args.algorithms else list(ALGORITHMS)
+    unknown = [a for a in algorithms if a not in ALGORITHMS]
+    if unknown:
+        raise SystemExit(f"unknown algorithms {unknown}; choose from {list(ALGORITHMS)}")
     campaign.mkdir(parents=True, exist_ok=True)
     before = campaign / "results_before"
     if before.exists():
@@ -177,10 +192,11 @@ def cmd_archive(args) -> None:
     (campaign / "results_before.md5").write_text("".join(f"{h}  {p}\n" for p, h in source.items()), encoding="utf-8")
     info = {"start": now(), **checkout(), "python": sys.version.split()[0], "platform": platform.platform(),
             "processor": cpu_name(), "cpus": os.cpu_count(),
-            "host": platform.node(), "results_files": len(source)}
+            "host": platform.node(), "results_files": len(source), "algorithms": algorithms}
     (campaign / "campaign.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
     log(campaign, f"archive: {len(source)} files of results/ copied to {before.name}, md5 checked; "
-                  f"commit {info['commit'][:7]}{' (modified files!)' if info['modified'] else ''}")
+                  f"commit {info['commit'][:7]}{' (modified files!)' if info['modified'] else ''}; "
+                  f"algorithms {', '.join(algorithms)}")
 
 
 # ------------------------------------------------------------------ run
@@ -297,6 +313,8 @@ def run_class(campaign, algorithm, preset, cls_name, problem, algo_values, cls, 
 def cmd_run(args) -> None:
     campaign = Path(args.campaign).resolve()
     info = load_campaign(campaign)
+    if args.algorithm not in campaign_algorithms(info):
+        raise SystemExit(f"{args.algorithm} is not an algorithm of this campaign: {campaign_algorithms(info)}")
     current = checkout()
     if current["commit"] != info["commit"] or current["modified"]:
         raise SystemExit(f"checkout {current['commit'][:7]} (modified: {bool(current['modified'])}) differs from the "
@@ -324,8 +342,8 @@ def cmd_run(args) -> None:
 
 # ------------------------------------------------------------------ status
 
-def blocks(args):
-    algos = [args.algorithm] if args.algorithm else list(ALGORITHMS)
+def blocks(args, info):
+    algos = [args.algorithm] if args.algorithm else campaign_algorithms(info)
     presets = [args.preset] if args.preset else list(PRESETS)
     classes = args.classes.split(",") if args.classes else CLASSES
     return [(a, p, c) for a in algos for p in presets for c in classes]
@@ -333,12 +351,12 @@ def blocks(args):
 
 def cmd_status(args) -> None:
     campaign = Path(args.campaign).resolve()
-    start = load_campaign(campaign)["start"]
+    info = load_campaign(campaign)
     instances = parse_range(args.instances)
-    for algorithm, preset, cls_name in blocks(args):
+    for algorithm, preset, cls_name in blocks(args, info):
         problem = block_values(algorithm, preset)[0]
         paths = layouts(cls_name, instances)
-        n = sum(done(result_file(algorithm, problem, p), problem, start) for p in paths)
+        n = sum(done(result_file(algorithm, problem, p), problem, info["start"]) for p in paths)
         print(f"{algorithm:12s} {preset:9s} {cls_name:5s} {n:3d}/{len(paths)}")
 
 
@@ -412,7 +430,7 @@ def cmd_check(args) -> None:
     info = load_campaign(campaign)
     instances = parse_range(args.instances)
     n = bad = missing = 0
-    for algorithm, preset, cls_name in blocks(args):
+    for algorithm, preset, cls_name in blocks(args, info):
         problem = block_values(algorithm, preset)[0]
         for layout in layouts(cls_name, instances):
             path = result_file(algorithm, problem, layout)
@@ -447,7 +465,7 @@ def cmd_check(args) -> None:
     after = manifest(RESULTS)
     changed = sorted(p for p in after if before.get(p) != after[p])
     removed = sorted(p for p in before if p not in after)
-    campaign_files = set()
+    campaign_files = set()   # result files of any campaign's algorithm count as campaign files
     for a in ALGORITHMS:
         for pr in PRESETS:
             values = block_values(a, pr)[0]
@@ -465,6 +483,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("archive")
     a.add_argument("campaign")
+    a.add_argument("--algorithms")
     for name, positional in (("run", True), ("status", False), ("check", False)):
         p = sub.add_parser(name)
         p.add_argument("campaign")
