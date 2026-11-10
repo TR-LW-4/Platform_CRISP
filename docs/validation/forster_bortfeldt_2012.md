@@ -8,7 +8,7 @@ Scope set by Wei (10 Nov 2026): the C&OR tree search, standalone in CRP-Time, va
 
 ## Summary
 
-Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) done at the F20 commit: criterion not met** (fails at H = n on 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; at H = T + 2 on 5-5, 5-8, 5-9, 6-6; 9 of the 10 failures are fewer relocations than Table 3). Stopped after step 3; diagnostics wait for Thom.
+Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) done at the F20 commit: criterion not met** (fails at H = n on 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; at H = T + 2 on 5-5, 5-8, 5-9, 6-6; 9 of the 10 failures are fewer relocations than Table 3). Verdict stays "fail". Diagnostics on the failing sizes (§8): no single switch of this implementation removes the failures; the CRP_D implementation passes 6 of the 10 failing size-variants, with more relocations than this implementation. Stopped after the diagnostics.
 - Step 1 (§3): the Fig. 3 bound is 25 (pass). The CVS labels map to the Caserta files by the stack-count column of Table 2 (F3; the item-count key failed on a misprint). The mean bound is above nrel − LB gap of Table 3 on all sizes; this is a reported discrepancy, not a stop criterion (F5).
 - Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 20 unit tests pass (the 20th for F20). On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
 - Deviation from the printed figure: greedy priority (4) takes the *minimum* of g − lowest group of the target (F9, reading B), where Fig. 4 and p. 304 print "maximum"; decided by Thom after seeing the greedy results of §4.3.
@@ -452,3 +452,75 @@ H = T + 2, against nrel − msh of Table 3:
 - Ended at the bound ("optimal"): 83 of 840 instances at H = n; p. 307 reports 69 of 840 solved to optimality (not part of the criterion).
 - Total wall clock 1.82 h (H = n) + 1.85 h (H = T + 2).
 - Status: stopped after step 3 (criterion not met). Diagnostics of §5 (Fig. 3 g_top reading and greedy reading (C), whole failing sizes) not started; they wait for Thom's go-ahead.
+
+## 8. Step 3 diagnostics on the failing sizes (10–11 Nov 2026)
+
+Task (Thom, after the §7 results): the failing sizes only (H = n: 4-6, 5-4, 5-5, 5-7, 5-8, 6-6; H = T + 2: 5-5, 5-8, 5-9, 6-6), 60 s limit, sequential, at 87eb188 plus one diagnostic switch per run. The switches are applied at run time by `step3_diag.py`; the package is unchanged (the script refuses to run unless it equals 87eb188). **The verdict of the main run (§7) stays "fail".** Diagnostics 1 and 2 are pre-registered (§5); 3 and 4 are post hoc, added by Thom after the §7 results; 5 is step 4 of the task. The 600 s no-limit diagnostic of §5 has no instance to rerun (no failing size has a time-limit hit). Data: `step3_diag_<name>.jsonl` / `.log` (plans stored as [d, r, g]), summary `step3_diag_summary.txt` (`step3_diag_summary.py`).
+
+### 8.1 Sanity check (0)
+- `step3_full.jsonl` stores the number of relocations, not the plans, so the plans could not be recounted from it. The failing sizes have no time-limit hit, so their runs are deterministic: they were rerun at 87eb188 without a switch, with the plans stored (`step3_diag_main.jsonl`).
+- On all 400 runs, the relocations returned by `check_plan`, the relocation moves counted in the stored plan, len(plan) − n and the value of the main run agree: 0 mismatches. Every rerun ends as in the main run (bound reached or tree exhausted).
+
+### 8.2 Switches (each changes one thing relative to 87eb188)
+1. **g_top as in Fig. 3** (pre-registered; F2): g_top(s) is the topmost badly placed item of the stack, n(L) + 1 if there is none, instead of the top item if badly placed (Table 1). Replaces `Bay.lower_bound`, so the bound changes everywhere (pruning, sort, optimality abort).
+2. **Greedy priority (4) reading (C)** (pre-registered; F9): the FLG_BB relocation with the maximum |g − top group of the target| (text p. 304).
+3. **Greedy priority (4) reading (A)** (post hoc; F9): the maximum of g − lowest group of the target (Fig. 4 as printed).
+4. **Reversed tie-breaking** (post hoc; F8/F17): `Bay.relocations` enumerated in reversed donor-then-receiver order, so every tie in the greedy, in the stable sorts of Figs. 5 and 7 and in the order of the BG moves goes to the last move instead of the first.
+5. **CRP_D implementation** (step 4): `run_tree_search` of algorithms/CRP_D/heuristic/forster_bortfeldt_2012 with the parameters of p. 306 (nSucc 10, cmStopThreshold 150, maxFlg_bb 3, maxGg 2, 60 s; the platform defaults nSucc 5 and 15 s are not used). Its moves are replayed to (d, r, g) and checked with `check_plan` (non-empty, top items only, removes in order, height ≤ H, bay empty at the end); invalid or empty plans are recorded, not raised.
+
+Checks of the switches on hand-made layouts before the runs: Fig. 3 bound 25 under both g_top readings; layout [3, 4, 2] [1, 10] [5, 11] bound 11 (Table 1) and 10 (Fig. 3); greedy on Fig. 3: 13 (B), 26 (A), 19 (C) relocations; first greedy move on [1, 5] [2, 7] [6] [8]: (0, 2, 5), and (1, 3, 7) with reversed ties.
+
+### 8.3 Results
+Mean nrel per size (difference with Table 3; difference with the main run), verdict against the tolerance of §5:
+
+| H | CVS | Table 3 | tol | main run | 1 g_top Fig. 3 | 2 greedy (C) | 3 greedy (A), post hoc | 4 ties reversed, post hoc | 5 CRP_D |
+|---|---|---|---|---|---|---|---|---|---|
+| n | 4-6 | 13.70 | 0.14 | 13.550 (-0.150) FAIL | 13.550 (-0.150; +0.000) FAIL | 13.550 (-0.150; +0.000) FAIL | 13.550 (-0.150; +0.000) FAIL | 13.525 (-0.175; -0.025) FAIL | 13.575 (-0.125; +0.025) **pass** |
+| n | 5-4 | 15.00 | 0.15 | 15.325 (+0.325) FAIL | 15.325 (+0.325; +0.000) FAIL | 15.375 (+0.375; +0.050) FAIL | 15.375 (+0.375; +0.050) FAIL | 15.325 (+0.325; +0.000) FAIL | 15.375 (+0.375; +0.050) FAIL |
+| n | 5-5 | 18.63 | 0.19 | 18.375 (-0.255) FAIL | 18.375 (-0.255; +0.000) FAIL | 18.375 (-0.255; +0.000) FAIL | 18.375 (-0.255; +0.000) FAIL | 18.350 (-0.280; -0.025) FAIL | 18.600 (-0.030; +0.225) **pass** |
+| n | 5-7 | 23.58 | 0.24 | 23.100 (-0.480) FAIL | 23.100 (-0.480; +0.000) FAIL | 23.100 (-0.480; +0.000) FAIL | 23.100 (-0.480; +0.000) FAIL | 23.125 (-0.455; +0.025) FAIL | 23.175 (-0.405; +0.075) FAIL |
+| n | 5-8 | 26.73 | 0.27 | 26.325 (-0.405) FAIL | 26.375 (-0.355; +0.050) FAIL | 26.325 (-0.405; +0.000) FAIL | 26.325 (-0.405; +0.000) FAIL | 26.350 (-0.380; +0.025) FAIL | 26.550 (-0.180; +0.225) **pass** |
+| n | 6-6 | 29.68 | 0.30 | 29.350 (-0.330) FAIL | 29.300 (-0.380; -0.050) FAIL | 29.350 (-0.330; +0.000) FAIL | 29.350 (-0.330; +0.000) FAIL | 29.425 (-0.255; +0.075) **pass** | 29.325 (-0.355; -0.025) FAIL |
+| T + 2 | 5-5 | 18.80 | 0.19 | 18.600 (-0.200) FAIL | 18.625 (-0.175; +0.025) **pass** | 18.600 (-0.200; +0.000) FAIL | 18.600 (-0.200; +0.000) FAIL | 18.575 (-0.225; -0.025) FAIL | 18.750 (-0.050; +0.150) **pass** |
+| T + 2 | 5-8 | 27.03 | 0.27 | 26.525 (-0.505) FAIL | 26.550 (-0.480; +0.025) FAIL | 26.525 (-0.505; +0.000) FAIL | 26.525 (-0.505; +0.000) FAIL | 26.475 (-0.555; -0.050) FAIL | 26.775 (-0.255; +0.250) **pass** |
+| T + 2 | 5-9 | 30.05 | 0.30 | 29.425 (-0.625) FAIL | 29.450 (-0.600; +0.025) FAIL | 29.475 (-0.575; +0.050) FAIL | 29.475 (-0.575; +0.050) FAIL | 29.450 (-0.600; +0.025) FAIL | 29.800 (-0.250; +0.375) **pass** |
+| T + 2 | 6-6 | 31.13 | 0.31 | 30.100 (-1.030) FAIL | 30.100 (-1.030; +0.000) FAIL | 30.100 (-1.030; +0.000) FAIL | 30.100 (-1.030; +0.000) FAIL | 30.300 (-0.830; +0.200) FAIL | 30.175 (-0.955; +0.075) FAIL |
+
+Instances below / equal to / above the main run, and time-limit hits:
+
+| H | CVS | gtop_fig3 | greedy_C | greedy_A | ties_reversed | crp_d |
+|---|---|---|---|---|---|---|
+| n | 4-6 | 0 / 40 / 0 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 39 / 0 | 3 / 33 / 4 |
+| n | 5-4 | 0 / 40 / 0 | 0 / 38 / 2 | 0 / 38 / 2 | 1 / 38 / 1 | 4 / 32 / 4 |
+| n | 5-5 | 1 / 38 / 1 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 39 / 0 | 2 / 28 / 10 |
+| n | 5-7 | 0 / 40 / 0 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 38 / 1 | 3 / 31 / 6 |
+| n | 5-8 | 0 / 38 / 2 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 37 / 2 | 2 / 29 / 9, 1 limit |
+| n | 6-6 | 2 / 38 / 0 | 0 / 40 / 0 | 0 / 40 / 0 | 3 / 32 / 5 | 9 / 21 / 10, 2 limit |
+| T + 2 | 5-5 | 0 / 39 / 1 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 39 / 0 | 3 / 29 / 8 |
+| T + 2 | 5-8 | 1 / 37 / 2 | 0 / 40 / 0 | 0 / 40 / 0 | 2 / 38 / 0 | 3 / 25 / 12, 1 limit |
+| T + 2 | 5-9 | 2 / 35 / 3 | 0 / 39 / 1 | 0 / 39 / 1 | 0 / 39 / 1 | 7 / 21 / 12, 3 limit |
+| T + 2 | 6-6 | 1 / 37 / 2 | 0 / 40 / 0 | 0 / 40 / 0 | 1 / 34 / 5 | 7 / 25 / 8, 3 limit |
+
+- **No switch of this implementation removes the failures.** Switches 1–4 change the mean by at most 0.2 and pass on one size each at most (1: 5-5 at T + 2; 4: 6-6 at H = n). The failures keep their sign: fewer relocations than Table 3 on 9 of the 10, and 5-4 at H = n above Table 3 under every switch (+0.325 to +0.375).
+- Greedy (2, 3): the greedy plans of A and C differ from those of B on 397 of 400 instances, yet the final relocations equal the main run on 397 of 400, and A and C agree on all 400 (identical plans on 395). On these sizes the search result hardly depends on the greedy start.
+- g_top (1) changes at most 5 instances per size; reversed ties (4) up to 8 (6-6 at H = n: 3 below, 5 above; 6-6 at T + 2: +0.200).
+- **CRP_D (5):** 400 valid plans, none empty; its reported relocations equal the recount on all 400. It passes 6 of the 10 failing size-variants (H = n: 4-6, 5-5, 5-8; T + 2: 5-5, 5-8, 5-9) and fails H = n 5-4, 5-7, 6-6 and T + 2 6-6. On 9 of the 10 it needs more relocations than this implementation (+0.025 to +0.375 per size); it lies closer to Table 3 on 8 of the 10 (further on H = n 5-4 and 6-6); 10 of its runs hit the 60 s limit (5-8, 5-9, 6-6).
+
+### 8.4 Code differences CRP_D vs. this implementation
+From `algorithms/CRP_D/heuristic/forster_bortfeldt_2012/tree_search.py` and `layout.py`, read after the runs:
+
+| # | Point | CRP_D | This implementation (87eb188) | Effect on the plan without a time limit |
+|---|---|---|---|---|
+| D1 | Greedy priority (4) | Maximum of g − g_min(r) (reading A) | F9, reading B | Diagnostic 3: none on 397 of 400 |
+| D2 | cmStopValue (Fig. 6) | Multiplies first and extends while cmStopValue · \|Pm\| < cmStopThreshold (`new_cm_stop`) | As printed: compares the incoming value, then passes cmStopValue · \|Pm\| | Compound moves stop one level earlier, so Cm and the search change; **not tested** |
+| D3 | Pruning | Fig. 6 as printed (F14), plus in perform_compound_moves: skip a child if nm(s′) + n′_m(L′) ≥ nm(s*), and return if maxMoves < 0 | F20 | None: both drop only branches that cannot improve s* (F20 argument) |
+| D4 | Optimality abort | Only when nm(s*) ≤ n, i.e. zero relocations | F19, at n′_m(L_Init) | None (s* at the bound cannot improve); costs time |
+| D5 | Time limit | `time.monotonic`, also checked per productive move and before each child | F15, on entry of perform_compound_moves | Only runs that hit the limit (10 CRP_D runs) |
+| D6 | GG key with no item below or an empty target | Difference 0 | F12, group G | Changes the GG order and the maxGg = 2 cut; **not tested** |
+| D7 | Greedy with no applicable priority group | Any relocation (fallback) | Raises | Not checked whether reached |
+
+Equal in both: tie-breaking in donor-then-receiver order (F8/F17), priority (2) and (3) keys (F10), BG condition, FLG (F16), the bound with the Table 1 g_top (F2), clean supply (Table 1).
+
+D2 and D6 are the differences that can change CRP_D's plans on runs without a time limit; D2 is a deviation of CRP_D from Fig. 6 as printed. Testing either as a switch of this implementation would be a further post-hoc diagnostic (Thom).
+
+- Status: stopped after the diagnostics; the main implementation and the verdict of §7 are unchanged.
