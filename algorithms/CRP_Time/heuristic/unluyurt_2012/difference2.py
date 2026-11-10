@@ -31,12 +31,11 @@ class UnluyurtAydinDifference2(BaseAlgorithm):
     name = "Ünlüyurt–Aydın (2012) Difference2"
     category = "Heuristic"
     description = (
-        "Fixed-rule heuristic (Sec. 4.2): the three rules of Difference1, where at each rule the stacks "
-        "between the container's stack and the truck lane are tried before the stacks beyond it. It does "
-        "not use the time model's parameters; f2 and f2vert are measured on its plan. Not in the paper: "
-        "the lane side is preferred per rule rather than before all rules (the paper allows both "
-        "readings), ties go to the stack nearest the truck lane, and an empty stack counts as a container "
-        "retrieved after all others."
+        "Variant of Difference1 from the same paper. It applies the same three rules, but at each rule it "
+        "first considers the stacks between the container's stack and the truck lane, and only then the "
+        "stacks beyond it. Like Difference1, it uses no crane times, so its plan does not depend on the time "
+        "model. The paper pairs it with Objective2 (A × number of crane pickups + B × horizontal distance "
+        "travelled)."
     )
     compatible_problems = ["CRP-Time"]
     geometry = "single-bay"

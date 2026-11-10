@@ -31,12 +31,14 @@ class UnluyurtAydinDifference1(BaseAlgorithm):
     name = "Ünlüyurt–Aydın (2012) Difference1"
     category = "Heuristic"
     description = (
-        "Fixed-rule heuristic (Sec. 4.2): each container above the next one to retrieve goes to a stack "
-        "where it blocks nothing, preferring the stack whose earliest container is retrieved soonest; "
-        "otherwise onto the top container retrieved just before it; otherwise onto the top container "
-        "closest to it in retrieval order. It does not use crane time; f2 and f2vert are measured on its "
-        "plan. Not in the paper: ties go to the stack nearest the truck lane, and an empty stack counts as "
-        "a container retrieved after all others."
+        "Fixed rule from Ünlüyurt & Aydın (2012). Containers are retrieved in due-date order. Each container "
+        "blocking the next retrieval goes to the first stack found by three rules, tried in turn over all "
+        "other stacks with room: (1) a stack where it blocks nothing, preferring the one whose earliest "
+        "container is retrieved soonest after it (an empty stack counts as last); (2) otherwise, a stack "
+        "whose top container is retrieved before it, preferring the closest in retrieval order; (3) "
+        "otherwise, the stack whose top container is closest in retrieval order. Ties go to the stack "
+        "nearest the truck lane. The rule uses no crane times, so it gives the same plan under every time "
+        "model and under CRP-R. The paper pairs it with Objective1 (number of relocations)."
     )
     # CRP-R too (Wei, 9 Nov 2026): Difference1 is the paper's heuristic for the relocation count (O9).
     compatible_problems = ["CRP-Time", "CRP-R"]
