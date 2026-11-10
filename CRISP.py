@@ -19,9 +19,9 @@ Examples:
     
 displays the GUI of CRISP.
 
-    
-    
-    
+    python CRISP.py --problem CRP-R --algo CM --layout benchmark/Caserta_dataset --class 3-3 --save
+
+runs CM on the 40 Caserta instances of class 3-3.
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.
@@ -157,26 +157,19 @@ def main() -> None:
         from web.__main__ import main as web_main
         web_main()
         return
-    parser = argparse.ArgumentParser(description="Run one algorithm on one problem")
-    parser.add_argument("--problem", default="CRP-R")
-    parser.add_argument("--algo", required=True, help="Algorithm class name")
-    parser.add_argument("--layout", help="One Caserta .dat or Zhu .txt file")
-    parser.add_argument(
-        "--time-model",
-        choices=["f2", "f2_vertical", "rmgc_current"],
-        help="Crane-time model for CRP-Time",
-    )
-    parser.add_argument("--save", action="store_true", help="Write a result JSON file")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--problem")
+    parser.add_argument("--algo")
+    parser.add_argument("--layout")
+    parser.add_argument("--save")
     args = parser.parse_args()
 
     from core.registry import get_algorithm_class
 
-    algorithm_cls = get_algorithm_class(args.algo)
-    if algorithm_cls is None:
-        raise SystemExit(
-            f"Unknown algorithm: {args.algo!r}  (try: python -m core.registry)"
-        )
-    problem = _problem(args.problem, args.layout, args.time_model)
+    algorithm_cls = get_algorithm_class(args.algo)      
+    
+    problem = _problem(args.problem, args.layout)
+    
     moves, cost = crisp(algorithm_cls(config=_algorithm_config(algorithm_cls)), problem)
     _print_result(args.problem, args.algo, moves, cost)
     if args.save:
