@@ -12,7 +12,7 @@ Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke r
 - Step 1 (§3): the Fig. 3 bound is 25 (pass). The CVS labels map to the Caserta files by the stack-count column of Table 2 (F3; the item-count key failed on a misprint). The mean bound is above nrel − LB gap of Table 3 on all sizes; this is a reported discrepancy, not a stop criterion (F5).
 - Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 19 unit tests pass. On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
 - Deviation from the printed figure: greedy priority (4) takes the *minimum* of g − lowest group of the target (F9, reading B), where Fig. 4 and p. 304 print "maximum"; decided by Thom after seeing the greedy results of §4.3.
-- Step 3 (§5–6): smoke run, 10 instances per size, both height variants, sequential.
+- Step 3 (§5–6): smoke run, instances 1–10 per size, both height variants, sequential, 420 valid plans; 81 runs hit the 60 s limit, all on sizes 5-8 and larger; maximum wall clock 60.07 s; the full run would take about 6.4 h. Mean nrel is not compared with Table 3 before the full run.
 
 ## 1. Specification from the paper
 
@@ -285,3 +285,39 @@ Fixed before any step-3 result (task of 10 Nov 2026 and Thom's additions of 10 N
 - Criterion: per size, the mean nrel is within max(0.10; 1 %) of Table 3, for every size except CVS 10–6 and 10–10, which are reported only. CVS 5–9 stays in the criterion; if it is the only failing size, the verdict is "fail on 5–9", with a note that this row of Table 3 is internally inconsistent (§3.3); it is not excluded.
 - Report per size: mean nrel, difference with the paper, mean and maximum wall clock per instance (F15), the number of instances that hit the 60 s limit, and how many ended by the optimality abort (bound reached), by the limit, or by exhausting the tree.
 - If a size fails: rerun it without a time limit, with the Fig. 3 reading of g_top, and with greedy reading (C) (F9); all diagnostics only, the verdict stays with the main 60 s run.
+
+## 6. Step 3 smoke run (10 Nov 2026)
+
+Instances 1–10 of every size, H = n and H = T + 2, 420 runs, sequential, time limit 60 s, CRISP 3210477, rl Python 3.11.16. Every plan passed `check_plan`. Two idle VS Code python processes were present during the run; nothing else ran. Data: `docs/validation/data/forster_bortfeldt_2012/step3_smoke.jsonl`, summary `step3_smoke_summary.txt` (`step3_summary.py` without `--paper`). Mean nrel is not compared with Table 3 here: the criterion (§5) applies to all 40 instances per size.
+
+Wall clock per instance in seconds. "limit" = stopped by the 60 s limit, "optimal" = stopped at the lower bound, "exhaust" = the tree was searched to the end (Fig. 5, nSucc and cmStopThreshold) without reaching the bound.
+
+| CVS | H = n mean | max | limit | optimal | exhaust | H = T + 2 mean | max | limit | optimal | exhaust |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3-3 | 0.00 | 0.00 | 0 | 4 | 6 | 0.00 | 0.00 | 0 | 4 | 6 |
+| 3-4 | 0.00 | 0.01 | 0 | 3 | 7 | 0.00 | 0.01 | 0 | 3 | 7 |
+| 3-5 | 0.01 | 0.02 | 0 | 4 | 6 | 0.01 | 0.01 | 0 | 4 | 6 |
+| 3-6 | 0.02 | 0.08 | 0 | 3 | 7 | 0.02 | 0.07 | 0 | 2 | 8 |
+| 3-7 | 0.03 | 0.10 | 0 | 2 | 8 | 0.03 | 0.11 | 0 | 2 | 8 |
+| 3-8 | 0.05 | 0.24 | 0 | 1 | 9 | 0.07 | 0.27 | 0 | 1 | 9 |
+| 4-4 | 0.02 | 0.12 | 0 | 1 | 9 | 0.01 | 0.04 | 0 | 1 | 9 |
+| 4-5 | 0.02 | 0.06 | 0 | 2 | 8 | 0.02 | 0.04 | 0 | 2 | 8 |
+| 4-6 | 0.10 | 0.56 | 0 | 2 | 8 | 0.09 | 0.47 | 0 | 2 | 8 |
+| 4-7 | 0.48 | 2.49 | 0 | 0 | 10 | 0.46 | 2.02 | 0 | 0 | 10 |
+| 5-4 | 0.04 | 0.14 | 0 | 0 | 10 | 0.04 | 0.12 | 0 | 0 | 10 |
+| 5-5 | 0.38 | 2.01 | 0 | 0 | 10 | 0.17 | 0.60 | 0 | 0 | 10 |
+| 5-6 | 0.63 | 2.29 | 0 | 0 | 10 | 0.83 | 3.34 | 0 | 0 | 10 |
+| 5-7 | 2.97 | 15.97 | 0 | 1 | 9 | 2.98 | 15.15 | 0 | 0 | 10 |
+| 5-8 | 16.46 | 60.01 | 1 | 0 | 9 | 13.46 | 60.00 | 1 | 0 | 9 |
+| 5-9 | 32.54 | 60.05 | 3 | 0 | 7 | 27.39 | 60.01 | 2 | 0 | 8 |
+| 5-10 | 53.22 | 60.03 | 8 | 0 | 2 | 51.27 | 60.03 | 7 | 0 | 3 |
+| 6-6 | 6.40 | 34.95 | 0 | 0 | 10 | 4.34 | 11.17 | 0 | 0 | 10 |
+| 6-10 | 60.01 | 60.02 | 10 | 0 | 0 | 59.93 | 60.02 | 9 | 0 | 1 |
+| 10-6 | 60.03 | 60.05 | 10 | 0 | 0 | 60.02 | 60.06 | 10 | 0 | 0 |
+| 10-10 | 60.03 | 60.05 | 10 | 0 | 0 | 60.04 | 60.07 | 10 | 0 | 0 |
+
+- Time-limit hits: 42 of 210 runs at H = n, 39 of 210 at H = T + 2, all on sizes 5-8 and larger. All 10-6 and 10-10 runs, and all but one 6-10 run, end by the limit.
+- Overshoot (F15): the largest wall clock is 60.07 s, so the check on entry of perform_compound_moves overshoots the limit by at most 0.07 s.
+- Total wall clock 0.82 h (H = n) + 0.78 h (H = T + 2) = 1.60 h. At this rate the full run (40 instances per size) takes about 6.4 h sequentially.
+- Machine dependence: the 81 runs that hit the limit depend on the machine's speed (one-machine rule); the others end by the bound or by exhausting the tree and are deterministic.
+- Status: stopped before the full run (Thom).
