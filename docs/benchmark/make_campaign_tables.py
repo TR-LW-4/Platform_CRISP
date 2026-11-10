@@ -15,6 +15,7 @@ its outputs document the October runs and are not touched.
   python docs/benchmark/make_campaign_tables.py docs/validation/data/final_campaign_20261029
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -32,7 +33,7 @@ F2, F2V, ACC = "crane_time_f2", "crane_time_vertical", "crane_time_accel"
 TIME_KEYS = ("stack_s_per_stack", "pickup_place_s", "empty_vertical_s_per_tier", "loaded_vertical_s_per_tier",
              "outside_height")
 AZARI_NOTE = "Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance."
-# Markdown only: the GBH fallback and the source of the limits (docs/validation/data/azari_repeat_20261106/README.md).
+# The GBH fallback and the source of the limits (docs/validation/data/azari_repeat_20261106/README.md).
 AZARI_FALLBACK = (
     "On 6×10 #20, #21, #23, #29 and #39 CSUM finds no complete solution within its 5 s and returns the GBH plan, "
     "in the campaign and in all 10 repetitions of 6 Nov 2026 (`docs/validation/data/azari_repeat_20261106/`), "
@@ -43,6 +44,13 @@ AZARI_FALLBACK = (
     "0.24 %. The limits 3 s + 5 s are the paper's for the Lee & Lee (2010) instances (Azari et al. 2017, p. 316); "
     "applying them to the Caserta instances is our choice, not the paper's."
 )
+
+
+def tex_note(text):
+    """A Markdown note as LaTeX text: &, #, _ and × escaped, `code` as \\texttt, then make_table.tex_cell (%, dashes)."""
+    for a, b in (("&", r"\&"), ("#", r"\#"), ("_", r"\_"), ("×", r"$\times$")):
+        text = text.replace(a, b)
+    return mt.tex_cell(re.sub(r"`([^`]*)`", r"\\texttt{\1}", text))
 
 
 def columns(preset):
@@ -157,7 +165,7 @@ def write(campaign, info, rows):
             tex.append(" & ".join([r["class"].replace("×", r"$\times$"), name]
                                   + [mt.tex_cell(r[k]) for k in keys(p)[2:]]) + r" \\")
         tex += [r"\bottomrule", r"\end{tabular}",
-                r"\par\smallskip\footnotesize * optimised. $^{1}$ " + AZARI_NOTE,
+                r"\par\smallskip\footnotesize * optimised. $^{1}$ " + AZARI_NOTE + " " + tex_note(AZARI_FALLBACK),
                 rf"\caption{{CRP-Time final campaign under {TEX_LABELS[p]}, Caserta instances, 40 per class: mean "
                 r"$\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; "
                 r"budget hit: instances whose step 1 reached its node budget.}",

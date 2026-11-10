@@ -28,7 +28,7 @@ Class & Algorithm & $n$ & $f_2$ (s)* & $f_2^{\mathrm{vert}}$ (s) & Accel.\ time 
 6$\times$10 & L\'{o}pez-Plata et al.\ (2019) A$^\ast$-Based Heuristic & 40 & 4340.8 $\pm$ 210.3 & 10835.7 $\pm$ 462.7 & 10579.2 $\pm$ 457.5 & 49.65 $\pm$ 5.69 & 601.9 $\pm$ 3.7 & 40/40 & 40/40 \\
 \bottomrule
 \end{tabular}
-\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance.
+\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance. On 6$\times$10 \#20, \#21, \#23, \#29 and \#39 CSUM finds no complete solution within its 5 s and returns the GBH plan, in the campaign and in all 10 repetitions of 6 Nov 2026 (\texttt{docs/validation/data/azari\_repeat\_20261106/}), under all three time models. On 6$\times$10 \#38 under f2vert this happened in one repetition (rep04); the main objective of \#38 under f2vert spreads by 8.0 \% over the 11 runs ((max $-$ min) / min; three different plans). Of the 240 instance--time-model pairs of 5$\times$7 and 6$\times$10, 236 give the same plan in all 11 runs (campaign and 10 repetitions); on the other three (6$\times$10 f2 \#17 and \#30, f2vert \#19) the main objective spreads by at most 0.24 \%. The limits 3 s + 5 s are the paper's for the Lee \& Lee (2010) instances (Azari et al. 2017, p. 316); applying them to the Caserta instances is our choice, not the paper's.
 \caption{CRP-Time final campaign under $f_2$, Caserta instances, 40 per class: mean $\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; budget hit: instances whose step 1 reached its node budget.}
 \label{tab:crp-time-campaign-f2}
 \end{table}
@@ -61,7 +61,7 @@ Class & Algorithm & $n$ & $f_2^{\mathrm{vert}}$ (s)* & $f_2$ (s) & Accel.\ time 
 6$\times$10 & L\'{o}pez-Plata et al.\ (2019) A$^\ast$-Based Heuristic & 40 & 10623.3 $\pm$ 496.8 & 4516.5 $\pm$ 247.0 & 10599.3 $\pm$ 513.7 & 52.58 $\pm$ 6.49 & 603.5 $\pm$ 8.7 & 40/40 & 40/40 \\
 \bottomrule
 \end{tabular}
-\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance.
+\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance. On 6$\times$10 \#20, \#21, \#23, \#29 and \#39 CSUM finds no complete solution within its 5 s and returns the GBH plan, in the campaign and in all 10 repetitions of 6 Nov 2026 (\texttt{docs/validation/data/azari\_repeat\_20261106/}), under all three time models. On 6$\times$10 \#38 under f2vert this happened in one repetition (rep04); the main objective of \#38 under f2vert spreads by 8.0 \% over the 11 runs ((max $-$ min) / min; three different plans). Of the 240 instance--time-model pairs of 5$\times$7 and 6$\times$10, 236 give the same plan in all 11 runs (campaign and 10 repetitions); on the other three (6$\times$10 f2 \#17 and \#30, f2vert \#19) the main objective spreads by at most 0.24 \%. The limits 3 s + 5 s are the paper's for the Lee \& Lee (2010) instances (Azari et al. 2017, p. 316); applying them to the Caserta instances is our choice, not the paper's.
 \caption{CRP-Time final campaign under $f_2^{\mathrm{vert}}$, Caserta instances, 40 per class: mean $\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; budget hit: instances whose step 1 reached its node budget.}
 \label{tab:crp-time-campaign-f2vert}
 \end{table}
@@ -94,7 +94,7 @@ Class & Algorithm & $n$ & $f_2^{\mathrm{vert}}$ practice (s)* & Accel.\ time (s)
 6$\times$10 & L\'{o}pez-Plata et al.\ (2019) A$^\ast$-Based Heuristic & 40 & 8441.8 $\pm$ 379.7 & 10503.2 $\pm$ 481.8 & 52.42 $\pm$ 6.01 & 605.3 $\pm$ 10.6 & 40/40 & 40/40 \\
 \bottomrule
 \end{tabular}
-\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance.
+\par\smallskip\footnotesize * optimised. $^{1}$ Azari's GBH (3 s) and CSUM (5 s) time limits are not recorded per instance. On 6$\times$10 \#20, \#21, \#23, \#29 and \#39 CSUM finds no complete solution within its 5 s and returns the GBH plan, in the campaign and in all 10 repetitions of 6 Nov 2026 (\texttt{docs/validation/data/azari\_repeat\_20261106/}), under all three time models. On 6$\times$10 \#38 under f2vert this happened in one repetition (rep04); the main objective of \#38 under f2vert spreads by 8.0 \% over the 11 runs ((max $-$ min) / min; three different plans). Of the 240 instance--time-model pairs of 5$\times$7 and 6$\times$10, 236 give the same plan in all 11 runs (campaign and 10 repetitions); on the other three (6$\times$10 f2 \#17 and \#30, f2vert \#19) the main objective spreads by at most 0.24 \%. The limits 3 s + 5 s are the paper's for the Lee \& Lee (2010) instances (Azari et al. 2017, p. 316); applying them to the Caserta instances is our choice, not the paper's.
 \caption{CRP-Time final campaign under $f_2^{\mathrm{vert}}$ (practice parameters), Caserta instances, 40 per class: mean $\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; budget hit: instances whose step 1 reached its node budget.}
 \label{tab:crp-time-campaign-practice}
 \end{table}
