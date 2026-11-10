@@ -239,6 +239,25 @@ class TestSearch(unittest.TestCase):
     def test_caserta_3x4(self):
         self.run_class(3, 4)
 
+    def test_tight_pruning_returns_the_plan_of_the_printed_test(self):
+        """F20: without a time limit, the test of Fig. 6 as printed (n'_m(L') > maxMoves) and the tight test
+        (> maxMoves - 1) give the same plan. The printed test is obtained by passing maxMoves + 1 to the first-level
+        call of determine_compound_moves; the recursion then compares with maxMoves, maxMoves - 1, ... as printed."""
+
+        class Printed(TreeSearch):
+            def _determine(self, bay, s, cm_work, max_moves, v, cm):
+                super()._determine(bay, s, cm_work, max_moves + (not cm_work), v, cm)
+
+        for tiers, stacks in ((3, 3), (3, 4)):
+            for k in range(1, 41):
+                st = caserta(tiers, stacks, k)
+                n = sum(map(len, st))
+                for H in (n, tiers + 2):
+                    tight = TreeSearch(Bay.from_stacks(st, H), Params(time_limit=None))
+                    printed = Printed(Bay.from_stacks(st, H), Params(time_limit=None))
+                    self.assertEqual(tight.run(), printed.run(), (tiers, stacks, k, H))
+                    self.assertLessEqual(tight.nodes, printed.nodes, (tiers, stacks, k, H))
+
     def test_time_limit_returns_the_greedy(self):
         st = caserta(5, 5, 1)
         bay = Bay.from_stacks(st, 25)

@@ -146,7 +146,8 @@ class TreeSearch:
                 if len(s) + len(cm_work) + 1 < len(self.best):
                     self.best = s + cm_work + [m]
                 continue
-            if nxt.lower_bound() > max_moves:              # F14: as printed in Fig. 6
+            # F20: the move budget from L' is maxMoves - 1 (Fig. 6 prints "> maxMoves"); same plans, less work
+            if nxt.lower_bound() > max_moves - 1:
                 continue
             work = cm_work + [m]
             if cm_stop_value < self.p.cm_stop_threshold:

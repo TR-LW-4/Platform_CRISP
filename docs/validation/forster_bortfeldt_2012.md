@@ -8,12 +8,12 @@ Scope set by Wei (10 Nov 2026): the C&OR tree search, standalone in CRP-Time, va
 
 ## Summary
 
-Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done, full run not started** (Thom: stop before the full run). **Open for Thom: F20** (pruning test of Fig. 6) and F21 (duplicate compound moves).
+Status 10 Nov 2026: **step 2 done with Thom's decisions F8–F19; step 3 smoke run and profiling done; F20 and F21 decided by Thom; full run (§7) at the F20 commit.**
 - Step 1 (§3): the Fig. 3 bound is 25 (pass). The CVS labels map to the Caserta files by the stack-count column of Table 2 (F3; the item-count key failed on a misprint). The mean bound is above nrel − LB gap of Table 3 on all sizes; this is a reported discrepancy, not a stop criterion (F5).
-- Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 19 unit tests pass. On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
+- Step 2 (§4): greedy (Fig. 4), productive moves (Fig. 7), compound moves (Fig. 6) and search (Fig. 5) implemented from the paper; 20 unit tests pass (the 20th for F20). On all 80 Caserta 3x3 and 3x4 instances, at H = n and H = T + 2, every plan is valid, none is below the bound, none is worse than the greedy, and at H = T + 2 none is below the exact optimum (IDA*).
 - Deviation from the printed figure: greedy priority (4) takes the *minimum* of g − lowest group of the target (F9, reading B), where Fig. 4 and p. 304 print "maximum"; decided by Thom after seeing the greedy results of §4.3.
 - Step 3 (§5–6): smoke run, instances 1–10 per size, both height variants, sequential, 420 valid plans; 81 runs hit the 60 s limit, all on sizes 5-8 and larger; maximum wall clock 60.07 s; the full run would take about 6.4 h. Mean nrel is not compared with Table 3 before the full run.
-- Profiling (§6.1): no deviation from Figs. 5–7 as printed. Almost all work on the wide bays goes to nodes that can no longer improve s*, a consequence of the pruning test as printed in Fig. 6 (F14), which is one move weaker than its stated purpose (p. 305). Proposed as F20 (open, not changed). The rest is a per-node cost of 0.75–2.7 ms in Python.
+- Profiling (§6.1): no deviation from Figs. 5–7 as printed. Almost all work on the wide bays goes to nodes that can no longer improve s*, a consequence of the pruning test as printed in Fig. 6 (F14), which is one move weaker than its stated purpose (p. 305). Adopted by Thom as F20, an implementation optimisation with the same plans without a time limit; duplicate compound moves stay (F21). The rest is a per-node cost of 0.75–2.7 ms in Python.
 
 ## 1. Specification from the paper
 
@@ -104,31 +104,39 @@ Proposed by Claude and decided by Thom on 10 Nov 2026, after step 2. The decisio
 | F11 | GG sort in Fig. 7 | Differences signed as moved − other: key = (g − below) − (g − top of target), ascending. | Fig. 7 (p. 306), p. 306 text | (b) |
 | F12 | GG with no item below g, or an empty target | That item counts as group G. | def. 2 (p. 302) | (b) |
 | F13 | G | Largest group of the initial layout (n for Caserta). | Table 1 (p. 302) | (b) |
-| F14 | Pruning in Fig. 6 | As printed: skip pm if n′_m(L′) > maxMoves. | Fig. 6, p. 305 | — |
+| F14 | Pruning in Fig. 6 | As printed: skip pm if n′_m(L′) > maxMoves. **Superseded by F20.** | Fig. 6, p. 305 | — |
 | F15 | Time limit | Wall clock (`time.perf_counter`) from the start of the run, including bound and greedy; checked only on entry of perform_compound_moves. The maximum wall clock per instance is reported per size. | Fig. 5 (p. 304); p. 306 | (b) |
 | F16 | FLG | The donator holds an item of the currently lowest group below the moved item. | p. 302 | — |
 | F17 | Ties in the sorts of Figs. 5 and 7 | Stable: generation order. | Figs. 5, 7 silent | (b) |
 | F18 | Several removes at once | Greedy applies all of Rm (Fig. 4); Fig. 7 offers all removes as alternatives. Only with repeated groups (never on Caserta). | Figs. 4, 7 | — |
 | F19 | Optimality abort | Stop when nm(s*) equals n′_m(L_Init), the bound of the initial layout, in moves. | Fig. 5 (p. 304) | — |
 
-### 2.3 After the profiling (F20–F21), open
+### 2.3 After the profiling (F20–F21)
 
-Proposed by Claude on 10 Nov 2026 after the profiling of §6.1; **not decided, not implemented**. The code stays as committed (F14 as printed).
+Proposed by Claude after the profiling of §6.1 and decided by Thom on 10 Nov 2026, before the full step-3 run. The decision was based on runtimes and on plan identity; the smoke-run relocations were recorded in `step3_smoke.jsonl` but neither summarised nor compared with Table 3.
 
-| # | Point | As implemented | Proposed | Basis | Category if adopted |
+| # | Point | Printed | Decision | Basis | Category |
 |---|---|---|---|---|---|
-| F20 | Pruning test of Fig. 6 (reopens F14) | Skip pm if n′_m(L′) > maxMoves (as printed). | Skip pm if n′_m(L′) > maxMoves − 1, the moves still allowed from L′. | Fig. 6 and p. 305: maxMoves is "the maximum number of (single) moves to an empty layout starting with current layout L that still ensures an improvement"; pm is skipped if it "would result in a compound move that can no longer lead to a new best solution" | (c) |
-| F21 | Duplicate layouts in Cm | Kept (Cm is a list, Fig. 5–6). | Keep. | Figs. 5–6; the paper is silent on duplicates | (b) |
+| F20 | Pruning test of Fig. 6 (supersedes F14) | Skip pm if n′_m(L′) > maxMoves. | Skip pm if n′_m(L′) > maxMoves − 1, the move budget from L′. | Fig. 6 and p. 305: maxMoves is "the maximum number of (single) moves to an empty layout starting with current layout L that still ensures an improvement"; pm is skipped if it "would result in a compound move that can no longer lead to a new best solution" | implementation optimisation: same plans without a time limit, not an interpretation change |
+| F21 | Duplicate layouts in Cm | Kept (Cm is a list, Figs. 5–6). | Keep, as printed. | Figs. 5–6; the paper is silent on duplicates | — (as printed) |
 
 #### F20 — pruning test of Fig. 6
-- maxMoves of a call on L is the number of moves from L that still improves s* (p. 305; Fig. 5 passes nm(s*) − nm(s) − 1). After pm, at most maxMoves − 1 moves remain from L′, and the recursion passes maxMoves − 1 (Fig. 6). The printed test skips pm only if n′_m(L′) > maxMoves, so a layout L′ with n′_m(L′) = maxMoves, which can no longer improve s*, is kept (F14 noted this as harmless).
-- In this implementation the bound drops by at most one per move: a remove lowers n by one and n′_non-BG(L) = 0 when a remove exists; a BG relocation lowers n_b by one and n′_non-BG(L) = 0 when a BG relocation exists; other relocations do not lower n_b. Once a compound move has no slack left (n′_m = maxMoves at the test), removes and BG relocations keep it exactly there, so the printed test never cuts it. It ends in Cm with sort key (moves + n′_m) = A + 1, A being maxMoves of the node, becomes a child node that cannot improve s*, and the same happens again in that child.
-- Consequence: without a time limit, the tight test gives the same plan. It removes exactly the Cm entries with key A + 1, which sort behind every other entry (Fig. 5, first criterion), and the subtrees below them, which cannot update s*. With the 60 s limit, the printed test spends the budget on these subtrees. Checked on the 339 smoke runs that ended before 60 s (`step3_f14_check.py`, no time limit): 339 of 339 plans identical; total wall clock 883.6 s printed against 93.5 s tight (944 677 against 117 966 nodes; longest run 60.14 s against 14.92 s).
-- Effect (§6.1): on 5-8 #1 and 5-10 #1 at H = n, 97.2 % and 99.5 % of the determine_compound_moves calls lie in nodes that cannot improve s* on arrival; with the tight test, 5-8 #1 ends in 0.13 s instead of 7.9 s and 5-10 #1 searches its tree to the end in 0.19 s instead of hitting the 60 s limit (instrumented times).
-- Adopting F20 would be a deviation from the printed figure, justified by the text's stated purpose (as F9). Decision: Thom.
+**Decision (Thom, 10 Nov 2026): adopt the tight test, skip pm if n′_m(L′) > maxMoves − 1, as an implementation optimisation, not an interpretation change.** Argument:
+1. maxMoves is defined on p. 305 as the move budget from L ("the maximum number of (single) moves to an empty layout starting with current layout L that still ensures an improvement"), so after pm the budget for L′ is maxMoves − 1. Both Fig. 6 and the sentence on p. 305 print "greater than maxMoves".
+2. The bound drops by at most 1 per move: a remove or a BG relocation implies that the non-BG term was 0 before the move; FLG_BB and GG relocations leave n and n_b unchanged. So any compound move that passes the printed test but fails the tight one, and every extension of it, has first sort key |cm| + n′_m = nm(s*) − nm(s); every compound move that can still improve s* has at most nm(s*) − nm(s) − 1. These moves therefore always sort after all useful ones (Fig. 5, first criterion) and never take a useful branch's nSucc slot.
+3. Hence, without a time limit, the explored useful branches and the returned s* are identical under both tests; the 339 of 339 identical plans below are consistent with this. The change only affects which runs reach the 60 s limit.
+4. Secondary: the paper's runtimes (Table 3, p. 307: 5-8 < 0.1 s, 5-10 0.2 s) are inconsistent with the printed test (5-8 #1: 7.9 s; 5-10 #1: more than 60 s in Python).
+
+Implementation and evidence:
+- `search.py` `_determine`: `if nxt.lower_bound() > max_moves - 1: continue`.
+- Unit test `test_tight_pruning_returns_the_plan_of_the_printed_test`: printed and tight tests return identical plans without a time limit on all 3-3 and 3-4 instances, at H = n and H = T + 2 (the printed test is obtained by passing maxMoves + 1 to the first-level call).
+- Smoke runs that ended before 60 s, at 3210477 (`step3_f14_check.py`, no time limit): 339 of 339 plans identical; total wall clock 883.6 s printed against 93.5 s tight (944 677 against 117 966 nodes; longest run 60.14 s against 14.92 s).
+- Profiling (§6.1): on 5-8 #1 and 5-10 #1 at H = n, 97.2 % and 99.5 % of the determine_compound_moves calls lie in nodes that cannot improve s* on arrival; with the tight test, 5-8 #1 ends in 0.13 s instead of 7.9 s and 5-10 #1 searches its tree to the end in 0.19 s instead of hitting the 60 s limit (instrumented times).
+- Step-2 table (§4.2) at the F20 commit: identical except the mean node counts (`step2_small_f20.txt`).
 
 #### F21 — duplicate compound moves
-- The same moves in another order often give the same layout: 31–65 % of Cm before the cut on the three profiled instances, and 278–5406 duplicates among the kept nSucc. Fig. 6 collects compound moves in a list and the paper does not mention removing duplicates, so they are kept. With the tight test (F20), 13–96 duplicates remain among the kept entries. Proposed: keep, as printed.
+- The same moves in another order often give the same layout: 31–65 % of Cm before the cut on the three profiled instances, and 278–5406 duplicates among the kept nSucc. Fig. 6 collects compound moves in a list and the paper does not mention removing duplicates, so they are kept. With the tight test (F20), 13–96 duplicates remain among the kept entries.
+- **Decision (Thom, 10 Nov 2026): keep duplicates in Cm, as printed.** Removing them would change which branches fill the nSucc slots and could change the result.
 
 #### F9 — greedy priority (4)
 - Fig. 4 (p. 303): "determine bb_flgBest ∈ Bb_flg so that the item group difference between the moved item and the item with the lowest item group in the target stack is maximum".
@@ -150,7 +158,7 @@ Proposed by Claude on 10 Nov 2026 after the profiling of §6.1; **not decided, n
 - A GG move of the only item of a stack has no item below m; a GG move to an empty stack has no top item. Def. 2 (p. 302): "an empty stack provides H clean supply slots of group G". Decision: the missing item counts as group G, so the stack that becomes empty, or the empty target, acts like a stack topped by group G.
 
 #### F14 — pruning bound in Fig. 6
-- Fig. 6 and p. 305 skip pm if "n′_m(L′) … is greater than maxMoves", with maxMoves the moves from L that still improve s*. After pm, at most maxMoves − 1 moves remain from L′, so the printed test prunes one level later than it could. Implemented as printed; it cannot cut off an improvement.
+- Fig. 6 and p. 305 skip pm if "n′_m(L′) … is greater than maxMoves", with maxMoves the moves from L that still improve s*. After pm, at most maxMoves − 1 moves remain from L′, so the printed test prunes one level later than it could. Implemented as printed at first; it cannot cut off an improvement. **Superseded by F20** (Thom, 10 Nov 2026), after the profiling of §6.1 showed the cost of the printed test.
 
 #### F15 — time limit
 - p. 306: "a time limit of 60 s"; Fig. 5 checks it on entry only. The run's clock starts before the bound and the greedy. An overrun is at most one call of determine_compound_moves (bounded by cmStopThreshold); the step-3 runtimes report it: per size the maximum wall clock per instance (Thom).
@@ -276,6 +284,8 @@ Script `docs/validation/data/forster_bortfeldt_2012/step2_small.py`, output `ste
 
 Greedy reading (B) (F9), the code of the step-2 commit. Every plan passes `check_plan`; no search plan is below the bound, above the greedy, or below the exact optimum. No time limit; not step-3 results.
 
+At the F20 commit (`step2_small_f20.txt`) every column is identical except the mean node counts: 1.7, 1.6, 4.5, 4.2.
+
 The first version of this table used reading (A) (output kept as `step2_small_readingA.txt`): greedy 6.40, 6.50, 8.68, 8.65 in the row order above; search, exact, =exact and =LB identical; nodes 3.6, 3.9, 7.7, 7.6.
 
 ### 4.3 Greedy readings of priority (4) (F9)
@@ -301,7 +311,7 @@ Under greedy reading (A). Greedy + search with a 20 s limit on the Fig. 3 layout
 Fixed before any step-3 result (task of 10 Nov 2026 and Thom's additions of 10 Nov 2026):
 - Runs are sequential (Thom), one instance at a time, on an otherwise idle machine.
 - Smoke run first: instances 1–10 per size, both height variants; runtimes and time-limit hits reported, then stop before the full run (Thom).
-- Full run: all 840 Caserta instances (F3), two variants: H = n (F7), compared with nrel of Table 3; H = T + 2 (F6), compared with nrel − msh. Parameters of p. 306, time limit 60 s (F15).
+- Full run at the F20 commit (Thom, 10 Nov 2026; the smoke run and the profiling, §6, were at 3210477 with the printed test): all 840 Caserta instances (F3), two variants: H = n (F7), compared with nrel of Table 3; H = T + 2 (F6), compared with nrel − msh. Parameters of p. 306, time limit 60 s (F15).
 - Criterion: per size, the mean nrel is within max(0.10; 1 %) of Table 3, for every size except CVS 10–6 and 10–10, which are reported only. CVS 5–9 stays in the criterion; if it is the only failing size, the verdict is "fail on 5–9", with a note that this row of Table 3 is internally inconsistent (§3.3); it is not excluded.
 - Report per size: mean nrel, difference with the paper, mean and maximum wall clock per instance (F15), the number of instances that hit the 60 s limit, and how many ended by the optimality abort (bound reached), by the limit, or by exhausting the tree.
 - If a size fails: rerun it without a time limit, with the Fig. 3 reading of g_top, and with greedy reading (C) (F9); all diagnostics only, the verdict stays with the main 60 s run.
@@ -375,3 +385,4 @@ Setup: `step3_profile.py`, H = n, 60 s, package as at 3210477. productive_moves,
 - Nodes that cannot improve s*: on 5-8 #1 and 5-10 #1 almost every node is one. These nodes are created by the pruning test of Fig. 6 as printed (F20). Pm there consists of removes and BG relocations, each lowering the bound by exactly one, so the printed test never cuts these compound moves. On 6-6 #1, FLG_BB and GG relocations are frequent; they do not lower the bound and are cut, so the dead nodes cost only 3.6 % of the work. This matches the concentration on wide bays.
 - Diagnostic with the tight test (F20, `--f14-tight`, not the implementation): 6-6 #1 0.45 s, 413 nodes; 5-8 #1 0.13 s, 101 nodes; 5-10 #1 0.19 s, 111 nodes; all three trees searched to the end. Checked on the 339 smoke runs that ended before 60 s (`step3_f14_check.py`, no time limit): 339 of 339 plans identical; total wall clock 883.6 s printed against 93.5 s tight (944 677 against 117 966 nodes; longest run 60.14 s against 14.92 s).
 - Verdict. (1) No deviation from Figs. 5–7 as printed: maxMoves (Fig. 5), the pruning test and the recursion with maxMoves − 1 (Fig. 6), the order of the cmStopValue check, and Cm as a list are all as printed. (2) Open interpretation: the pruning test, one move weaker than the purpose stated on p. 305; recorded as F20, not changed. Without a time limit it does not change the plan, but it causes the non-constant slowdown on bays with 8 or more stacks. (3) Constant-factor cost: 0.75–2.7 ms per node (instrumented), with move generation the largest share; with the tight test 1.1–1.8 ms per node. Duplicate compound moves (F21) are as printed and cost little once F20 is applied.
+- Decision (Thom, 10 Nov 2026): F20 adopted as an implementation optimisation, F21 kept as printed (§2.3).
