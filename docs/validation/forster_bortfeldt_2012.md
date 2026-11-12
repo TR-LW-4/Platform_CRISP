@@ -561,8 +561,14 @@ Written before these runs (Thom, 11 Nov 2026). **Post hoc**, added after the res
 | This implementation vs. Table 3, H = n | 0.324 / 0.480 (6 cells) | 0.146 / 0.480 |
 | This implementation vs. Table 3, H = T + 2 | 0.590 / 1.030 (4 cells) | 0.193 / 1.030 |
 | This implementation vs. Table 3, both | 0.430 / 1.030 | 0.169 / 1.030 (38 cells) |
-| This implementation vs. CRP_D | 0.148 / 0.375 | not available: CRP_D was run on the 10 failing cells only (§8) |
-| CRP_D vs. Table 3 | 0.298 / 0.955 | not available |
+| This implementation vs. CRP_D, H = n | 0.104 / 0.225 (6 cells) | 0.220 / 2.150 (§9.1) |
+| This implementation vs. CRP_D, H = T + 2 | 0.212 / 0.375 (4 cells) | 0.199 / 2.250 (§9.1) |
+| This implementation vs. CRP_D, both | 0.148 / 0.375 | 0.209 / 2.250 (38 cells; §9.1) |
+| CRP_D vs. Table 3, H = n | 0.245 / 0.405 (6 cells) | 0.243 / 1.875 (§9.1) |
+| CRP_D vs. Table 3, H = T + 2 | 0.378 / 0.955 (4 cells) | 0.244 / 1.920 (§9.1) |
+| CRP_D vs. Table 3, both | 0.298 / 0.955 | 0.243 / 1.920 (38 cells; §9.1) |
+
+The CRP_D figures for the 19 criterion sizes come from the post-hoc, descriptive run of §9.1 (CRP_D on the 28 cells it had not run on, plus the 10 of §8); the per-height 10-cell CRP_D figures were added with it (same script); the 10-cell totals are unchanged. All figures: `step3_crp_d_criterion_summary.txt`.
 
 - 5-4 at H = n and 6-6 at H = T + 2 are missed in the same direction by every implementation and switch: 5-4 at H = n from +0.225 to +0.375 above Table 3, 6-6 at H = T + 2 from −0.830 to −1.180 below (main run, switches 1–4, D2, D6, CRP_D). The 5-9 row of Table 3 is internally inconsistent: nrel − LB gap = 24.85 is below the mean number of badly placed items (25.10 in Table 2, 25.05 in the files), which no bound of the Proposition allows (§3.3, F5).
 - **Status: not reproduced within tolerance; consistent with an independent implementation.**
@@ -576,3 +582,12 @@ Written before this run (Thom, 12 Nov 2026). **Post hoc and descriptive only.** 
 - Conditions as in diagnostic 5: the same machine, rl Python 3.11.16, VS Code open (its idle python processes present), nothing else running.
 - Script changes for this run (data repo), no change to what a run does: an option to select these cells instead of the failing ones; the package pin compares the code files the script imports with 87eb188 at the old path, since the package has moved (header, "Location").
 - To be reported: this implementation (§7) vs. CRP_D, and CRP_D vs. Table 3: mean and maximum absolute difference of the size means over all 38 criterion cells and per height. The 10-cell figures above stay as they are.
+
+Results (12 Nov 2026):
+- Run: `step3_diag.py . crp_d ... --cells remaining`, CRISP 3934b84 (CRP_D unchanged since a064651, the commit of diagnostic 5: no diff in `algorithms/CRP_D`), package pin 87eb188 passed, rl Python 3.11.16, sequential, 12:30:15–14:20:14. Conditions: the same machine, VS Code open; at the start no python.exe process was running (the pre-registration above expected VS Code's idle python processes); nothing else was started during the run apart from reading files. Data: `step3_diag_crp_d_remaining.jsonl` / `.log`; summary `step3_crp_d_criterion_summary.py` / `.txt`.
+- 1120 runs, 1120 valid plans; 0 invalid, 0 empty; CRP_D's reported relocations equal the recount on all of them.
+- Mean / maximum absolute difference of the size means: in the table above (all 38 cells and per height). Over the 28 remaining cells alone: this implementation vs. CRP_D 0.231 / 2.250, CRP_D vs. Table 3 0.224 / 1.920, this implementation vs. Table 3 0.076 / 0.330.
+- The maxima are on 6-10: CRP_D is +2.150 (H = n) and +2.250 (H = T + 2) above this implementation and +1.875 and +1.920 above Table 3; it hit the 60 s limit on 37 of 40 runs in each of these two cells (this implementation: 15 and 17, §7). These differences therefore mix the code differences of §8.4 with runtime (D5); they are not separated here. CRP_D time-limit hits: 89 in the 28 cells, 99 over all 38.
+- Cells where CRP_D is within the §5 tolerance of Table 3: 29 of 38 (13 of 19 at H = n, 16 of 19 at H = T + 2); outside at H = n on 4-4, 5-4, 5-7, 5-10, 6-6, 6-10 and at H = T + 2 on 5-6, 6-6, 6-10. For comparison, this implementation (§7): 13 of 19 and 15 of 19. Descriptive only; the criterion applies to this implementation.
+- Instances, all 38 cells: CRP_D below / equal to / above this implementation 110 / 1188 / 222; CRP_D's size mean is above this implementation's in 21 cells, below in 8, equal in 9.
+- **The step-3 verdict (§7, §9), the implementation and F12 are unchanged.**
