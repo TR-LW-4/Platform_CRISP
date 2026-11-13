@@ -301,5 +301,5 @@ The summary rechecks every stored plan (checks 1–3): 70/70.
 
 - Instance-weighted means over the 70 instances: M 586.29 restricted, 574.20 unrestricted; CMT 53518.0 and 51264.6. Restricted M is lower on 9 instances, equal on 3 and higher on 58.
 - Bays at the 60 s limit: 59 of 308 restricted, 92 unrestricted. 39 bays stopped at the lower bound and 210 exhausted the tree.
-- On the three largest U test cases the restricted run needs fewer moves on average (−4.5, −2.5, −2.0), but more crane time (+1.0 %, +1.5 %, +1.4 %): the plans differ in which stacks are used, not only in the number of moves.
+- On U061608-0570, U081606-0570 and U101606-0720 the restricted run needs fewer moves on average (−4.5, −2.5, −2.0) but more crane time (+1.0 %, +1.5 %, +1.4 %): fewer moves do not imply less crane time here.
 - Lee & Lee's Table 1 is not used here: the restricted version is not the paper's method (§7, O4: adapted).
