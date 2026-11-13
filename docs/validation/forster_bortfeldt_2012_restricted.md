@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented) and 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) done.
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. Open: O1–O5 (§3.4).
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -137,3 +137,16 @@ Script `step1e_checks.py` → `step1e_checks.txt`, per-instance records with pla
 | 4-4 | 2 | 27 | 11 | 10.325 | 10.000 | 9/40 |
 
 - The restricted search is better than the unrestricted one on a few instances (1, 2, 2 per class). Both are heuristics; the restricted one searches a smaller move set and reaches the restricted optimum on 3-3 and 3-4.
+
+## 6. Step 1f — the unrestricted package is unchanged (13 Nov 2026)
+
+Script `step1f_unchanged.py` → `step1f_unchanged.txt`, run at CRISP 6300e44; this log's §6 commit touches only this log.
+- `git diff --stat 0186485 HEAD -- algorithms/CRP_Time/crp_time_u` is empty, as are the diff against the working tree and `git status` on that folder.
+- Git tree hash of `crp_time_u/forster_bortfeldt_2012`: `5b4cf6b3c9a5f743819e5a41b27778d663c02417` at 0186485 and at HEAD. Tree hash of `crp_time_u`: `d68376cd17141488c2fbd903c97fbb3c648732d7` at both.
+- Every file changed since 0186485 is under `crp_time_r/` or is this log.
+- The full unit suite passes at 6a10012: 206 tests, the 162 of before plus the 44 of the restricted package.
+- The registry still loads 74 algorithms with no module under `algorithms/` failing to import (`step1f_registry.txt`). The restricted package defines no algorithm class, so it is not registered (not wired into CRP-Time, the UI or the CLI).
+
+## 7. Open decisions
+
+O1–O5 (§3.4); none is implemented. Outside this step: wiring the restricted search into CRP-Time (a `BaseAlgorithm` class, the f2/f2vert objective, `relocation_rule = "restricted"`).
