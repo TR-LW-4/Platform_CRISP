@@ -117,7 +117,7 @@ class TestState(unittest.TestCase):
         for _ in range(300):
             S, H = rng.randint(2, 5), rng.randint(3, 6)
             n = rng.randint(1, S * H - 1)
-            groups = [rng.randint(1, n) for _ in range(n)]      # repeated groups too
+            groups = rng.sample(range(1, n + 1), n)            # distinct groups (R2)
             stacks = [[] for _ in range(S)]
             for g in groups:
                 rng.choice([s for s in stacks if len(s) < H]).append(g)
@@ -133,6 +133,11 @@ class TestState(unittest.TestCase):
                 bay = bay.apply(rng.choice(moves))
                 if not bay.n:
                     break
+
+
+    def test_repeated_groups_are_refused(self):
+        with self.assertRaises(ValueError):
+            Bay.from_stacks([[1, 2], [2]], 3)
 
 
 class TestLowerBound(unittest.TestCase):

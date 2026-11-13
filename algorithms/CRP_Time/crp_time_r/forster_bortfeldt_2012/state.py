@@ -52,6 +52,8 @@ class Bay:
         if any(len(s) > H for s in st):
             raise ValueError("a stack is higher than H")
         n = sum(map(len, st))
+        if len({g for s in st for g in s}) != n:
+            raise ValueError("repeated groups: the restricted move rule (R1) needs one item per group (R2)")
         G = max((max(s) for s in st if s), default=0) if G is None else G
         return cls(tuple(st), tuple(mn), tuple(bd), H, G, n, sum(bd))
 
