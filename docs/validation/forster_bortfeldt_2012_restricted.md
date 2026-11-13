@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5) and 1d (R1, R2 implemented) done.
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented) and 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) done.
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -101,3 +101,39 @@ Only R1 and R2 change code; R3–R5 hold without a change (§3.2).
     - New: `check_restricted`, a plain-list check of R1 independent of `state.Bay`. It is applied to the greedy and search plans of all Caserta 3x3 and 3x4 runs of the unit tests (at H = n and H = T + 2), and its own test shows that it rejects a relocation from another stack.
 - **ba40168, R2.** `Bay.from_stacks` raises `ValueError` on repeated groups. The random-layout test draws distinct groups; a test for the refusal.
 - 44 tests of the two restricted test modules pass at ba40168. `multibay.py` is unchanged (O4); its tests pass unchanged on the restricted search.
+
+## 5. Step 1e — checks (13 Nov 2026)
+
+Script `step1e_checks.py` → `step1e_checks.txt`, per-instance records with plans in `step1e_checks.jsonl`. Settings:
+- Caserta 3-3, 3-4 and 4-4, all 40 instances each, no time limit, sequential.
+- CRISP 6a10012 (algorithm code as at ba40168), rl Python 3.11.16.
+- H = `max_tiers` of the platform's own config (`problem_config_for_caserta_dat`) = T + 2, asserted per instance; equal to F6 of the unrestricted log. The unlimited-height variant H = n (F7) has no CRP-Time counterpart and is not run.
+
+**Checks, all passed on all 120 instances:**
+1. **Replay through `CRP_R.step` itself.** Before every relocation of the plan, the CRP_R yard equals the plan's layout. `step(r)` executes exactly one relocation (reward −1.0) and moves the plan's item. At the end, CRP_R's move history equals the plan move by move, including its automatic retrievals at the plan's removes; CRP_R is done and the yard is empty. In addition, `CRP_R.validate_plan` on the explicit plan reports it feasible, with the same number of relocations and no errors.
+2. **`plan.check_plan` (plain lists):** only top items moved, removes in group order, height ≤ H, bay empty.
+3. **Lower bound:** moves ≥ the lower bound of the initial layout (`Bay.lower_bound` = `layout.lower_bound`).
+4. **Exact restricted optimum:** moves ≥ the exact restricted optimum.
+   - The optimum is computed with the A* of the Jovanović validation (`jovanovic_2019_checks2/jov_astar.py`; `jovanovic_2019.md` §4, "OPT column of Table 5"): restricted BRP, retrieval as soon as the target is on top.
+   - Unit cost per move: its f2 model with t_s = 0 (the module constant `TS`, set by the script) and t_pp = 1, so the cost of a plan is its number of moves and the heuristic is n + n_b. The solver code is unchanged.
+   - Because the solver was re-parameterised, its optimum is cross-checked against an independent breadth-first search over restricted layouts (`bfs_restricted` in the script): equal on all 120 instances.
+
+**Gap to the exact restricted optimum** (relocations; LB rel = lower bound − n; greedy = the restricted greedy of Fig. 4; "at opt" = gap 0; "bound hit" = the search stopped at the lower bound, F19; max s = largest wall clock of a search):
+
+| class | LB rel | optimum | search | greedy | gap mean | gap max | at opt | bound hit | max s |
+|---|---|---|---|---|---|---|---|---|---|
+| 3-3 | 4.000 | 5.000 | 5.000 | 5.175 | 0.000 | 0 | 40/40 | 11/40 | 0.0003 |
+| 3-4 | 5.075 | 6.175 | 6.175 | 6.350 | 0.000 | 0 | 40/40 | 11/40 | 0.0019 |
+| 4-4 | 7.700 | 10.200 | 10.325 | 11.000 | 0.125 | 2 | 36/40 | 2/40 | 0.0058 |
+
+- Gap distribution (instances per gap): 3-3 all 40 at 0; 3-4 all 40 at 0; 4-4 36 at 0, 3 at 1, 1 at 2.
+
+**Descriptive only, not a check: restricted against unrestricted.** The unrestricted search (`crp_time_u`, same H, no time limit) on the same instances, compared in relocations. Its relocations equal those of the earlier unrestricted full run (`forster_bortfeldt_2012/step3_full.jsonl`, variant t2) on 40 of 40 instances per class. "Below restricted opt" counts the instances where the unrestricted search needs fewer relocations than the exact restricted optimum, which only an unrestricted solution can do.
+
+| class | restricted better | equal | worse | mean restricted | mean unrestricted | unrestricted below restricted opt |
+|---|---|---|---|---|---|---|
+| 3-3 | 1 | 38 | 1 | 5.000 | 5.025 | 1/40 |
+| 3-4 | 2 | 33 | 5 | 6.175 | 6.100 | 5/40 |
+| 4-4 | 2 | 27 | 11 | 10.325 | 10.000 | 9/40 |
+
+- The restricted search is better than the unrestricted one on a few instances (1, 2, 2 per class). Both are heuristics; the restricted one searches a smaller move set and reaches the restricted optimum on 3-3 and 3-4.
