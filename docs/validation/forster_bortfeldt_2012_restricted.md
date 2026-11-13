@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. O1–O5 decided by Thom (§7). Step 2a (all 840 Caserta instances, 60 s): every hard check passes (§8).
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. O1–O5 decided by Thom (§7). Step 2a (all 840 Caserta instances, 60 s): every hard check passes (§8). Step 2b (O4 implemented; all 70 Lee & Lee instances, 60 s per bay): every hard check passes, including a replay through `CRP_R.step` on the Lee geometry (§9).
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -234,3 +234,72 @@ better / equal / worse = the restricted search needs fewer / equal / more reloca
 - On 3-3, 3-4 and 3-5 the restricted search equals Jovanović on every instance; on 3-3 and 3-4 both equal the exact restricted optimum (§5). From 4-7 on, the difference grows with the class (+1.1 to +3.2 on the 5-x and 6-x classes).
 - 10-6 and 10-10: every restricted search stops at the limit. On 10-10 the result (146.325) is barely below the greedy start (146.400); on 10-6 the search improves the greedy by 4.0 relocations. The unrestricted search stops at the limit there too; on 10-6 the restricted one needs fewer relocations on 24 of 40 instances.
 - These are observations, not a verdict: the tree search's parameters (p. 306) were set for the unrestricted problem (O2: kept).
+
+## 9. Step 2b — O4 and the restricted multi-bay run on the Lee & Lee instances (13 Nov 2026)
+
+**O4 in code (e9ed98c).** `multibay.py` of the restricted package:
+- Move generation needs no change. Each bay search is restricted (R1): before the next remove of the bay's lowest group it relocates only from the stack that holds that group. Algorithm 1 (`merge`, p. 261) appends a bay's moves up to its next remove only while that bay holds the block's lowest group. With one group per container, every relocation of the block plan therefore stays in its bay (P9) and moves the top of the stack that holds the block's lowest group, which is what `CRP_R.step` allows (§2), restricted further to the bay.
+- `check_block_plan` now refuses a relocation to another bay, and a relocation from a stack without the block's lowest group or of that group itself. Before, moves between bays were allowed in the check.
+- `solve_block` refuses blocks with repeated groups (R2 at block level, O1). `Bay.from_stacks` sees only one bay at a time, so it does not catch a group that repeats across bays.
+- Tests (`test_multibay.py`):
+  - Lee & Lee's Example 1 sequence was accepted by the check before. It relocates 6 from bay 1 to bay 0 (its third move), so it is now refused; its crane time (2243.2) is still checked.
+  - New tests: the check refuses the three kinds of unrestricted relocation; `solve_block` refuses repeated groups across bays.
+  - 46 tests of the restricted package and the full suite (208) pass at e9ed98c; the unrestricted package is unchanged (`git diff 0186485 HEAD -- algorithms/CRP_Time/crp_time_u` empty).
+
+Scripts `step2b_run.py` → `step2b_run.jsonl` (with plans), `step2b_run.log`; `step2b_summary.py` → `step2b_summary.txt`. Both were committed before any result (data repo ae43e32) and ran unchanged. Settings as in the multi-bay full run (multi-bay log §8, §11):
+- all 70 Lee & Lee instances, R and U; Example 1 left out;
+- `Params()`, 60 s per bay (P14), sequential, in file-name order;
+- CRISP e9ed98c, rl Python 3.11.16; total wall clock 1.25 h.
+
+**Hard checks, all passed on all 70 instances:**
+1. `check_block_plan` of the restricted package: only top items moved, removes in group order, height ≤ H, block empty, every relocation within its bay and from the stack holding the block's lowest group.
+2. Every relocation within its bay, counted on the plan independently of 1.
+3. Moves ≥ the summed per-bay lower bound (the C&OR bound of each ranked bay).
+4. **Replay through `CRP_R.step` on the Lee geometry.** This was possible without changing shared code:
+   - The environment is `CRP_R` with num_bays = B, num_rows = S, max_tiers = H, built through a subclass defined in the script. It overrides only `_build_episode`, the layout loading, because `CRP_R` itself loads only Caserta-format files.
+   - It places stack (b, d) at (bay b + 1, row d + 1). The groups are a permutation of 1…C on every instance (checked), so container id = priority = group.
+   - `step`, the automatic retrievals and `validate_plan` are `CRP_R`'s own.
+   - As in step 1e: yards equal before every relocation, one relocation per `step(b·S + r)`, move histories equal including the automatic retrievals, CRP_R done with an empty yard.
+   - Also `CRP_R.validate_plan` on the explicit plan: feasible, same relocations, no errors.
+   - Before the run, the subclass was tried on Example 1: its block plan replays, and `validate_plan` refuses a relocation from a non-target stack ("relocation is not from current target stack").
+
+The summary rechecks every stored plan (checks 1–3): 70/70.
+
+**Descriptive only, not a check: per test case, restricted against unrestricted.**
+- Columns:
+  - n: instances;
+  - LB: summed lower bound in moves;
+  - M: moves;
+  - b / e / w: restricted M lower / equal / higher than unrestricted per instance;
+  - CMT: `crane_time.plan_time`, default model P4–P7 of the multi-bay log;
+  - limit: bays stopped by the 60 s limit;
+  - s r: runtime of the restricted run.
+- The unrestricted columns are the multi-bay full run, `forster_bortfeldt_2011_multibay/step4_full.jsonl` (CRISP 77cace1, 60 s per bay), with M and CMT recomputed from its stored plans. That run took 7566 s in total.
+
+| test case | LB | M restricted | M unrestricted | dM | b / e / w | CMT restricted | CMT unrestricted | dCMT % | limit r | limit u | s r |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R011606-0070 | 104.4 | 110.0 | 108.0 | +2.0 | 0 / 1 / 4 | 9279.0 | 8832.9 | +5.1 | 0/5 | 1/5 | 3 |
+| R011608-0090 | 142.0 | 153.4 | 146.6 | +6.8 | 0 / 0 / 5 | 12440.3 | 11627.4 | +7.0 | 0/5 | 3/5 | 70 |
+| R021606-0140 | 209.0 | 220.8 | 215.0 | +5.8 | 0 / 0 / 5 | 19142.1 | 18170.7 | +5.3 | 0/10 | 1/10 | 10 |
+| R021608-0190 | 305.8 | 334.2 | 320.6 | +13.6 | 0 / 0 / 5 | 27473.8 | 25567.1 | +7.5 | 10/10 | 8/10 | 600 |
+| R041606-0280 | 426.8 | 447.8 | 439.2 | +8.6 | 0 / 0 / 5 | 40419.2 | 38522.3 | +4.9 | 1/20 | 5/20 | 99 |
+| R041608-0380 | 610.6 | 671.0 | 645.6 | +25.4 | 0 / 0 / 5 | 57961.5 | 54324.3 | +6.7 | 14/20 | 19/20 | 899 |
+| R061606-0430 | 655.6 | 692.4 | 673.8 | +18.6 | 0 / 0 / 5 | 65493.6 | 62008.8 | +5.6 | 3/30 | 7/30 | 363 |
+| R061608-0570 | 906.2 | 1009.2 | 969.2 | +40.0 | 0 / 0 / 5 | 90841.2 | 85725.2 | +6.0 | 26/30 | 28/30 | 1659 |
+| R081606-0570 | 875.8 | 920.0 | 898.0 | +22.0 | 0 / 0 / 5 | 91131.5 | 86870.5 | +4.9 | 2/40 | 8/40 | 384 |
+| R101606-0720 | 1092.0 | 1146.6 | 1119.8 | +26.8 | 0 / 0 / 5 | 119258.7 | 113806.1 | +4.8 | 3/50 | 8/50 | 411 |
+| U011606-0070 | 124.5 | 126.5 | 125.5 | +1.0 | 1 / 0 / 1 | 9559.0 | 9321.8 | +2.5 | 0/2 | 0/2 | 0 |
+| U011608-0090 | 164.0 | 167.0 | 165.5 | +1.5 | 0 / 0 / 2 | 12808.4 | 12352.2 | +3.7 | 0/2 | 0/2 | 0 |
+| U021606-0140 | 248.5 | 253.0 | 252.0 | +1.0 | 0 / 0 / 2 | 20160.9 | 19420.1 | +3.8 | 0/4 | 0/4 | 0 |
+| U021608-0190 | 348.0 | 356.0 | 353.5 | +2.5 | 1 / 0 / 1 | 27668.5 | 26755.1 | +3.4 | 0/4 | 0/4 | 0 |
+| U041606-0280 | 496.5 | 502.0 | 501.5 | +0.5 | 1 / 0 / 1 | 41689.2 | 40545.0 | +2.8 | 0/8 | 0/8 | 0 |
+| U041608-0380 | 697.0 | 706.5 | 706.0 | +0.5 | 0 / 1 / 1 | 56941.5 | 56615.3 | +0.6 | 0/8 | 0/8 | 7 |
+| U061606-0430 | 764.5 | 773.5 | 772.5 | +1.0 | 1 / 0 / 1 | 67109.6 | 65841.2 | +1.9 | 0/12 | 0/12 | 0 |
+| U061608-0570 | 1048.0 | 1060.0 | 1064.5 | -4.5 | 2 / 0 / 0 | 89958.7 | 89078.1 | +1.0 | 0/12 | 3/12 | 0 |
+| U081606-0570 | 1014.0 | 1020.0 | 1022.5 | -2.5 | 1 / 1 / 0 | 92406.1 | 91083.9 | +1.5 | 0/16 | 0/16 | 1 |
+| U101606-0720 | 1282.0 | 1292.0 | 1294.0 | -2.0 | 2 / 0 / 0 | 121226.7 | 119611.5 | +1.4 | 0/20 | 1/20 | 3 |
+
+- Instance-weighted means over the 70 instances: M 586.29 restricted, 574.20 unrestricted; CMT 53518.0 and 51264.6. Restricted M is lower on 9 instances, equal on 3 and higher on 58.
+- Bays at the 60 s limit: 59 of 308 restricted, 92 unrestricted. 39 bays stopped at the lower bound and 210 exhausted the tree.
+- On the three largest U test cases the restricted run needs fewer moves on average (−4.5, −2.5, −2.0), but more crane time (+1.0 %, +1.5 %, +1.4 %): the plans differ in which stacks are used, not only in the number of moves.
+- Lee & Lee's Table 1 is not used here: the restricted version is not the paper's method (§7, O4: adapted).
