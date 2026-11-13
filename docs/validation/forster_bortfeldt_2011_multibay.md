@@ -8,12 +8,12 @@ Scope (Wei, 26 Oct 2026; task of 13 Nov 2026): the CRP-Time version of Forster�
 
 ## Summary
 
-Status 13 Nov 2026: **step 1 (deterministic checks) done; no tree search has been run.** Open for Thom before any search run: the time limit (§7, options T1–T3), the validation criterion, and the proposals P6–P11 (§2).
+Status 13 Nov 2026: **step 1 (deterministic checks) done; no tree search has been run.** Open for Thom before any search run: the time limit (P14, §7, options T1–T3), the validation criterion, the group labels and G inside a bay (P12, P13), and the proposals P5–P7 and P10.
 - 1a (§3): 71 instance files read; R 10 test cases × 5, U 10 × 2, plus Example 1. Every file matches its name (bays, 16 stacks, maximum height, containers); every container in slot 2 or higher of a U instance is badly placed; one group per container in every file. C + n_b equals Lee & Lee's lower bound L on all 71 files. Inside the Proceedings paper's Table 1 the Lee & Lee CT column does not recompute from Lee & Lee's tables (CMT and M do).
-- 1b (§4): see §4.
-- 1c (§5): see §5.
-- 1d (§6): see §6.
-- 1e (§7): see §7.
+- 1b (§4): `crane_time.py` implements p. 258 with the footnote parameters; 6 hand-computed tests pass. **Lee & Lee's Example 1 (2346 s) is not reproduced:** 2243.2 s under the proposed readings, and none of 720 combinations of readings gives 2346 s (closest 2283.2 s). The one-bay times of both papers (79.3–93.9 s per move) exceed the 68.4 s that a truck inside the bay allows, so a remove crosses a bay in both papers (P6). Core's RMGC model differs in three points (max of the axes, t_ad per trip, start (1, 1)): 2855.3 s on Example 1.
+- 1c (§5): Algorithm 1 implemented as printed (`multibay.py`); 9 tests on a hand-made 3-bay block and Example 1 pass: removes in group order, every bay keeps its own move order, block empty; the hand-timed merged plan (911.0 s) agrees.
+- 1d (§6): the mean summed per-bay bound is ≤ M of Table 1 for both methods on all 20 test cases. Tree-search gaps 0.5–82.2 moves (0.40–9.07 %), Lee & Lee gaps 3.0–336.0 (2.22–37.09 %).
+- 1e (§7): Table 1's CT stays at 8.2–11.9 s on R for 1 to 10 bays (1.19–10.10 s per bay); three options T1–T3 with upper bounds 5.13 h, 0.19 h and 1.17 h for all 70 instances. Not chosen.
 
 ## 1. Specification from the papers
 
@@ -51,11 +51,16 @@ Categories as in the validation workflow: (a) required by the unified 2D setting
 | P2 | Test case ↔ files | Test case `R011606-0070` (Table 1, p. 262) = files `R011606_0070_001`…`_005`; `R020306_0020_001` is Lee & Lee's Example 1, not part of the sets. | p. 260; Lee & Lee Tables 1, 3; §3 | — | reading |
 | P3 | Groups | One container per group (group = id in every file); retrieval order by increasing id. | Lee & Lee p. 1140; files | — | reading |
 | P4 | Acceleration term | ad = 1 once per move if b ≥ 1, also when both the empty and the loaded trip cross bays. | p. 258 (formula as printed); Lee & Lee describe two gantry trips per move (p. 1143) | — | reading (as printed) |
-| P5 | Counting b and s | Positions (bay, row), bays 1…B, rows 1…S inside a bay. b = \|bay(last) − bay(src)\| + \|bay(src) − bay(dst)\|, s the same over rows; gantry and trolley terms added. | p. 258 ("between his last position, the starting stack and the target stack"); Lee & Lee p. 1141 (stack numbering), p. 1143 (sequence of the crane's steps), p. 1144–1145 (s per bay, s per container width) | (b) | proposed |
+| P5 | Counting b and s | Positions (bay, row), bays 1…B, rows 1…S inside a bay. b = \|bay(last) − bay(src)\| + \|bay(src) − bay(dst)\|, s the same over rows; gantry and trolley terms added. | p. 258 ("between his last position, the starting stack and the target stack"); Lee & Lee p. 1141 (stack numbering), p. 1143 (sequence of the crane's steps), p. 1144–1145 (3.5 s per bay, 1.2 s per container width) | (b) | proposed |
 | P6 | Where removed containers go | A fixed truck position (bay 0, row 0): one bay before bay 1, beside row 1. Every remove crosses at least one bay. | p. 258 silent ("a dedicated spot"); Lee & Lee p. 1140 ("a truck waiting at one end of the crane"), p. 1141 (stack 0); one-bay times of both papers (§4.2); equals core's truck position | (b) | proposed |
 | P7 | Initial crane position | The truck position (0, 0). | p. 258 silent; Lee & Lee p. 1143 ("initial stowed position", not located) | (b) | proposed |
 | P8 | Merge | Algorithm 1 as printed: lowestGroupBlock is fixed for one pass over the bays; the bays are visited in index order; every bay holding that group gives its moves up to and including its next remove (one remove per bay and pass). A bay solution that ends before that remove, or has moves left at the end, is an error. | Algorithm 1 and Sec. 3.2 (p. 260–261) | — | reading |
 | P9 | Relocations between bays | None: each bay is solved on its own, so every relocation of the block solution stays in its bay. The crane still travels between bays (crane_time.py). | p. 260 ("completely independent"), p. 262 (inter-bay relocations as future work) | — | reading |
+| P10 | Search per bay | The validated C&OR search unchanged (F1–F21), objective the number of moves, H of the test case, unrestricted; parameters of C&OR p. 306 (nSucc 10, cmStopThreshold 150, maxFlg_bb 3, maxGg 2). | p. 259–260 (refers to [5] for the algorithm; no parameters restated) | (b) for the parameters | proposed |
+| P11 | Order of the bay searches | One after another, in bay index order (matters only with a budget shared by the bays, P14). | p. 260 (parallel possible), p. 262 (parallel named as an improvement) | (b) | proposed, with P14 |
+| P12 | Group labels inside a bay | **Open.** (A) the block's groups as in the file; (B) groups ranked 1…n inside each bay. Removal order and badly placed items are the same; the C&OR keys that use group values differ (greedy F9/F10, GG key F11/F12, clean supply, and g_top = n(L) + 1 of the bound, F2). On the initial layouts the bound differs on 4 of 70 instances by 1 move (§6). | p. 260 silent; C&OR Table 1 (p. 302) defines groups 1…G for one bay | (b) | open |
+| P13 | G inside a bay (F13) | **Open**, tied to P12: under (A) the largest group of the bay (`Bay.from_stacks` default) or of the block (C); under (B) the bay's n. | C&OR Table 1, def. 2 (p. 302) | (b) | open |
+| P14 | Time limit | **Open** (§7: T1 60 s per bay; T2 10 s per instance split over the bays; T3 60 s per instance split over the bays). | none stated; Table 1 CT (p. 262); p. 261–262 | (b) | open |
 
 ## 3. Step 1a — instances and reader (13 Nov 2026)
 
@@ -64,7 +69,7 @@ Source: `C:\Users\thomt\Downloads\Lee_instances.zip` (SHA-256 `9f8556f19d31f73ba
 ### 3.1 Checks
 - **Names and headers:** for all 71 files, header name = file name and header (B, S, H, C) = the fields of the name; ids are 1…C. **Pass.**
 - **Set sizes (p. 260):** R 10 test cases × 5 instances, U 10 × 2; every test case has 16 stacks per bay; the 20 test cases are exactly the rows of Table 1 (p. 262), and the 70 instances exactly the rows of Lee & Lee's Tables 1 and 3. **Pass.**
-- **U property (p. 261):** in every U instance every container in slot 2 or higher is badly placed (e.g. U011606_0070_001: 55 of 55). In R the share is 30/54 to 387/560. **Pass.**
+- **U property (p. 261):** in every U instance every container in slot 2 or higher is badly placed (e.g. U011606_0070_001: 55 of 55); for R the counts per instance are in `step1a_output.txt`. **Pass.**
 - **Lee & Lee's lower bound** (p. 1140: containers plus the minimum relocations per stack): C + n_b equals L of Tables 1 and 3 on all 70 instances, and 27 for Example 1 (p. 1145). **Pass.** This also confirms the bottom-to-top orientation (P1).
 - **Example 1:** `R020306_0020_001` (2 bays × 3 stacks, H = 6, 20 containers) equals Fig. 6 stack by stack (stacks 1–3 bay 1, 4–6 bay 2, bottom to top: [10, 4, 18], [9, 17, 8, 20], [5, 19, 2], [16, 14, 7, 13, 3, 6], [1, 11], [15, 12]). **Yes, it is Example 1.**
 
@@ -157,3 +162,77 @@ Hand-made block: 3 bays × 2 stacks, H = 3, groups 1–8; bay 0 = [3, 6], [1]; b
 - Merged plan timed by hand (positions from 1, start and truck (0, 0)): 81.8 + 79.4 + 79.4 + 75.9 + 75.9 + 80.6 + 80.6 + 86.4 + 81.8 + 93.4 + 95.8 = 911.0 s; `plan_time(to_positions(merge(...)))` gives the same. **Pass.**
 
 Other checks (`step1c_tests_registry.txt`): the 20 validated tests of `test_forster_bortfeldt.py`, the 15 of `test_multibay.py` and the 9 of `core/benchmarks/test_lee_lee.py` pass (44); the registry still loads 74 algorithms and no module under `algorithms/` fails to import; `state.py`, `search.py`, `plan.py` and `layout.py` are unchanged (`git diff` against 8a5252a is empty).
+
+## 6. Step 1d — lower bound per test case (13 Nov 2026)
+
+Script `step1d_lower_bound.py`, output `step1d_output.txt`. Per instance the bound on moves is the sum over the bays of the validated `layout.lower_bound` (n′_REM + n′_BG + n′_non-BG, C&OR p. 302) of the initial bay layout; per test case the mean over its instances. Computed under both group labellings of P12; n′_REM + n′_BG is the same under both and equals Lee & Lee's L on every instance. Gap = M (Table 1, p. 262) − mean bound, with the file labelling.
+
+| test case | bays | mean bound (file) | mean bound (ranks) | M tree search | gap | gap % | M Lee & Lee | gap | gap % | bays with n′_non-BG = 1 (file / ranks) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| R011606-0070 | 1 | 104.4 | 104.4 | 108.0 | 3.6 | 3.45 | 125.4 | 21.0 | 20.11 | 0 / 0 |
+| R011608-0090 | 1 | 142.0 | 142.0 | 148.4 | 6.4 | 4.51 | 191.4 | 49.4 | 34.79 | 0 / 0 |
+| R021606-0140 | 2 | 209.0 | 209.0 | 215.6 | 6.6 | 3.16 | 230.2 | 21.2 | 10.14 | 0 / 0 |
+| R021608-0190 | 2 | 305.8 | 305.8 | 324.6 | 18.8 | 6.15 | 367.8 | 62.0 | 20.27 | 0 / 0 |
+| R041606-0280 | 4 | 426.8 | 426.8 | 439.8 | 13.0 | 3.05 | 454.2 | 27.4 | 6.42 | 0 / 0 |
+| R041608-0380 | 4 | 610.6 | 610.6 | 657.8 | 47.2 | 7.73 | 769.2 | 158.6 | 25.97 | 0 / 0 |
+| R061606-0430 | 6 | 655.6 | 655.6 | 684.2 | 28.6 | 4.36 | 709.8 | 54.2 | 8.27 | 0 / 0 |
+| R061608-0570 | 6 | 906.0 | 906.2 | 988.2 | 82.2 | 9.07 | 1242.0 | 336.0 | 37.09 | 0 / 1 |
+| R081606-0570 | 8 | 875.6 | 875.8 | 910.2 | 34.6 | 3.95 | 945.4 | 69.8 | 7.97 | 0 / 1 |
+| R101606-0720 | 10 | 1092.0 | 1092.0 | 1134.0 | 42.0 | 3.85 | 1169.2 | 77.2 | 7.07 | 0 / 0 |
+| U011606-0070 | 1 | 124.5 | 124.5 | 125.0 | 0.5 | 0.40 | 127.5 | 3.0 | 2.41 | 0 / 0 |
+| U011608-0090 | 1 | 164.0 | 164.0 | 167.0 | 3.0 | 1.83 | 177.5 | 13.5 | 8.23 | 0 / 0 |
+| U021606-0140 | 2 | 248.0 | 248.5 | 251.5 | 3.5 | 1.41 | 257.0 | 9.0 | 3.63 | 0 / 1 |
+| U021608-0190 | 2 | 348.0 | 348.0 | 353.5 | 5.5 | 1.58 | 400.5 | 52.5 | 15.09 | 0 / 0 |
+| U041606-0280 | 4 | 496.5 | 496.5 | 501.0 | 4.5 | 0.91 | 507.5 | 11.0 | 2.22 | 0 / 0 |
+| U041608-0380 | 4 | 697.0 | 697.0 | 706.0 | 9.0 | 1.29 | 800.0 | 103.0 | 14.78 | 2 / 2 |
+| U061606-0430 | 6 | 764.5 | 764.5 | 772.5 | 8.0 | 1.05 | 793.0 | 28.5 | 3.73 | 1 / 1 |
+| U061608-0570 | 6 | 1047.5 | 1048.0 | 1059.5 | 12.0 | 1.15 | 1234.0 | 186.5 | 17.80 | 7 / 8 |
+| U081606-0570 | 8 | 1014.0 | 1014.0 | 1019.5 | 5.5 | 0.54 | 1044.0 | 30.0 | 2.96 | 1 / 1 |
+| U101606-0720 | 10 | 1282.0 | 1282.0 | 1291.0 | 9.0 | 0.70 | 1345.0 | 63.0 | 4.91 | 2 / 2 |
+
+- **Pass:** on all 20 test cases the mean bound is ≤ M of the tree search and ≤ M of Lee & Lee, under both labellings. The smallest gap is U011606-0070 (0.5 moves: the tree search is on average half a move above the bound).
+- The labellings differ on 4 instances (R061608_0570_001, R081606_0570_001, U021606_0140_001, U061608_0570_001), each by one n′_non-BG term; ranks give the higher bound there. With the file's groups, g_top = n(L) + 1 of a bay can lie below the bay's groups, which weakens the non-BG term but never invalidates it (F2).
+- Lee & Lee's sequences may relocate between bays, so the per-bay non-BG terms are not a proven bound for their M; n′_REM + n′_BG = L is. Lee & Lee's M is above the larger bound anyway.
+
+## 7. Step 1e — time limit: evidence and options (13 Nov 2026)
+
+Script `step1e_time_limit.py`, output `step1e_output.txt`. The Proceedings paper states no time limit, no hardware and no parameter setting.
+
+### 7.1 Evidence
+- **Table 1 CT against bays and containers** (p. 262; CT per bay and per container computed):
+
+| test case | B | C | CT (s) | CT/B (s) | test case | B | C | CT (s) | CT/B (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| R011606-0070 | 1 | 70 | 8.2 | 8.20 | U011606-0070 | 1 | 70 | 1.2 | 1.20 |
+| R011608-0090 | 1 | 90 | 10.1 | 10.10 | U011608-0090 | 1 | 90 | 10.0 | 10.00 |
+| R021606-0140 | 2 | 140 | 9.1 | 4.55 | U021606-0140 | 2 | 140 | 2.9 | 1.45 |
+| R021608-0190 | 2 | 190 | 10.1 | 5.05 | U021608-0190 | 2 | 190 | 4.5 | 2.25 |
+| R041606-0280 | 4 | 280 | 9.5 | 2.38 | U041606-0280 | 4 | 280 | 6.1 | 1.52 |
+| R041608-0380 | 4 | 380 | 10.8 | 2.70 | U041608-0380 | 4 | 380 | 5.3 | 1.32 |
+| R061606-0430 | 6 | 430 | 10.2 | 1.70 | U061606-0430 | 6 | 430 | 5.6 | 0.93 |
+| R061608-0570 | 6 | 570 | 11.9 | 1.98 | U061608-0570 | 6 | 570 | 4.6 | 0.77 |
+| R081606-0570 | 8 | 570 | 10.7 | 1.34 | U081606-0570 | 8 | 570 | 3.8 | 0.47 |
+| R101606-0720 | 10 | 720 | 11.9 | 1.19 | U101606-0720 | 10 | 720 | 6.9 | 0.69 |
+
+  - R: CT 8.2–11.9 s for 1 to 10 bays, while every bay holds 70–95 containers (C/B), so the per-bay problem has about the same size in every test case. CT per bay falls from 8.2–10.1 s (one bay) to 1.19 s (ten bays). Pearson r(CT, B) = 0.75 over the 10 R test cases, but the totals stay close: one bay 8.2 and 10.1 s, two to ten bays 9.1–11.9 s.
+  - U: CT 1.2–10.0 s with no relation to the number of bays (r = 0.13). U011606 (1.2 s) is the test case where the tree search ends 0.5 moves above the bound (§6), consistent with searches that stop at the bound (Fig. 5 of C&OR).
+  - Instance-weighted mean CT 8.78 s (printed 8.8 s, p. 261).
+  - Reading of these numbers (not stated in the paper): a fixed limit per bay would make CT grow roughly in proportion to B on R; the observed totals near 10 s for every B fit a budget of about 10 s per instance shared by its bays, with the excess above 10 s (up to 1.9 s) from overruns and overhead. The paper gives neither the value nor how it is shared.
+- **C&OR setting** (C&OR 39, p. 306): 60 s per single-bay instance; Java, Core 2 Duo P7350 2 GHz. The Proceedings paper refers to [5] for the algorithm but restates none of its settings.
+- **Remark on parallel bays:** the bay solutions "could be computed in parallel, as they are completely independent of each other" (p. 260); as future work, "calculating the single bay results in parallel, giving each individual tree search instance more time to explore the solution space" (p. 261–262). This implies that in the reported runs the bays were computed one after another and that each bay search got less time than it would have in a parallel run, i.e. a time budget shared by the bays of an instance.
+- **Our Python C&OR implementation** (log forster_bortfeldt_2012.md §6–7; rows of `step3_full_summary.txt`): at 60 s per instance, all 40 instances of 10-6 and 10-10 and 15 (H = n) or 17 (H = T + 2) of 40 of 6-10 end by the limit; 0.75–2.7 ms per node. A Lee & Lee bay (16 stacks, 70–95 containers) is wider than any Caserta size, so most R bays are expected to end by the limit under every option (expectation, not measured).
+
+### 7.2 Options (not chosen)
+70 instances, 308 bay searches. Upper bounds of the total search time, sequential, if every bay runs to its limit:
+
+| option | limit | per bay (B = 1, 2, 4, 6, 8, 10) | per instance ≤ | total ≤ |
+|---|---|---|---|---|
+| T1 | 60 s per bay (the C&OR value, applied per bay) | 60 s | 600 s | 18 480 s = 5.13 h |
+| T2 | 10 s per instance, split equally over its bays | 10, 5, 2.5, 1.67, 1.25, 1 s | 10 s | 700 s = 0.19 h |
+| T3 | 60 s per instance (the C&OR value), split equally over its bays | 60, 30, 15, 10, 7.5, 6 s | 60 s | 4 200 s = 1.17 h |
+
+- T1 follows the C&OR setting literally per bay; its totals (up to 600 s per instance) are far above Table 1's CT.
+- T2 matches the order of Table 1's CT (§7.1), but 10 s is inferred from Table 1, not stated; in Python it leaves 1–1.25 s per bay on 8 and 10 bays, i.e. 457–1673 nodes per bay on 8 bays and 365–1339 on 10 bays at 0.747–2.738 ms per node (C&OR log §6.1), including the greedy (F15).
+- T3 keeps the C&OR value as a per-instance budget, consistent with a shared budget (p. 261–262), but with 60 s per instance where Table 1 reports 8.2–11.9 s on R.
+- Sub-questions for T2/T3: equal split, or unused time of a bay that ends early passed on to the next bay (P11); the limit includes the greedy (F15).
+- Expected actual runtime: close to the upper bound on R (wide bays, see above); lower on U where searches may end at the bound. Not measured: no search was run in step 1.
