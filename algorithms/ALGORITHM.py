@@ -17,7 +17,6 @@ class Algorithm:
         solve       use the algorithm to solve a problem
         main        the main function of the algorithm
         parameter    read a named parameter of this run
-        
     """
     
 
@@ -28,7 +27,9 @@ class Algorithm:
         self.problem = problem
         self.starttime = time.perf_counter()
         self.result = self.main()
-        relocations = sum(1 for step in self.result if step.to_bay is not None)
+        
+        
+        relocations = sum(1 for step in self.result if step.destination is not None)
         self.metric = {
             "relocations": float(relocations),
             "crane_time": 0.0,

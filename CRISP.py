@@ -1,7 +1,5 @@
 """
-    CRISP - Run one algorithm on one problem.
-
-starts the GUI of CRISP.
+    CRISP   (Container Relocation integrated Stowage Platform)
 
     python CRISP.py --problem <name> --algo <name>
 
@@ -19,7 +17,7 @@ Examples:
     
 displays the GUI of CRISP.
 
-    python CRISP.py --problem CRP-R --algo CM --layout benchmark/Caserta_dataset --class 3-3 --save
+    python CRISP.py --problem CRP-R --algo CM --benchmark caserta --size 3-3 
 
 runs CM on the 40 Caserta instances of class 3-3.
 
@@ -31,13 +29,19 @@ paper listed in the Reference section of the algorithm that was used.
 --------------------------------------------------------------------------
 """
 
-from __future__ import annotations
-
+import sys
 import argparse
-from pathlib import Path
-from types import SimpleNamespace
 
-
+def split_call(text):
+    name, sep, rest = text.partition("(")
+    if not sep:
+        return name, {}
+    extra = {}
+    for item in rest[:-1].split(","):
+        if item.strip():
+            key, value = item.split("=")
+            extra[key.strip()] = value.strip()
+    return name.strip(), extra
 
 
 def main() -> None:
@@ -48,25 +52,38 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem")
     parser.add_argument("--algo")
-    parser.add_argument("--layout")
-    parser.add_argument("--save")
-    args = parser.parse_args()
-
-    from core.registry import get_algorithm_class
-
-    algorithm_cls = get_algorithm_class(args.algo)   
-    problem_cls = get_problem_class(args.problem)   
+    parser.add_argument("--benchmark")
+    parser.add_argument("--size")
     
-    for path in layout_paths(args.layout, args.class_name):
-        data = read_layout(path)
-        problem = problem_cls(
+    args = parser.parse_args()
+    
+    
+    
+    from web.registry import get_algorithm_class, get_problem_class
+
+    problem_name, problem_extra = split_call(args.problem)
+    algo_name, algo_extra = split_call(args.algo)
+    ALG = get_algorithm_class(algo_name)
+    Pro = get_problem_class(problem_name)
+    
+    import importlib
+
+    reader = importlib.import_module(f"benchmark.{args.benchmark}")
+    for path in reader.layout_paths(args.benchmark, args.size):
+        data = reader.read_layout(path)
+        problem = Pro(
             num_bays=data["num_bays"],
             num_rows=data["num_rows"],
             max_tiers=data["max_tiers"],
             num_containers=data["num_containers"],
+            stacks=data["stacks"],
+            retrieval_order=data["retrieval_order"],
         )
-        moves, cost = crisp(algorithm_cls(config=_algorithm_config(algorithm_cls)), problem)
-    
+        for name, value in problem_extra.items():
+            if hasattr(problem, name):
+                setattr(problem, name, type(getattr(problem, name))(value))
+        algorithm = ALG(type("Config", (), {"extra": algo_extra})())
+        result, metric = algorithm.solve(problem)
 
 if __name__ == "__main__":
     main()
