@@ -250,3 +250,18 @@ Set by Thom after step 1. Runs: all 70 instances of R and U, P5–P7, P10, P12�
 - **(B)** In each of the 20 test cases, our mean M and our mean CMT (under P5–P7) are both below Lee & Lee's values in Table 1 (p. 262).
 - **Descriptive only:** CMT against the Forster–Bortfeldt column of Table 1, under the default model, plus the min–max over the 194 alternative readings of `readings_ge2346.json` (§4.1).
 - **Report per test case:** mean M, mean CMT, the differences with both columns of Table 1 (tree search and Lee & Lee), the number of bays that hit the 60 s limit, and the total runtime.
+
+## 9. Step 2 — the multi-bay algorithm on small blocks (13 Nov 2026)
+
+Code (0fb3815): `multibay.solve_bay` (one bay as an independent CRP instance: groups ranked 1…n (P12), G = containers in the bay (P13), the validated `TreeSearch` with the parameters of C&OR p. 306 and its own 60 s limit (P10, P14); its moves mapped back to block groups) and `multibay.solve_block` (the bays one after another (P11), then `merge`). Tests: `test_multibay.py`, class `TestSolveBlock` (6 tests, without a time limit, so deterministic). Script `step2_blocks.py` at T1, output `step2_output.txt`. All 50 tests of the package and the reader pass; the registry still loads 74 algorithms, no import failures.
+
+Checked on every block: the block plan passes `check_block_plan` (only top containers moved, removes in group order, height ≤ H, block empty), every relocation stays in its bay (P9), M ≥ the summed per-bay lower bound (ranked groups), and the moves of each bay equal those of a standalone single-bay run of `TreeSearch` on that bay (same layout, H, G and parameters). **Pass** on all three blocks.
+
+| block | bays, H, containers | M | relocations | summed bound | per bay: moves / bound / exact in-bay optimum / how the search ended |
+|---|---|---|---|---|---|
+| Example 1 (R020306_0020_001) | 2, 6, 20 | 30 | 10 | 27 | bay 1: 17 / 14 / 17 / tree exhausted (greedy 17); bay 2: 13 / 13 / 13 / bound reached |
+| hand-made A | 2, 4, 12 | 17 | 5 | 17 | 8 / 8 / 8 / bound; 9 / 9 / 9 / bound (greedy 10) |
+| hand-made B (one empty stack) | 2, 3, 6 | 9 | 3 | 9 | 6 / 6 / 6 / bound; 3 / 3 / 3 / bound |
+
+- **Example 1: M = 30 against Lee & Lee's 27** (p. 1145, equal to their lower bound). Lee & Lee relocate between bays (3 of their 7 relocations), Forster & Bortfeldt do not (P9). The exact in-bay optimum of each bay (IDA* of `test_forster_bortfeldt.exact_moves`, independent of the search code) is 17 and 13, so 30 is the minimum for any method that relocates only inside a bay; the search finds it in both bays.
+- The exact in-bay optimum comes from a diagnostic with the IDA* of the validated test file; it is not part of the method.
