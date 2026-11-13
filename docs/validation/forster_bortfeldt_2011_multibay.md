@@ -54,6 +54,8 @@ Categories as in the validation workflow: (a) required by the unified 2D setting
 | P5 | Counting b and s | Positions (bay, row), bays 1…B, rows 1…S inside a bay. b = \|bay(last) − bay(src)\| + \|bay(src) − bay(dst)\|, s the same over rows; gantry and trolley terms added. | p. 258 ("between his last position, the starting stack and the target stack"); Lee & Lee p. 1141 (stack numbering), p. 1143 (sequence of the crane's steps), p. 1144–1145 (s per bay, s per container width) | (b) | proposed |
 | P6 | Where removed containers go | A fixed truck position (bay 0, row 0): one bay before bay 1, beside row 1. Every remove crosses at least one bay. | p. 258 silent ("a dedicated spot"); Lee & Lee p. 1140 ("a truck waiting at one end of the crane"), p. 1141 (stack 0); one-bay times of both papers (§4.2); equals core's truck position | (b) | proposed |
 | P7 | Initial crane position | The truck position (0, 0). | p. 258 silent; Lee & Lee p. 1143 ("initial stowed position", not located) | (b) | proposed |
+| P8 | Merge | Algorithm 1 as printed: lowestGroupBlock is fixed for one pass over the bays; the bays are visited in index order; every bay holding that group gives its moves up to and including its next remove (one remove per bay and pass). A bay solution that ends before that remove, or has moves left at the end, is an error. | Algorithm 1 and Sec. 3.2 (p. 260–261) | — | reading |
+| P9 | Relocations between bays | None: each bay is solved on its own, so every relocation of the block solution stays in its bay. The crane still travels between bays (crane_time.py). | p. 260 ("completely independent"), p. 262 (inter-bay relocations as future work) | — | reading |
 
 ## 3. Step 1a — instances and reader (13 Nov 2026)
 
@@ -140,3 +142,18 @@ Not used for the validation. `KinematicsModel` / `compute_crane_time` (core/obje
 | positions on Caserta | — | `apply_caserta_file_to_yard` puts stack k at (bay k, row 1) (core/benchmarks/caserta.py), so on a single Caserta bay every stack change counts as a gantry move |
 
 On Example 1: core 2855.3 s (initial (1, 1)) and 2858.8 s (initial (0, 0)); `crane_time.py` 2243.2 s (start (0, 0)) and 2238.5 s (start (1, 1)). One difference at a time, start and truck (0, 0): p. 258 2243.2 s; t_ad per gantry trip instead of per move 2963.2 s; max of the axes per trip with t_ad per trip 2858.8 s (= core). Neither model gives 2346 s.
+
+## 5. Step 1c — merge (Algorithm 1) (13 Nov 2026)
+
+Code: `multibay.py` — `merge` (Algorithm 1, P8), `check_block_plan` (independent replay on plain lists: only top items move, a remove takes an item of the block's lowest group, no stack above H, block empty at the end; moves between bays allowed so that Lee & Lee's Example 1 can be checked), `to_positions` (block moves → (bay, row) from 1 for `crane_time.py`). It imports only `state.Move` and `crane_time.Position` from the package. Tests: `test_multibay.py`, class `TestMerge` (9 tests).
+
+Hand-made block: 3 bays × 2 stacks, H = 3, groups 1–8; bay 0 = [3, 6], [1]; bay 1 = [2, 5], [4]; bay 2 = [7], [8] (bottom to top). Given bay solutions (each accepted by the validated `plan.check_plan`): bay 0 remove 1, 6 → stack 1, remove 3, remove 6; bay 1 5 → stack 1, remove 2, 5 → stack 0, remove 4, remove 5; bay 2 remove 7, remove 8.
+- The merged sequence equals the one written out by hand from Algorithm 1 (11 moves: bay 0 for group 1; bay 1 relocation + remove for group 2; bay 0 relocation + remove for group 3; bay 1 relocation + remove for group 4; then 5, 6, 7, 8). **Pass.**
+- Removes come in group order 1…8, `check_block_plan` accepts the sequence (3 relocations) and the block is empty. **Pass.**
+- The subsequence of every bay equals that bay's solution, and no relocation leaves its bay (P9). **Pass.**
+- Algorithm 1 with repeated groups: with group 1 in two bays, both bays give one remove in the same pass, in bay order; a bay holding two items of group 1 gives one remove per pass. **Pass** (as printed; does not occur in the Lee & Lee instances, P3).
+- Errors: a bay solution that ends before its remove, a non-top move, moves left after the block is empty, and a missing bay solution raise. `check_block_plan` rejects a remove out of block group order, a full stack, a non-empty end and a non-top move. **Pass.**
+- Lee & Lee's Example 1 sequence (with its 3 relocations between bays) passes `check_block_plan` on Fig. 6 with 7 relocations; its time under P4–P7 is 2243.2 s (§4.1, regression value).
+- Merged plan timed by hand (positions from 1, start and truck (0, 0)): 81.8 + 79.4 + 79.4 + 75.9 + 75.9 + 80.6 + 80.6 + 86.4 + 81.8 + 93.4 + 95.8 = 911.0 s; `plan_time(to_positions(merge(...)))` gives the same. **Pass.**
+
+Other checks (`step1c_tests_registry.txt`): the 20 validated tests of `test_forster_bortfeldt.py`, the 15 of `test_multibay.py` and the 9 of `core/benchmarks/test_lee_lee.py` pass (44); the registry still loads 74 algorithms and no module under `algorithms/` fails to import; `state.py`, `search.py`, `plan.py` and `layout.py` are unchanged (`git diff` against 8a5252a is empty).
