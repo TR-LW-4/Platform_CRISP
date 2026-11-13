@@ -18,9 +18,20 @@ from __future__ import annotations
 
 import unittest
 
+from core.benchmarks.lee_lee import DEFAULT_LEE_LEE_DIR, parse_lee_lee
+
 from .crane_time import START, TRUCK, TimeParams, move_time, plan_time
-from .multibay import check_block_plan, merge, to_positions
+from .layout import lower_bound
+from .multibay import check_block_plan, merge, ranked, solve_bay, solve_block, to_positions
 from .plan import check_plan
+from .search import Params, TreeSearch
+from .state import Bay
+
+EXAMPLE1_FILE = next(DEFAULT_LEE_LEE_DIR.rglob("R020306_0020_001.txt"), None) if DEFAULT_LEE_LEE_DIR.is_dir() else None
+# Two hand-made 2-bay blocks (bottom to top), groups unique per block.
+BLOCK_A = ([[[5, 1, 9], [3], [12, 7]], [[2, 10], [8, 4, 11], [6]]], 4)
+BLOCK_B = ([[[4, 2], [1, 6]], [[3, 5], []]], 3)
+NO_LIMIT = Params(time_limit=None)
 
 # Three bays of two stacks, H = 3, groups 1-8, with hand-made bay solutions (d, r, g).
 BLOCK = [[[3, 6], [1]], [[2, 5], [4]], [[7], [8]]]
@@ -149,3 +160,47 @@ class TestMerge(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSolveBlock(unittest.TestCase):
+    """Step 2 (log §9): block plans of the multi-bay algorithm, without a time limit (deterministic)."""
+
+    def check_block(self, bays, H):
+        plan, runs = solve_block(bays, H, NO_LIMIT)
+        check_block_plan(bays, H, plan)                                   # top only, group order, H, empty
+        self.assertTrue(all(dst is None or dst[0] == src[0] for src, dst, _g in plan))   # P9
+        lb = sum(lower_bound(ranked(bay)[0]) for bay in bays)
+        self.assertEqual(lb, sum(r.lower_bound for r in runs))
+        self.assertGreaterEqual(len(plan), lb)
+        for b, bay in enumerate(bays):
+            layout, back = ranked(bay)
+            n = sum(map(len, bay))
+            alone = TreeSearch(Bay.from_stacks(layout, H, G=n), NO_LIMIT).run() if n else []
+            own = [(d, None if dst is None else dst[1], g) for (bb, d), dst, g in plan if bb == b]
+            self.assertEqual(own, [(d, r, back[g]) for d, r, g in alone])     # = standalone single-bay run
+            self.assertEqual(own, runs[b].moves)
+        return plan, runs
+
+    def test_ranked(self):
+        layout, back = ranked([[5, 9], [], [2]])
+        self.assertEqual(layout, [[2, 3], [], [1]])
+        self.assertEqual(back, {1: 2, 2: 5, 3: 9})
+
+    def test_default_parameters(self):
+        self.assertEqual(Params(), Params(10, 150, 3, 2, 60.0))                # P10, P14 (T1)
+
+    def test_empty_bay(self):
+        self.assertEqual(solve_bay([[], []], 3).moves, [])
+
+    def test_block_a(self):
+        self.check_block(*BLOCK_A)
+
+    def test_block_b_with_an_empty_stack(self):
+        self.check_block(*BLOCK_B)
+
+    @unittest.skipUnless(EXAMPLE1_FILE, f"R020306_0020_001 not found in {DEFAULT_LEE_LEE_DIR}")
+    def test_example_1(self):
+        ins = parse_lee_lee(EXAMPLE1_FILE)
+        self.assertEqual([[list(s) for s in bay] for bay in ins.groups], FIG6)
+        plan, _runs = self.check_block(ins.groups, ins.max_height)
+        self.assertGreaterEqual(len(plan), 27)                                 # Lee & Lee's L (p. 1145)

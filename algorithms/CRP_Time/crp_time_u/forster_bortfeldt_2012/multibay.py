@@ -3,7 +3,7 @@ Multi-bay retrieval of Forster & Bortfeldt (Oper. Res. Proc. 2011), Sec. 3.2:
 each bay is emptied by its own move sequence (the C&OR tree search, p. 260),
 and the bay sequences are merged into one block sequence by Algorithm 1
 (p. 261). Also an independent replay check of a block sequence and the
-conversion to crane_time positions. Decisions P1-P11:
+conversion to crane_time positions. Decisions P1-P14:
 docs/validation/forster_bortfeldt_2011_multibay.md §2.
 
 A bay move is (d, r, g) as in state.py (stacks from 0, r None for a remove).
@@ -21,15 +21,60 @@ retrieval problem", Operations Research Proceedings 2011, 257-262 (2012).
 
 from __future__ import annotations
 
+import time
 from collections import deque
-from typing import List, Optional, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .crane_time import Position
-from .state import Move
+from .search import Params, TreeSearch
+from .state import Bay, Move
 
 Slot = Tuple[int, int]
 BlockMove = Tuple[Slot, Optional[Slot], int]
 Block = Sequence[Sequence[Sequence[int]]]
+
+
+@dataclass(frozen=True)
+class BayRun:
+    """One bay search: its moves in block groups, wall clock (s), and how it ended."""
+    moves: List[Move]
+    seconds: float
+    timed_out: bool
+    optimal: bool
+    nodes: int
+    lower_bound: int
+    greedy_moves: int
+
+
+def ranked(stacks: Sequence[Sequence[int]]) -> Tuple[List[List[int]], Dict[int, int]]:
+    """P12: the bay's groups renumbered 1..n, order kept; returns the layout and rank -> block group."""
+    groups = sorted({g for s in stacks for g in s})
+    rank = {g: i + 1 for i, g in enumerate(groups)}
+    return [[rank[g] for g in s] for s in stacks], {i + 1: g for i, g in enumerate(groups)}
+
+
+def solve_bay(stacks: Sequence[Sequence[int]], H: int, params: Params = Params(),
+              clock: Callable[[], float] = time.perf_counter) -> BayRun:
+    """One bay as an independent CRP instance (p. 260): groups ranked (P12), G = containers in the bay (P13),
+    the C&OR search with its own time limit (P10, P14)."""
+    n = sum(map(len, stacks))
+    if n == 0:
+        return BayRun([], 0.0, False, True, 0, 0, 0)
+    layout, block_group = ranked(stacks)
+    t0 = clock()
+    ts = TreeSearch(Bay.from_stacks(layout, H, G=n), params, clock)
+    plan = ts.run()
+    seconds = clock() - t0
+    return BayRun([(d, r, block_group[g]) for d, r, g in plan], seconds, ts.timed_out, ts.optimal, ts.nodes,
+                  ts.lb_root, ts.greedy_moves)
+
+
+def solve_block(bays: Block, H: int, params: Params = Params(),
+                clock: Callable[[], float] = time.perf_counter) -> Tuple[List[BlockMove], List[BayRun]]:
+    """Every bay searched on its own, one after another in index order (P11), then merged (Algorithm 1)."""
+    runs = [solve_bay(bay, H, params, clock) for bay in bays]
+    return merge(bays, [r.moves for r in runs]), runs
 
 
 def merge(bays: Block, solutions: Sequence[Sequence[Move]]) -> List[BlockMove]:
