@@ -4,7 +4,7 @@ Checks for the multi-bay part of Forster & Bortfeldt (Oper. Res. Proc. 2011)
 p. 258 with the parameters of p. 261 on hand-computed moves (within a bay,
 across bays, removes), and the merge of Algorithm 1 (p. 261) on small blocks.
 
-  python -m unittest algorithms.CRP_Time.crp_time_u.forster_bortfeldt_2012.test_multibay   (from the repo root)
+  python -m unittest algorithms.CRP_Time.crp_time_r.forster_bortfeldt_2012.test_multibay   (from the repo root)
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.

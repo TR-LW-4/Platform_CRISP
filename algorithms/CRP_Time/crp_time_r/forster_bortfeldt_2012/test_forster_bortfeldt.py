@@ -7,7 +7,7 @@ the productive moves (Fig. 7), the plan checker, and greedy and search on the
 Caserta 3x3 and 3x4 instances (valid plans, never below the bound, never worse
 than the greedy, never below the exact optimum at H = T + 2).
 
-  python -m unittest algorithms.CRP_Time.crp_time_u.forster_bortfeldt_2012.test_forster_bortfeldt   (from the repo root)
+  python -m unittest algorithms.CRP_Time.crp_time_r.forster_bortfeldt_2012.test_forster_bortfeldt   (from the repo root)
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.
