@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. Open: O1–O5 (§3.4).
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. O1–O5 decided by Thom (§7).
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -75,7 +75,7 @@ Under `CRP_R.step` a relocation exists only when no remove is possible (the targ
 - **Search, Fig. 5 (p. 304).** Unchanged: sort keys (|cm| + n′_m, length descending, clean supply descending), nSucc = 10, time limit. The clean supply (def. 2, p. 302) is a property of the layout and is computed as before.
 - **The greedy and Caserta's min–max heuristic.** The paper calls its greedy "a generalisation of the min–max-heuristic described by Caserta et al. [18] that is not limited to BG moves from a stack that contains an item with lowest item group" (p. 304). Under R1 that generalisation falls away; the restricted greedy still differs from min–max as summarised on p. 301 in rule (2), which takes the top group of the target stack (F10), where min–max takes its minimum group. Observation only.
 
-### 3.4 Open decisions (not implemented)
+### 3.4 Open decisions (decided 13 Nov 2026, §7)
 
 | # | Point | Options | Note |
 |---|---|---|---|
@@ -147,6 +147,14 @@ Script `step1f_unchanged.py` → `step1f_unchanged.txt`, run at CRISP 6300e44; t
 - The full unit suite passes at 6a10012: 206 tests, the 162 of before plus the 44 of the restricted package.
 - The registry still loads 74 algorithms with no module under `algorithms/` failing to import (`step1f_registry.txt`). The restricted package defines no algorithm class, so it is not registered (not wired into CRP-Time, the UI or the CLI).
 
-## 7. Open decisions
+## 7. Decisions on O1–O5 (Thom, 13 Nov 2026)
 
-O1–O5 (§3.4); none is implemented. Outside this step: wiring the restricted search into CRP-Time (a `BaseAlgorithm` class, the f2/f2vert objective, `relocation_rule = "restricted"`).
+| # | Decision | Code |
+|---|---|---|
+| O1 | (c) Keep refusing layouts with repeated groups (R2): the Caserta and Lee & Lee instances have one group per container, and `CRP_R.step` assumes it (one target per priority). | none (R2 stays) |
+| O2 | (a) Keep the paper's parameters (maxGg = 2, p. 306); the GG slots are not given to FLG_BB. | none |
+| O3 | (a) Keep the paper's lower bound n′_m unchanged (R5). | none |
+| O4 | Multi-bay keeps relocations within a bay, as in the Proceedings paper (multi-bay log, P9), restricted to the target's stack. These are a subset of what `CRP_R.step` allows (§2: any non-full stack in any bay), so every plan stays feasible under `CRP_R.step`. Label: adapted. | step 2b (§9) |
+| O5 | (a) Keep the unreachable GG branch of `productive_moves` with its key (F11, F12), so the diff with the validated version stays the restriction only. | none |
+
+Outside these steps: wiring the restricted search into CRP-Time (a `BaseAlgorithm` class, the f2/f2vert objective, `relocation_rule = "restricted"`). On Caserta the platform maps each stack to its own bay (§2), so the integration must convert such a yard to one bay of S stacks before the single-bay search.
