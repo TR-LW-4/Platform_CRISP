@@ -5,7 +5,9 @@ the plain definitions of layout.py, the bound of Fig. 3 and against exact optima
 the move types of Sec. 4.2, one case per priority group of the greedy (Fig. 4),
 the productive moves (Fig. 7), the plan checker, and greedy and search on the
 Caserta 3x3 and 3x4 instances (valid plans, never below the bound, never worse
-than the greedy, never below the exact optimum at H = T + 2).
+than the greedy, never below the exact optimum at H = T + 2). Restricted as
+CRP_R.step (R1, docs/validation/forster_bortfeldt_2012_restricted.md): every
+greedy and search plan is also checked by check_restricted.
 
   python -m unittest algorithms.CRP_Time.crp_time_r.forster_bortfeldt_2012.test_forster_bortfeldt   (from the repo root)
 
@@ -46,6 +48,19 @@ def clean_supply(stacks, H, G):
         elif not any(badly_placed(s)):
             total += sum(s[-1] for _h in range(len(s), H))
     return total
+
+
+def check_restricted(stacks, plan):
+    """R1, plain lists: every relocation moves the top item of the stack that holds the lowest remaining group, and
+    that item is not of the lowest group. Validity itself is plan.check_plan's."""
+    bay = [list(s) for s in stacks]
+    for i, (d, r, g) in enumerate(plan):
+        low = min(min(s) for s in bay if s)
+        if r is not None and (low not in bay[d] or g == low):
+            raise AssertionError(f"move {i}: ({d}, {r}, {g}) is not from the stack of the lowest group {low}")
+        item = bay[d].pop()
+        if r is not None:
+            bay[r].append(item)
 
 
 def exact_moves(stacks, H):
@@ -113,6 +128,8 @@ class TestState(unittest.TestCase):
                 self.assertEqual(bay.lower_bound(), lower_bound(ref))
                 self.assertEqual(bay.clean_supply(), clean_supply(ref, H, n))
                 moves = bay.removes() or [m for m, *_ in bay.relocations()]
+                if not moves:                       # R1: every stack but the target's is full
+                    break
                 bay = bay.apply(rng.choice(moves))
                 if not bay.n:
                     break
@@ -131,7 +148,7 @@ class TestLowerBound(unittest.TestCase):
 
 
 class TestMoveTypes(unittest.TestCase):
-    """Sec. 4.2 (p. 302), stacks from 0."""
+    """Sec. 4.2 (p. 302), stacks from 0; under R1 every relocation is FLG_BG or FLG_BB."""
 
     @staticmethod
     def kind(stacks, move, H=6):
@@ -140,14 +157,24 @@ class TestMoveTypes(unittest.TestCase):
                 return ("FLG_" if flg else "FOG_") * before + "GB"[before] + "GB"[after]
         raise AssertionError(move)
 
+    @staticmethod
+    def moves(stacks, H=6):
+        return [m for m, *_ in Bay.from_stacks(stacks, H).relocations()]
+
     def test_fig3_and_small_layouts(self):
-        self.assertEqual(self.kind(FIG3, (2, 0, 15)), "FLG_BB")
-        self.assertEqual(self.kind(FIG3, (3, 0, 6)), "FOG_BB")
-        self.assertEqual(self.kind(FIG3, (0, 1, 2)), "GG")
-        self.assertEqual(self.kind(FIG3, (0, 2, 2)), "GB")
+        # Fig. 3: group 1 lies in stack 2 under 15; the lowest groups of stacks 0, 1, 3 (2, 3, 4) are below 15.
+        self.assertEqual(self.moves(FIG3), [(2, 0, 15), (2, 1, 15), (2, 3, 15)])
+        for m in self.moves(FIG3):
+            self.assertEqual(self.kind(FIG3, m), "FLG_BB")
         self.assertEqual(self.kind([[1, 5], [6]], (0, 1, 5)), "FLG_BG")
-        self.assertEqual(self.kind([[2, 3, 5], [1, 4], [6]], (0, 2, 5)), "FOG_BG")
-        self.assertEqual(self.kind([[2, 3, 5], [1, 4], []], (0, 2, 5)), "FOG_BG")
+        # group 1 in stack 1 under 4: onto stack 0 (lowest 2) BB, onto stack 2 (6) BG; stack 0 never donates.
+        self.assertEqual(self.moves([[2, 3, 5], [1, 4], [6]]), [(1, 0, 4), (1, 2, 4)])
+        self.assertEqual(self.kind([[2, 3, 5], [1, 4], [6]], (1, 0, 4)), "FLG_BB")
+        self.assertEqual(self.kind([[2, 3, 5], [1, 4], [6]], (1, 2, 4)), "FLG_BG")
+        self.assertEqual(self.moves([[2, 3, 5], [1, 4], []]), [(1, 0, 4), (1, 2, 4)])
+
+    def test_no_relocation_while_the_lowest_group_is_on_top(self):
+        self.assertEqual(self.moves([[2, 1], [3]]), [])
 
     def test_full_stack_is_no_receiver(self):
         self.assertNotIn((0, 1, 5), [m for m, *_ in Bay.from_stacks([[1, 5], [7, 6]], 2).relocations()])
@@ -176,7 +203,11 @@ class TestGreedy(unittest.TestCase):
         self.assertEqual(self.first([[1, 9], [2, 6], [4, 8]]), (0, 2, 9))
 
     def test_fig3_plan_is_valid(self):
-        self.assertEqual(check_plan(FIG3, 6, greedy(Bay.from_stacks(FIG3, 6))), 13)
+        bay = Bay.from_stacks(FIG3, 6)
+        plan = greedy(bay)
+        check_plan(FIG3, 6, plan)
+        check_restricted(FIG3, plan)
+        self.assertGreaterEqual(len(plan), bay.lower_bound())
 
 
 class TestProductiveMoves(unittest.TestCase):
@@ -187,19 +218,19 @@ class TestProductiveMoves(unittest.TestCase):
 
     def test_all_bg_when_there_is_one(self):
         bay = Bay.from_stacks([[1, 5], [2, 7], [6], [8]], 4)
-        self.assertEqual(productive_moves(bay, Params()), [(0, 2, 5), (0, 3, 5), (1, 3, 7)])
+        # 5 onto 6 and onto 8 are BG; 7 (stack 1, FOG_BG unrestricted) cannot move under R1.
+        self.assertEqual(productive_moves(bay, Params()), [(0, 2, 5), (0, 3, 5)])
 
-    def test_flg_bb_and_gg_sorted_and_cut(self):
+    def test_flg_bb_sorted_and_cut_and_no_gg(self):
         bay = Bay.from_stacks([[1, 9], [7, 3], [6, 4], [8, 5], [2, 10]], 5)
         # FLG_BB of 9 by 9 - lowest group of the target: 4, 5, 6 (7 cut by maxFlg_bb = 3);
-        # GG by (g - below) - (g - top) (F11): 3->4: -3, 3->5: -2 (4->5: -1 cut by maxGg = 2).
-        self.assertEqual(productive_moves(bay, Params()),
-                         [(0, 3, 9), (0, 2, 9), (0, 1, 9), (1, 2, 3), (1, 3, 3)])
+        # the GG moves 3->4, 3->5 of the unrestricted search start from stack 1, which cannot donate under R1.
+        self.assertEqual(productive_moves(bay, Params()), [(0, 3, 9), (0, 2, 9), (0, 1, 9)])
 
-    def test_gg_from_single_item_stack_uses_group_G(self):
+    def test_no_gg_under_the_restriction(self):
         bay = Bay.from_stacks([[1, 9], [3], [6, 4], [8, 5], [2, 10]], 5)
-        # 3->4: 4 - G = -6, 3->5: 5 - G = -5, 4->5: 5 - 6 = -1 (F12, G = 10)
-        self.assertEqual(productive_moves(bay, Params(max_flg_bb=0, max_gg=3)), [(1, 2, 3), (1, 3, 3), (2, 3, 4)])
+        # only 9 can move, and it is badly placed: no GG move exists (R4), so no FLG_BB and maxGg = 3 leave nothing
+        self.assertEqual(productive_moves(bay, Params(max_flg_bb=0, max_gg=3)), [])
 
 
 class TestCheckPlan(unittest.TestCase):
@@ -214,6 +245,12 @@ class TestCheckPlan(unittest.TestCase):
             check_plan([[1], [2]], 1, [(1, 0, 2)])
         self.assertEqual(check_plan(st, 2, [(0, None, 1), (0, None, 2), (1, None, 3)]), 0)
 
+    def test_check_restricted(self):
+        st = [[1, 5], [2, 7], [6]]
+        with self.assertRaises(AssertionError):      # 7 is not above the lowest group 1
+            check_restricted(st, [(1, 2, 7)])
+        check_restricted(st, [(0, 2, 5), (0, None, 1), (1, 0, 7), (1, None, 2)])
+
 
 class TestSearch(unittest.TestCase):
 
@@ -226,6 +263,8 @@ class TestSearch(unittest.TestCase):
                 ts = TreeSearch(bay, Params(time_limit=None))
                 plan = ts.run()
                 rel = check_plan(st, H, plan)
+                check_restricted(st, plan)
+                check_restricted(st, greedy(bay))
                 self.assertGreaterEqual(len(plan), bay.lower_bound(), (k, H))
                 self.assertLessEqual(len(plan), ts.greedy_moves, (k, H))
                 self.assertEqual(check_plan(st, H, greedy(bay)) + n, ts.greedy_moves)

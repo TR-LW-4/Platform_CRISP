@@ -2,8 +2,10 @@
 The tree search of Forster & Bortfeldt (2012), Sec. 6 (p. 303-306): the greedy
 initial solution (Fig. 4), the productive moves (Fig. 7), the compound moves
 (Fig. 6) and the depth-first search over them (Fig. 5). The objective is the
-number of moves, equivalently relocations (p. 306); relocations are
-unrestricted (p. 302). Decisions F1-F19: docs/validation/forster_bortfeldt_2012.md §2.
+number of moves, equivalently relocations (p. 306). Relocations are restricted
+as in CRISP's CRP_R.step (R1; unrestricted in the paper, p. 302). Decisions F1-F21:
+docs/validation/forster_bortfeldt_2012.md §2; R1-R5:
+docs/validation/forster_bortfeldt_2012_restricted.md §3.
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.

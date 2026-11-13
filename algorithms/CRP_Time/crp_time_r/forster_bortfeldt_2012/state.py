@@ -4,8 +4,9 @@ stacks of item groups (bottom to top) with, per stack, the running minimum and
 the number of badly placed items, so that a move, the lower bound (Sec. 5,
 p. 302), the clean supply (Table 1, p. 302) and the move types (Sec. 4.2,
 p. 302) cost O(S) instead of O(n). layout.py holds the plain definitions these
-must equal (test_forster_bortfeldt.py). Decisions F1-F19:
-docs/validation/forster_bortfeldt_2012.md §2.
+must equal (test_forster_bortfeldt.py). Decisions F1-F21:
+docs/validation/forster_bortfeldt_2012.md §2. Relocations are restricted as in
+CRISP's CRP_R.step (R1): docs/validation/forster_bortfeldt_2012_restricted.md §3.
 
 A move is (d, r, g): the top item, of group g, of stack d goes to stack r, or
 leaves the bay if r is None (a remove).
@@ -100,10 +101,11 @@ class Bay:
 
     def relocations(self):
         """Every applicable relocation with its type (Sec. 4.2, p. 302), stacks d then r ascending (F8):
-        (move, badly placed before, badly placed after, FLG)."""
+        (move, badly placed before, badly placed after, FLG). Restricted (R1): only the top item of the stack that
+        holds the currently lowest group, and only while that item is not on top."""
         low = self.low()
         for d, sd in enumerate(self.stacks):
-            if not sd:
+            if not sd or self.mins[d][-1] != low or sd[-1] == low:
                 continue
             g, before = sd[-1], self.top_bad(d)
             flg = before and self.mins[d][-2] == low
