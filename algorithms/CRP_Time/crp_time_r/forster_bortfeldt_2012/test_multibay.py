@@ -142,10 +142,26 @@ class TestMerge(unittest.TestCase):
             with self.subTest(plan=plan[:2]), self.assertRaises(ValueError):
                 check_block_plan(BLOCK, H, plan)
 
+    def test_block_check_rejects_unrestricted_relocations(self):
+        # O4: after the remove of 1, group 2 lies in (1, 0) under 5
+        cases = [
+            [MERGED[0], ((1, 0), (0, 1), 5)],                                 # 5 to another bay
+            [MERGED[0], ((0, 0), (0, 1), 6)],                                 # 6 does not block group 2
+            [((0, 0), (0, 1), 6)],                                            # 1 is on top: no relocation
+        ]
+        for plan in cases:
+            with self.subTest(plan=plan), self.assertRaisesRegex(ValueError, "O4"):
+                check_block_plan(BLOCK, 3, plan)
+        # the target itself is never relocated: 1 alone in (0, 1), lowest group of the block
+        with self.assertRaisesRegex(ValueError, "O4"):
+            check_block_plan(BLOCK, 3, [((0, 1), (0, 0), 1)])
+
     def test_example_1_of_lee_lee(self):
-        # global stack k = bay (k - 1) // 3, stack (k - 1) % 3; moves between bays are allowed in the check
+        # global stack k = bay (k - 1) // 3, stack (k - 1) % 3; Lee & Lee's sequence relocates 6 from bay 1 to bay 0
+        # (its third move), which the restricted check refuses (O4)
         plan = [(((a - 1) // 3, (a - 1) % 3), None if b == 0 else ((b - 1) // 3, (b - 1) % 3), c) for c, a, b in EXAMPLE1]
-        self.assertEqual(check_block_plan(FIG6, 6, plan), 7)
+        with self.assertRaisesRegex(ValueError, "move 2: relocation from bay 1 to bay 0"):
+            check_block_plan(FIG6, 6, plan)
         # P4-P7, not Lee & Lee's 2346 s (log §4.1); regression value of step1b_evaluator.txt
         self.assertAlmostEqual(plan_time(to_positions(plan)), 2243.2)
 
@@ -191,6 +207,10 @@ class TestSolveBlock(unittest.TestCase):
 
     def test_empty_bay(self):
         self.assertEqual(solve_bay([[], []], 3).moves, [])
+
+    def test_repeated_groups_across_bays_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "repeated groups"):
+            solve_block([[[1, 2]], [[3, 1]]], 3, NO_LIMIT)
 
     def test_block_a(self):
         self.check_block(*BLOCK_A)

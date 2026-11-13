@@ -6,6 +6,13 @@ and the bay sequences are merged into one block sequence by Algorithm 1
 conversion to crane_time positions. Decisions P1-P14:
 docs/validation/forster_bortfeldt_2011_multibay.md §2.
 
+Restricted (O4, docs/validation/forster_bortfeldt_2012_restricted.md §7):
+relocations stay within their bay (P9) and move the top of the stack that
+holds the block's lowest group. The bay searches are restricted (R1), and
+Algorithm 1 appends a bay's relocations only while that bay holds the
+block's lowest group; check_block_plan enforces both. Blocks with repeated
+groups are refused (R2, O1).
+
 A bay move is (d, r, g) as in state.py (stacks from 0, r None for a remove).
 A block move is (src, dst, g) with src = (bay, stack), dst = (bay, stack) or
 None for a remove, bays and stacks from 0.
@@ -73,6 +80,9 @@ def solve_bay(stacks: Sequence[Sequence[int]], H: int, params: Params = Params()
 def solve_block(bays: Block, H: int, params: Params = Params(),
                 clock: Callable[[], float] = time.perf_counter) -> Tuple[List[BlockMove], List[BayRun]]:
     """Every bay searched on its own, one after another in index order (P11), then merged (Algorithm 1)."""
+    groups = [g for bay in bays for s in bay for g in s]
+    if len(set(groups)) != len(groups):
+        raise ValueError("repeated groups: the restricted move rule needs one item per group in the block (R2, O1)")
     runs = [solve_bay(bay, H, params, clock) for bay in bays]
     return merge(bays, [r.moves for r in runs]), runs
 
@@ -110,8 +120,9 @@ def merge(bays: Block, solutions: Sequence[Sequence[Move]]) -> List[BlockMove]:
 
 def check_block_plan(bays: Block, H: int, plan: Sequence[BlockMove]) -> int:
     """Replays plan on plain lists: only top items move, a remove takes an item of the lowest group in the block,
-    no stack exceeds H, and the block is empty at the end; raises ValueError on the first violation.
-    Moves between bays are allowed. Returns the number of relocations."""
+    a relocation stays in its bay and moves the top of a stack that holds the block's lowest group, never that group
+    (R1, O4), no stack exceeds H, and the block is empty at the end; raises ValueError on the first violation.
+    Returns the number of relocations."""
     layout = [[list(s) for s in bay] for bay in bays]
     if any(len(s) > H for bay in layout for s in bay):
         raise ValueError("initial layout higher than H")
@@ -129,6 +140,11 @@ def check_block_plan(bays: Block, H: int, plan: Sequence[BlockMove]) -> int:
         rb, r = dst
         if not (0 <= rb < len(layout) and 0 <= r < len(layout[rb])) or dst == (b, d):
             raise ValueError(f"move {i}: bad target {dst}")
+        if rb != b:
+            raise ValueError(f"move {i}: relocation from bay {b} to bay {rb} (O4: within a bay)")
+        low = min(x for bay in layout for s in bay for x in s)
+        if low not in layout[b][d] or g == low:
+            raise ValueError(f"move {i}: relocation of {g} from {(b, d)}, lowest group {low} (R1, O4)")
         if len(layout[rb][r]) >= H:
             raise ValueError(f"move {i}: stack {dst} is full (H = {H})")
         layout[rb][r].append(layout[b][d].pop())
