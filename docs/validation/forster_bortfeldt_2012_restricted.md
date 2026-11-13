@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. O1–O5 decided by Thom (§7).
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5), 1d (R1, R2 implemented), 1e (checks: all pass on Caserta 3-3, 3-4, 4-4; gap to the exact restricted optimum 0 on 3-3 and 3-4, mean 0.125 and max 2 on 4-4) and 1f (unrestricted package unchanged) done. O1–O5 decided by Thom (§7). Step 2a (all 840 Caserta instances, 60 s): every hard check passes (§8).
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -158,3 +158,79 @@ Script `step1f_unchanged.py` → `step1f_unchanged.txt`, run at CRISP 6300e44; t
 | O5 | (a) Keep the unreachable GG branch of `productive_moves` with its key (F11, F12), so the diff with the validated version stays the restriction only. | none |
 
 Outside these steps: wiring the restricted search into CRP-Time (a `BaseAlgorithm` class, the f2/f2vert objective, `relocation_rule = "restricted"`). On Caserta the platform maps each stack to its own bay (§2), so the integration must convert such a yard to one bay of S stacks before the single-bay search.
+
+## 8. Step 2a — restricted single bay on all Caserta instances (13 Nov 2026)
+
+Scripts `step2a_run.py` → `step2a_run.jsonl` (with plans), `step2a_run.log`; `step2a_summary.py` → `step2a_summary.txt`. Both scripts were committed before any result (data repo f48255a) and ran unchanged. Settings:
+- all 840 Caserta instances (21 classes × 40), sequential, in class order, one machine;
+- CRISP 8731c2e (restricted package as at ba40168), rl Python 3.11.16;
+- H = `max_tiers` of the platform's config = T + 2 (asserted per instance); 60 s limit per instance (`Params(time_limit=60.0)`, as F18 of the unrestricted log); total wall clock 1.59 h.
+
+**Hard checks, all passed on all 840 instances** (in the run; a failure would have been stored and the run continued):
+1. replay through `CRP_R.step` itself, as in step 1e (§5, check 1): yards equal before every relocation, one relocation per `step`, move histories equal including the automatic retrievals, CRP_R done with an empty yard;
+2. `CRP_R.validate_plan`: feasible, same relocations, no errors;
+3. `plan.check_plan`: only top items moved, removes in group order, height ≤ H, bay empty;
+4. moves ≥ the lower bound of the initial layout.
+
+The summary rechecks every stored plan on plain lists (check_plan, the `CRP_R` restriction as in the unit tests' `check_restricted`, relocations, lower bound): 840/840.
+
+**Per class** (relocations; LB rel = lower bound − n; greedy = the restricted greedy of Fig. 4; mean s / max s = wall clock of a search; limit = searches stopped by the 60 s limit; bound = searches stopped at the lower bound, F19; the others exhausted the tree):
+
+| class | LB rel | greedy | search | mean s | max s | limit | bound |
+|---|---|---|---|---|---|---|---|
+| 3-3 | 4.000 | 5.175 | 5.000 | 0.00 | 0.00 | 0/40 | 11/40 |
+| 3-4 | 5.075 | 6.350 | 6.175 | 0.00 | 0.00 | 0/40 | 11/40 |
+| 3-5 | 5.950 | 7.050 | 7.025 | 0.00 | 0.00 | 0/40 | 11/40 |
+| 3-6 | 7.400 | 8.500 | 8.425 | 0.00 | 0.01 | 0/40 | 13/40 |
+| 3-7 | 8.325 | 9.350 | 9.325 | 0.00 | 0.00 | 0/40 | 14/40 |
+| 3-8 | 9.375 | 10.750 | 10.700 | 0.00 | 0.01 | 0/40 | 7/40 |
+| 4-4 | 7.700 | 11.000 | 10.325 | 0.00 | 0.01 | 0/40 | 2/40 |
+| 4-5 | 10.425 | 13.775 | 13.075 | 0.00 | 0.02 | 0/40 | 2/40 |
+| 4-6 | 11.325 | 14.750 | 14.375 | 0.01 | 0.02 | 0/40 | 1/40 |
+| 4-7 | 13.475 | 17.025 | 16.600 | 0.01 | 0.07 | 0/40 | 0/40 |
+| 5-4 | 11.000 | 17.025 | 15.900 | 0.01 | 0.03 | 0/40 | 0/40 |
+| 5-5 | 13.525 | 21.400 | 20.050 | 0.03 | 0.39 | 0/40 | 0/40 |
+| 5-6 | 17.025 | 24.400 | 23.550 | 0.05 | 0.23 | 0/40 | 0/40 |
+| 5-7 | 19.225 | 27.000 | 25.725 | 0.12 | 0.91 | 0/40 | 0/40 |
+| 5-8 | 22.325 | 29.900 | 29.000 | 0.21 | 3.04 | 0/40 | 0/40 |
+| 5-9 | 25.175 | 33.100 | 31.875 | 0.54 | 6.56 | 0/40 | 0/40 |
+| 5-10 | 27.800 | 35.950 | 35.050 | 1.70 | 17.50 | 0/40 | 0/40 |
+| 6-6 | 21.825 | 36.700 | 33.850 | 1.04 | 11.07 | 0/40 | 0/40 |
+| 6-10 | 36.175 | 51.275 | 49.225 | 19.74 | 60.02 | 7/40 | 0/40 |
+| 10-6 | 42.725 | 105.100 | 101.125 | 60.01 | 60.02 | 40/40 | 0/40 |
+| 10-10 | 70.775 | 146.400 | 146.325 | 60.01 | 60.02 | 40/40 | 0/40 |
+
+**Descriptive only, not a check.** On the same instances, against
+- **Jovanović et al. (2019) ACO**, our implementation, under its paper's own objective (relocations, restricted BRP, Table 1 setting): the stored per-instance records of its validation, `jovanovic_2019_step5/step5_b379031.jsonl` (check `T1_reloc`, seed 0, 5000 iterations, H = T + 2, CRISP b379031, plans replayed as feasible there; `jovanovic_2019.md`, Step 5). Not rerun on the current code. Its relocation objective runs without the Zhu et al. bound (`jovanovic_2019.md`, Check 1);
+- **the unrestricted search** (`crp_time_u`), the full run of the unrestricted validation, variant t2 (H = T + 2, 60 s, CRISP 87eb188; the package is unchanged since, §6), as a diagnostic only.
+
+better / equal / worse = the restricted search needs fewer / equal / more relocations than the other method on an instance; u limit = unrestricted searches stopped by the limit.
+
+| class | restricted | Jovanović | diff | b / e / w vs Jovanović | unrestricted | diff | b / e / w vs unrestricted | u limit |
+|---|---|---|---|---|---|---|---|---|
+| 3-3 | 5.000 | 5.000 | +0.000 | 0 / 40 / 0 | 5.025 | -0.025 | 1 / 38 / 1 | 0/40 |
+| 3-4 | 6.175 | 6.175 | +0.000 | 0 / 40 / 0 | 6.100 | +0.075 | 2 / 33 / 5 | 0/40 |
+| 3-5 | 7.025 | 7.025 | +0.000 | 0 / 40 / 0 | 6.875 | +0.150 | 0 / 34 / 6 | 0/40 |
+| 3-6 | 8.425 | 8.400 | +0.025 | 0 / 39 / 1 | 8.325 | +0.100 | 1 / 34 / 5 | 0/40 |
+| 3-7 | 9.325 | 9.275 | +0.050 | 0 / 38 / 2 | 9.225 | +0.100 | 1 / 36 / 3 | 0/40 |
+| 3-8 | 10.700 | 10.650 | +0.050 | 0 / 38 / 2 | 10.475 | +0.225 | 0 / 34 / 6 | 0/40 |
+| 4-4 | 10.325 | 10.200 | +0.125 | 0 / 36 / 4 | 10.000 | +0.325 | 2 / 27 / 11 | 0/40 |
+| 4-5 | 13.075 | 12.950 | +0.125 | 0 / 36 / 4 | 12.575 | +0.500 | 1 / 22 / 17 | 0/40 |
+| 4-6 | 14.375 | 14.025 | +0.350 | 0 / 32 / 8 | 13.700 | +0.675 | 1 / 22 / 17 | 0/40 |
+| 4-7 | 16.600 | 16.125 | +0.475 | 0 / 25 / 15 | 15.875 | +0.725 | 4 / 17 / 19 | 0/40 |
+| 5-4 | 15.900 | 15.450 | +0.450 | 0 / 25 / 15 | 15.575 | +0.325 | 7 / 19 / 14 | 0/40 |
+| 5-5 | 20.050 | 18.950 | +1.100 | 0 / 13 / 27 | 18.600 | +1.450 | 3 / 9 / 28 | 0/40 |
+| 5-6 | 23.550 | 22.150 | +1.400 | 0 / 15 / 25 | 21.900 | +1.650 | 0 / 10 / 30 | 0/40 |
+| 5-7 | 25.725 | 24.325 | +1.400 | 0 / 13 / 27 | 23.350 | +2.375 | 2 / 6 / 32 | 0/40 |
+| 5-8 | 29.000 | 27.775 | +1.225 | 0 / 17 / 23 | 26.525 | +2.475 | 1 / 4 / 35 | 0/40 |
+| 5-9 | 31.875 | 30.475 | +1.400 | 0 / 12 / 28 | 29.425 | +2.450 | 4 / 4 / 32 | 0/40 |
+| 5-10 | 35.050 | 33.350 | +1.700 | 0 / 13 / 27 | 32.225 | +2.825 | 3 / 5 / 32 | 2/40 |
+| 6-6 | 33.850 | 31.075 | +2.775 | 0 / 5 / 35 | 30.100 | +3.750 | 2 / 2 / 36 | 0/40 |
+| 6-10 | 49.225 | 46.025 | +3.200 | 0 / 3 / 37 | 44.150 | +5.075 | 1 / 3 / 36 | 17/40 |
+| 10-6 | 101.125 | 80.050 | +21.075 | 0 / 0 / 40 | 103.925 | -2.800 | 24 / 1 / 15 | 40/40 |
+| 10-10 | 146.325 | 114.025 | +32.300 | 0 / 0 / 40 | 138.925 | +7.400 | 14 / 0 / 26 | 40/40 |
+
+- Over all 840 instances: mean relocations restricted 29.176, Jovanović 25.880, unrestricted 27.756. Against Jovanović the restricted search is better on 0, equal on 480 and worse on 360 instances; against the unrestricted search better on 74, equal on 360, worse on 406.
+- On 3-3, 3-4 and 3-5 the restricted search equals Jovanović on every instance; on 3-3 and 3-4 both equal the exact restricted optimum (§5). From 4-7 on, the difference grows with the class (+1.1 to +3.2 on the 5-x and 6-x classes).
+- 10-6 and 10-10: every restricted search stops at the limit. On 10-10 the result (146.325) is barely below the greedy start (146.400); on 10-6 the search improves the greedy by 4.0 relocations. The unrestricted search stops at the limit there too; on 10-6 the restricted one needs fewer relocations on 24 of 40 instances.
+- These are observations, not a verdict: the tree search's parameters (p. 306) were set for the unrestricted problem (O2: kept).
