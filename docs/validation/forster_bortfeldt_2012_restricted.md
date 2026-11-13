@@ -265,6 +265,8 @@ Scripts `step2b_run.py` → `step2b_run.jsonl` (with plans), `step2b_run.log`; `
 
 The summary rechecks every stored plan (checks 1–3): 70/70.
 
+**Limitation of check 4.** The Lee replay uses `CRP_R`'s own `step`, automatic retrievals and `validate_plan`, but the bays × rows geometry and the initial layout come from a subclass in the data script (`LeeBlockCRP_R` in `step2b_run.py`), since the platform has no Lee loader: `CRP_R` loads only Caserta-format files, which it maps to one stack per bay. The replay therefore checks the plans against `CRP_R`'s move rules on a yard built outside the platform, not through a platform path for the Lee instances.
+
 **Descriptive only, not a check: per test case, restricted against unrestricted.**
 - Columns:
   - n: instances;
