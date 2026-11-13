@@ -8,7 +8,7 @@ Scope (supervisor's decision, task of 13 Nov 2026): two separate folders, each w
 
 ## Summary
 
-Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows) and 1c (decisions R1–R5, open points O1–O5) done.
+Status 13 Nov 2026: step 1a (copy), 1b (what `CRP_R.step` allows), 1c (decisions R1–R5, open points O1–O5) and 1d (R1, R2 implemented) done.
 
 ## 1. Step 1a — copy (13 Nov 2026)
 
@@ -84,3 +84,20 @@ Under `CRP_R.step` a relocation exists only when no remove is possible (the targ
 | O3 | A bound that uses the restriction | (a) keep n′_m (current, R5); (b) a restricted bound (e.g. counting the relocations a restricted solution needs beyond n_b). | n′_m is valid (R5); a tighter bound would change pruning and the optimality abort, so it would be a change to the method. |
 | O4 | Multi-bay (`multibay.py`, copied unchanged) | (a) leave as copied; (b) adapt and check against `CRP_R.step` on a multi-bay yard. | Under R1 each bay search is restricted. `CRP_R.step` also allows relocations to other bays (§2); the Proceedings method relocates only inside a bay (multi-bay log, P9). Neither the merge of restricted bay solutions nor a multi-bay replay through `CRP_R` is checked in this step. |
 | O5 | Unreachable code under R1 | (a) keep the GG branch of `productive_moves` with its key (F11, F12) (current); (b) remove it from the restricted copy. | Keeping them leaves the copy closest to the validated code; removing them is a clean-up, not forced. |
+
+## 4. Step 1d — forced changes (13 Nov 2026)
+
+Only R1 and R2 change code; R3–R5 hold without a change (§3.2).
+
+- **f8ed8f3, R1.** `state.py`, `Bay.relocations`: one condition — a stack donates only if it holds the currently lowest group (`self.mins[d][-1] == low`) and that item is not on top (`sd[-1] != low`). The rest of the generator (receivers not full and ≠ d, the BG/BB/FLG flags, the order of F8) is unchanged. `greedy` (Fig. 4) and `productive_moves` (Fig. 7) call this generator and need no change.
+  - Comments: the module docstrings of `state.py` and `search.py` say that the relocations are restricted as in `CRP_R.step` (R1) and point to this log. `search.py` called them "unrestricted (p. 302)". Both had "F1-F19", now "F1-F21" (F20, F21 were added after the docstrings).
+  - Tests (`test_forster_bortfeldt.py`), changed where an expectation needed an unrestricted move; the new expectations are derived by hand in the test comments:
+    - move types on Fig. 3 and small layouts: only the target stack's top moves, always FLG_BB or FLG_BG;
+    - no relocation while the lowest group is on top;
+    - Fig. 7 without the FOG_BG and GG moves;
+    - no GG under the restriction (replaces the F12 GG-key test).
+    - The Fig. 3 greedy test checks validity, the restriction and the bound instead of the unrestricted count of 13 relocations.
+    - The random-move test stops when no move is left (every stack but the target's full).
+    - New: `check_restricted`, a plain-list check of R1 independent of `state.Bay`. It is applied to the greedy and search plans of all Caserta 3x3 and 3x4 runs of the unit tests (at H = n and H = T + 2), and its own test shows that it rejects a relocation from another stack.
+- **ba40168, R2.** `Bay.from_stacks` raises `ValueError` on repeated groups. The random-layout test draws distinct groups; a test for the refusal.
+- 44 tests of the two restricted test modules pass at ba40168. `multibay.py` is unchanged (O4); its tests pass unchanged on the restricted search.
