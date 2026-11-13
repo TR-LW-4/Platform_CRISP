@@ -265,3 +265,18 @@ Checked on every block: the block plan passes `check_block_plan` (only top conta
 
 - **Example 1: M = 30 against Lee & Lee's 27** (p. 1145, equal to their lower bound). Lee & Lee relocate between bays (3 of their 7 relocations), Forster & Bortfeldt do not (P9). The exact in-bay optimum of each bay (IDA* of `test_forster_bortfeldt.exact_moves`, independent of the search code) is 17 and 13, so 30 is the minimum for any method that relocates only inside a bay; the search finds it in both bays.
 - The exact in-bay optimum comes from a diagnostic with the IDA* of the validated test file; it is not part of the method.
+
+## 10. Step 3 — smoke run, runtime only (13 Nov 2026)
+
+`solve_block` at T1 (60 s per bay, wall clock including the greedy) on R011606_0070_001, R101606_0720_001, R011608_0090_001 and R061608_0570_001, sequential, CRISP 1abe282 (algorithm code as at 0fb3815), rl Python 3.11.16. Two idle `python3.13` processes (VS Code) were present; nothing else ran. Script `step3_smoke.py`, data `step3_smoke.jsonl` / `.log`, summary `step3_summary.py` → `step3_smoke_summary.txt`. M and crane time were not recorded (Thom); the only result check is plan validity: all 4 block plans pass `check_block_plan` with every relocation inside its bay.
+
+| instance | bays | bays at the limit | per bay (s; L = limit, E = tree exhausted) | instance wall clock (s) |
+|---|---|---|---|---|
+| R011606_0070_001 | 1 | 1 | 60.01 L | 60.01 |
+| R101606_0720_001 | 10 | 2 | 2.31 E, 1.97 E, 60.02 L, 12.15 E, 0.33 E, 35.76 E, 60.06 L, 2.02 E, 7.18 E, 2.09 E | 183.91 |
+| R011608_0090_001 | 1 | 1 | 60.00 L | 60.00 |
+| R061608_0570_001 | 6 | 6 | 60.06, 60.06, 60.06, 60.01, 60.01, 60.01, all L | 360.23 |
+
+- 10 of 18 bays hit the limit; no bay reached its lower bound. Largest bay wall clock 60.06 s (overrun ≤ 0.06 s, F15). Smoke run total 664.1 s.
+- H = 6 bays: mean 22.17 s over 11 bays (3 at the limit); H = 8 bays: 60.03 s over 7 bays (all at the limit).
+- **Projected total of the full run** (70 instances, 308 bays: R H = 6 155, R H = 8 65, U H = 6 62, U H = 8 26): mean per bay by H × bays with that H = **10 274 s ≈ 2.85 h**; upper bound 308 × 60.06 s = 18 499 s ≈ 5.14 h. The sample has no U instance; U bays may end earlier at the bound (§7.1), so the projection is likely on the high side for U.
