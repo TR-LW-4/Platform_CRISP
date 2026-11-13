@@ -8,12 +8,15 @@ Scope (Wei, 26 Oct 2026; task of 13 Nov 2026): the CRP-Time version of Forster�
 
 ## Summary
 
-Status 13 Nov 2026: **step 1 (deterministic checks) done.** Decided by Thom after step 1, before any search run: P5–P7, P10, P12 (groups ranked per bay), P13 (G = containers in the bay), P14 (T1, 60 s per bay), and the validation criterion (§8, pre-registered).
+Status 13 Nov 2026: **steps 1–4 done; full run against the pre-registered criterion (§8): (A) PASS, (B) PASS 20/20 (§11).** Step 1 (deterministic checks) below. Decided by Thom after step 1, before any search run: P5–P7, P10, P12 (groups ranked per bay), P13 (G = containers in the bay), P14 (T1, 60 s per bay), and the validation criterion (§8, pre-registered).
 - 1a (§3): 71 instance files read; R 10 test cases × 5, U 10 × 2, plus Example 1. Every file matches its name (bays, 16 stacks, maximum height, containers); every container in slot 2 or higher of a U instance is badly placed; one group per container in every file. C + n_b equals Lee & Lee's lower bound L on all 71 files. Inside the Proceedings paper's Table 1 the Lee & Lee CT column does not recompute from Lee & Lee's tables (CMT and M do).
 - 1b (§4): `crane_time.py` implements p. 258 with the footnote parameters; 6 hand-computed tests pass. **Lee & Lee's Example 1 (2346 s) is not reproduced:** 2243.2 s under the proposed readings, and none of 720 combinations of readings gives 2346 s (closest 2283.2 s). The one-bay times of both papers (79.3–93.9 s per move) exceed the 68.4 s that a truck inside the bay allows, so a remove crosses a bay in both papers (P6). Core's RMGC model differs in three points (max of the axes, t_ad per trip, start (1, 1)): 2855.3 s on Example 1.
 - 1c (§5): Algorithm 1 implemented as printed (`multibay.py`); 9 tests on a hand-made 3-bay block and Example 1 pass: removes in group order, every bay keeps its own move order, block empty; the hand-timed merged plan (911.0 s) agrees.
 - 1d (§6): the mean summed per-bay bound is ≤ M of Table 1 for both methods on all 20 test cases. Tree-search gaps 0.5–82.2 moves (0.40–9.07 %), Lee & Lee gaps 3.0–336.0 (2.22–37.09 %).
 - 1e (§7): Table 1's CT stays at 8.2–11.9 s on R for 1 to 10 bays (1.19–10.10 s per bay); three options T1–T3 with upper bounds 5.13 h, 0.19 h and 1.17 h for all 70 instances. Not chosen.
+- Step 2 (§9): `solve_block` gives valid block plans on Example 1 and two hand-made blocks, each bay equal to a standalone run; Example 1 M = 30 against Lee & Lee's 27 (the exact in-bay optima 17 + 13; Lee & Lee relocate between bays).
+- Step 3 (§10): smoke run on 4 R instances, runtime only; projected full run 2.85 h.
+- Step 4 (§11): all 70 instances at T1, 2.10 h, 92 of 308 bays at the 60 s limit, all block plans valid. (A): instance-weighted mean M 574.20 against 579.2 (−0.86 %), PASS. (B): mean M and mean CMT below Lee & Lee in 20/20 test cases, PASS. Descriptive: (B) with the per-trip CMT 12/20 (the 8 misses all H = 6); our default CMT is 6.3–8.7 % below the FB column in every test case, every ≥ 2346 s reading 1.2–22.0 % above it.
 
 ## 1. Specification from the papers
 
@@ -284,3 +287,80 @@ Checked on every block: the block plan passes `check_block_plan` (only top conta
 - 10 of 18 bays hit the limit; no bay reached its lower bound. Largest bay wall clock 60.06 s (overrun ≤ 0.06 s, F15). Smoke run total 664.1 s.
 - H = 6 bays: mean 22.17 s over 11 bays (3 at the limit); H = 8 bays: 60.03 s over 7 bays (all at the limit).
 - **Projected total of the full run** (70 instances, 308 bays: R H = 6 155, R H = 8 65, U H = 6 62, U H = 8 26): mean per bay by H × bays with that H = **10 274 s ≈ 2.85 h**; upper bound 308 × 60.06 s = 18 499 s ≈ 5.14 h. The sample has no U instance; U bays may end earlier at the bound (§7.1), so the projection is likely on the high side for U.
+
+## 11. Step 4 — full run against the criterion (13 Nov 2026)
+
+`solve_block` at T1 (60 s per bay, wall clock including the greedy) on all 70 instances of R and U, sequential, in file-name order, CRISP 77cace1 (algorithm code as at 0fb3815), rl Python 3.11.16, the same machine and conditions as the smoke run (§10: two idle `python3.13` processes from VS Code, nothing else running). Driver `step4_full.py` (data repo 6b86d62, unchanged since the start), data `step4_full.jsonl` / `step4_full.log`. Summary `step4_summary.py` (data repo b9a9a70, committed before any full-run result was read and run unchanged afterwards) → `step4_summary.txt`. M and CMT are recomputed from the stored block plans. **All 70 block plans pass `check_block_plan`, and every relocation stays inside its bay.**
+
+### 11.1 Verdict (criterion of §8)
+
+- **(A) PASS.** The instance-weighted mean M over the 70 instances is 574.20, against 579.2 in Table 1: −5.00 moves (−0.86 %), inside the band [567.62, 590.78].
+- **(B) PASS, 20/20.** In every test case, our mean M and our mean CMT (P4–P7) are both below Lee & Lee's values in Table 1.
+- The 600 s diagnostic of §8 addition 2 is not triggered, because (A) passes. It was not run.
+
+Per test case: columns ΔM and ΔCMT are our mean minus the Table 1 value. "FB" is the tree-search column and "LL" the Lee & Lee column of Table 1 (p. 262). "Limit" counts the bays that hit the 60 s limit. Runtime is the summed instance wall clock.
+
+| test case | M | ΔM FB | ΔM FB % | ΔM LL | ΔM LL % | CMT (s) | ΔCMT FB % | ΔCMT LL % | (B) | limit | runtime (s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R011606-0070 | 108.0 | +0.0 | +0.0 | -17.4 | -13.9 | 8832.9 | -7.4 | -22.8 | yes | 1/5 | 75 |
+| R011608-0090 | 146.6 | -1.8 | -1.2 | -44.8 | -23.4 | 11627.4 | -7.0 | -31.4 | yes | 3/5 | 241 |
+| R021606-0140 | 215.0 | -0.6 | -0.3 | -15.2 | -6.6 | 18170.7 | -6.4 | -17.2 | yes | 1/10 | 228 |
+| R021608-0190 | 320.6 | -4.0 | -1.2 | -47.2 | -12.8 | 25567.1 | -6.6 | -25.1 | yes | 8/10 | 557 |
+| R041606-0280 | 439.2 | -0.6 | -0.1 | -15.0 | -3.3 | 38522.3 | -6.3 | -15.6 | yes | 5/20 | 409 |
+| R041608-0380 | 645.6 | -12.2 | -1.9 | -123.6 | -16.1 | 54324.3 | -7.7 | -26.6 | yes | 19/20 | 1155 |
+| R061606-0430 | 673.8 | -10.4 | -1.5 | -36.0 | -5.1 | 62008.8 | -8.0 | -17.2 | yes | 7/30 | 735 |
+| R061608-0570 | 969.2 | -19.0 | -1.9 | -272.8 | -22.0 | 85725.2 | -7.2 | -30.1 | yes | 28/30 | 1754 |
+| R081606-0570 | 898.0 | -12.2 | -1.3 | -47.4 | -5.0 | 86870.5 | -7.1 | -17.2 | yes | 8/40 | 873 |
+| R101606-0720 | 1119.8 | -14.2 | -1.3 | -49.4 | -4.2 | 113806.1 | -7.1 | -16.8 | yes | 8/50 | 872 |
+| U011606-0070 | 125.5 | +0.5 | +0.4 | -2.0 | -1.6 | 9321.8 | -7.5 | -19.2 | yes | 0/2 | 6 |
+| U011608-0090 | 165.5 | -1.5 | -0.9 | -12.0 | -6.8 | 12352.2 | -6.7 | -22.7 | yes | 0/2 | 8 |
+| U021606-0140 | 252.0 | +0.5 | +0.2 | -5.0 | -1.9 | 19420.1 | -7.1 | -19.0 | yes | 0/4 | 6 |
+| U021608-0190 | 353.5 | +0.0 | +0.0 | -47.0 | -11.7 | 26755.1 | -6.7 | -26.6 | yes | 0/4 | 43 |
+| U041606-0280 | 501.5 | +0.5 | +0.1 | -6.0 | -1.2 | 40545.0 | -8.7 | -19.0 | yes | 0/8 | 23 |
+| U041608-0380 | 706.0 | +0.0 | +0.0 | -94.0 | -11.8 | 56615.3 | -6.4 | -25.6 | yes | 0/8 | 79 |
+| U061606-0430 | 772.5 | +0.0 | +0.0 | -20.5 | -2.6 | 65841.2 | -7.1 | -19.6 | yes | 0/12 | 39 |
+| U061608-0570 | 1064.5 | +5.0 | +0.5 | -169.5 | -13.7 | 89078.1 | -6.6 | -27.3 | yes | 3/12 | 244 |
+| U081606-0570 | 1022.5 | +3.0 | +0.3 | -21.5 | -2.1 | 91083.9 | -6.8 | -19.9 | yes | 0/16 | 55 |
+| U101606-0720 | 1294.0 | +3.0 | +0.2 | -51.0 | -3.8 | 119611.5 | -6.7 | -21.9 | yes | 1/20 | 164 |
+
+- On R, mean M is at or below the tree-search column in all 10 test cases; on U it is within −1.5 to +5.0 moves of it. The largest gaps in moves are on R H = 8 (R061608-0570 −19.0, R041608-0380 −12.2) and on the larger R H = 6 test cases.
+- Instance-weighted mean CMT: 51 264.6 s (default model) and 63 144.1 s (per trip), against 55 184.7 s (FB) and 65 531.0 s (LL) in Table 1.
+
+### 11.2 Descriptive (not part of the verdict)
+
+**(B) with CMT under the per-trip variant (§8 addition 1): 12/20.** The criterion is not met in R021606-0140, R041606-0280, R061606-0430, R081606-0570, R101606-0720, U011606-0070, U021606-0140 and U041606-0280. These are all H = 6 test cases. In each of them, mean M is below Lee & Lee's, but the per-trip CMT is not below Lee & Lee's T. Every H = 8 test case meets it.
+
+**CMT against the Forster–Bortfeldt column.** Under the default model (P4–P7), our mean CMT is 6.3–8.7 % below the FB column in every test case, although mean M is close to the FB column (§11.1). Under every one of the 194 readings that give at least 2346 s on Example 1 (§4.1), it is above the FB column in every test case, by +1.2 % to +22.0 %. The FB column therefore lies between our default model and the cheapest of those readings in all 20 test cases. No single reading in the grid reproduces it, consistent with §4.1, where Example 1 does not identify the model. Not tuned further (Thom, step 1).
+
+| test case | FB CMT | CMT default | Δ % | CMT per trip | (B) per trip | 194 readings, min–max | Δ % vs FB, min to max |
+|---|---|---|---|---|---|---|---|
+| R011606-0070 | 9534.1 | 8832.9 | -7.4 | 11192.9 | yes | 9822.2–11452.5 | +3.0 to +20.1 |
+| R011608-0090 | 12501.6 | 11627.4 | -7.0 | 14763.4 | yes | 12985.6–15031.2 | +3.9 to +20.2 |
+| R021606-0140 | 19412.7 | 18170.7 | -6.4 | 22890.7 | **no** | 20082.9–23167.4 | +3.5 to +19.3 |
+| R021608-0190 | 27366.5 | 25567.1 | -6.6 | 32183.1 | yes | 28484.1–32707.5 | +4.1 to +19.5 |
+| R041606-0280 | 41103.3 | 38522.3 | -6.3 | 48106.3 | **no** | 42565.3–48664.3 | +3.6 to +18.4 |
+| R041608-0380 | 58853.0 | 54324.3 | -7.7 | 67388.3 | yes | 59919.1–68216.2 | +1.8 to +15.9 |
+| R061606-0430 | 67417.1 | 62008.8 | -8.0 | 76736.8 | **no** | 68270.2–77665.0 | +1.3 to +15.2 |
+| R061608-0570 | 92363.0 | 85725.2 | -7.2 | 105333.2 | yes | 93963.9–106053.6 | +1.7 to +14.8 |
+| R081606-0570 | 93556.5 | 86870.5 | -7.1 | 106422.5 | **no** | 94680.2–107479.2 | +1.2 to +14.9 |
+| R101606-0720 | 122450.9 | 113806.1 | -7.1 | 138638.1 | **no** | 124256.4–139703.8 | +1.5 to +14.1 |
+| U011606-0070 | 10077.4 | 9321.8 | -7.5 | 11761.8 | **no** | 10529.1–12298.4 | +4.5 to +22.0 |
+| U011608-0090 | 13244.6 | 12352.2 | -6.7 | 15532.2 | yes | 13776.3–15833.6 | +4.0 to +19.5 |
+| U021606-0140 | 20902.1 | 19420.1 | -7.1 | 24300.1 | **no** | 21577.7–24750.9 | +3.2 to +18.4 |
+| U021608-0190 | 28676.5 | 26755.1 | -6.7 | 33475.1 | yes | 29909.7–34343.9 | +4.3 to +19.8 |
+| U041606-0280 | 44406.2 | 40545.0 | -8.7 | 50345.0 | **no** | 45275.6–51837.0 | +2.0 to +16.7 |
+| U041608-0380 | 60499.3 | 56615.3 | -6.4 | 69955.3 | yes | 62544.3–71269.7 | +3.4 to +17.8 |
+| U061606-0430 | 70906.4 | 65841.2 | -7.1 | 80681.2 | yes | 72540.2–82775.6 | +2.3 to +16.7 |
+| U061608-0570 | 95397.4 | 89078.1 | -6.6 | 109278.1 | yes | 98057.9–110866.7 | +2.8 to +16.2 |
+| U081606-0570 | 97740.1 | 91083.9 | -6.8 | 110843.9 | yes | 99907.0–112915.9 | +2.2 to +15.5 |
+| U101606-0720 | 128218.5 | 119611.5 | -6.7 | 144731.5 | yes | 131455.4–148726.7 | +2.5 to +16.0 |
+
+### 11.3 Runtime
+
+- The total is 7566 s = 2.10 h, against the projection of 2.85 h from the smoke run (§10) and the upper bound of 5.14 h.
+- 92 of 308 bays hit the 60 s limit; the largest bay took 60.14 s (F15 overrun).
+- 19 bays reached their lower bound and 197 exhausted the tree.
+- Set R: 88 of 220 bays at the limit, 9 reached the bound.
+- Set U: 4 of 88 bays at the limit, 10 reached the bound.
+- One-bay test cases, bays at the limit: R011606-0070 1/5, R011608-0090 3/5, U011606-0070 0/2, U011608-0090 0/2.
+- The limit binds mostly on R H = 8: R041608-0380 had 19 of 20 bays at the limit and R061608-0570 28 of 30.
