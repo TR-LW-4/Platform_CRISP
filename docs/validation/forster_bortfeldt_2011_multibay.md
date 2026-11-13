@@ -127,7 +127,7 @@ Code: `crane_time.py` (`move_time`, `plan_time`, `TimeParams`; P4–P7). Tests: 
 | plan from (0,0): (1,2)→(1,4); remove (1,2); remove (1,4) | 1, 1, 2 | 4, 4, 8 | 1, 1, 1 | 78.3 + 78.3 + 86.6 = 243.2 |
 
 ### 4.4 Comparison with CRP-Time's RMGC model (`core/objectives.py`)
-Not used for the validation. `KinematicsModel` / `compute_crane_time` (core/objectives.py:42–131, 469–491) against p. 258 with P4–P7:
+Not used for the validation. `KinematicsModel` / `compute_crane_time` (core/objectives.py:42–131, 469–490) against p. 258 with P4–P7:
 
 | | p. 258 (`crane_time.py`) | core RMGC |
 |---|---|---|
