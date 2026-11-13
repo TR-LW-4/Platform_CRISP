@@ -50,6 +50,10 @@ Categories as in the validation workflow: (a) required by the unified 2D setting
 | P1 | File format of the Lee & Lee instances | Header `name B S H C X`; then one line per bay and stack, `b s k` and k pairs (id, group), bottom to top. X kept as `n_groups` (equals C and the number of distinct groups in every file). | Files; orientation fixed by Fig. 6 (p. 1144, Lee & Lee) and by L = C + n_b (Tables 1, 3) on all 71 files (§3) | — | reading |
 | P2 | Test case ↔ files | Test case `R011606-0070` (Table 1, p. 262) = files `R011606_0070_001`…`_005`; `R020306_0020_001` is Lee & Lee's Example 1, not part of the sets. | p. 260; Lee & Lee Tables 1, 3; §3 | — | reading |
 | P3 | Groups | One container per group (group = id in every file); retrieval order by increasing id. | Lee & Lee p. 1140; files | — | reading |
+| P4 | Acceleration term | ad = 1 once per move if b ≥ 1, also when both the empty and the loaded trip cross bays. | p. 258 (formula as printed); Lee & Lee describe two gantry trips per move (p. 1143) | — | reading (as printed) |
+| P5 | Counting b and s | Positions (bay, row), bays 1…B, rows 1…S inside a bay. b = \|bay(last) − bay(src)\| + \|bay(src) − bay(dst)\|, s the same over rows; gantry and trolley terms added. | p. 258 ("between his last position, the starting stack and the target stack"); Lee & Lee p. 1141 (stack numbering), p. 1143 (sequence of the crane's steps), p. 1144–1145 (s per bay, s per container width) | (b) | proposed |
+| P6 | Where removed containers go | A fixed truck position (bay 0, row 0): one bay before bay 1, beside row 1. Every remove crosses at least one bay. | p. 258 silent ("a dedicated spot"); Lee & Lee p. 1140 ("a truck waiting at one end of the crane"), p. 1141 (stack 0); one-bay times of both papers (§4.2); equals core's truck position | (b) | proposed |
+| P7 | Initial crane position | The truck position (0, 0). | p. 258 silent; Lee & Lee p. 1143 ("initial stowed position", not located) | (b) | proposed |
 
 ## 3. Step 1a — instances and reader (13 Nov 2026)
 
@@ -94,3 +98,45 @@ Source: `C:\Users\thomt\Downloads\Lee_instances.zip` (SHA-256 `9f8556f19d31f73ba
 - The Lee & Lee columns CMT and M of Table 1 (p. 262) equal the means of Lee & Lee's phase-three T and M (Tables 1 and 3) on all 20 test cases (within 0.05). The tree-search columns and these two Lee & Lee columns of the "Weighted avg." row recompute with instance weights (5 per R test case, 2 per U test case): 55184.72, 579.24, 8.78, 65530.96, 634.21. The transcription is consistent.
 - **Discrepancy inside Table 1, Lee & Lee CT:** only R011606-0070 (8204.3) equals the mean phase-three CPU time of Lee & Lee; the other 19 values do not equal the mean phase-three, phase-two or summed CPU time of their test case. Three of them equal the mean phase-three CPU of *another* test case (R041608-0380 ← R011608-0090, U011606-0070 ← R021606-0140, U041608-0380 ← R021608-0190). The column's weighted average is 15815.03, not the printed 19276.6. Not used anywhere in this validation.
 - The printed CMT difference of the weighted averages, −15.7 % (also in the abstract and on p. 261), recomputes to −15.79 % from the printed averages.
+
+## 4. Step 1b — crane-time evaluator (13 Nov 2026)
+
+Code: `crane_time.py` (`move_time`, `plan_time`, `TimeParams`; P4–P7). Tests: `test_multibay.py`, class `TestMoveTime` (6 tests, hand-computed times: within a bay with and without an empty trip, across bays (ad = 1, also with both trips across bays and one ad), removes to the truck, a chained three-move plan, and a remove with an in-bay truck passed as a parameter). Scripts: `step1b_readings.py` / `step1b_readings_grid.py` (readings against Example 1), `step1b_evaluator.py` (evaluator, one-bay bound, RMGC comparison); outputs `step1b_*.txt`.
+
+### 4.1 Worked example: Lee & Lee Example 1
+- Lee & Lee has one worked example with a time: Example 1 (Fig. 6, p. 1144), its 27-move sequence (p. 1145) and "can be completed in 2346 s" (p. 1146). `R020306_0020_001` is this instance (§3.1). Replayed on the file, the sequence is feasible (only top containers, removes in group order, H = 6 respected, block empty at the end): 27 moves, 7 relocations of which 3 between bays, 20 removes.
+- **Not reproduced.** Under the proposed readings (P4–P7) the sequence takes **2243.2 s (−102.8 s)**; the per-move breakdown is in `step1b_evaluator.txt`.
+- None of 720 combinations of the open readings gives 2346 s within 0.5 s: truck in the source bay or at bay 0, 1, 2 or 3, truck row 0, 1, 3 or 4; start at the first source, at the truck, (1, 0), (1, 1), (0, 0) or (0, 1); ad per move or per gantry trip; axes added or simultaneous (max per trip); with or without a return to the start. The closest is 2283.2 s (−62.8 s; truck at bay 0, start in bay 1, ad per move, axes added, return to the start after the last move). Readings that keep the truck in the source bay give 1403.5–1537.7 s (`step1b_readings.txt`).
+- The cause of the gap is unknown; no further readings were tried, so as not to fit the model to one number.
+
+### 4.2 One-bay instances: removes cross a bay in both papers
+- If a remove needs no gantry travel (truck at row 0 or 17 of the same 16-stack bay), every move of a one-bay plan takes at most t_pp + t_s·(16 + 16) = 68.4 s.
+- Reported times per move on one-bay test cases are all higher: Lee & Lee T/M 87.3–93.9 s (14 instances, Tables 1 and 3); Table 1 of the Proceedings paper, CMT/M of the tree search 88.28 (R011606), 84.24 (R011608), 80.62 (U011606), 79.31 s (U011608), and of Lee & Lee 88.52–91.27 s.
+- So in both papers a remove crosses at least one bay (or the truck lane lies at least 4.55 container widths beyond the outer stack, 7.88 for Lee & Lee's own T/M). This is the basis of P6. Under P6 every move that starts or ends at the truck pays the 40 s acceleration.
+
+### 4.3 Hand-computed unit tests
+| move (last → src → dst) | b | s | ad | time (s) |
+|---|---|---|---|---|
+| (1,3) → (1,3) → (1,7) | 0 | 4 | 0 | 34.8 |
+| (2,1) → (2,5) → (2,2) | 0 | 7 | 0 | 38.4 |
+| (1,2) → (1,2) → (3,5) | 2 | 3 | 1 | 80.6 |
+| (1,1) → (2,4) → (2,6) | 1 | 5 | 1 | 79.5 |
+| (1,1) → (3,1) → (2,1) | 3 | 0 | 1 | 80.5 |
+| remove: (2,3) → (2,3) → truck (0,0) | 2 | 3 | 1 | 80.6 |
+| remove: truck (0,0) → (1,1) → truck | 2 | 2 | 1 | 79.4 |
+| plan from (0,0): (1,2)→(1,4); remove (1,2); remove (1,4) | 1, 1, 2 | 4, 4, 8 | 1, 1, 1 | 78.3 + 78.3 + 86.6 = 243.2 |
+
+### 4.4 Comparison with CRP-Time's RMGC model (`core/objectives.py`)
+Not used for the validation. `KinematicsModel` / `compute_crane_time` (core/objectives.py:42–131, 469–491) against p. 258 with P4–P7:
+
+| | p. 258 (`crane_time.py`) | core RMGC |
+|---|---|---|
+| gantry and trolley | added: b·t_b + s·t_s over both trips | simultaneous: max(gantry, trolley) per trip |
+| acceleration t_ad | once per move if b ≥ 1 | once per trip with a bay change, so up to twice per move |
+| pick-up and place-down | t_pp once per move | spreader_s once per move (same) |
+| parameters | 3.5 / 1.2 / 40 / 30 | 3.5 / 1.2 / 40 / 30 (same) |
+| truck | (0, 0) (P6, proposed) | `_TRUCK_POS` = (0, 0) |
+| initial position | the truck (P7, proposed) | (1, 1) by default |
+| positions on Caserta | — | `apply_caserta_file_to_yard` puts stack k at (bay k, row 1) (core/benchmarks/caserta.py), so on a single Caserta bay every stack change counts as a gantry move |
+
+On Example 1: core 2855.3 s (initial (1, 1)) and 2858.8 s (initial (0, 0)); `crane_time.py` 2243.2 s (start (0, 0)) and 2238.5 s (start (1, 1)). One difference at a time, start and truck (0, 0): p. 258 2243.2 s; t_ad per gantry trip instead of per move 2963.2 s; max of the axes per trip with t_ad per trip 2858.8 s (= core). Neither model gives 2346 s.
