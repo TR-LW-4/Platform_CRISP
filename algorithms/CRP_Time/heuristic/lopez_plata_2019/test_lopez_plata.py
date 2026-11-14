@@ -181,16 +181,32 @@ class TestMeasures(unittest.TestCase):
 
     def test_h_by_hand(self):
         """T2, eq. 21-22 with n_T + epsilon = 6. With W_LOADED, EstRet of c at (s, t) is
-        (6-t)*1 + (6-t)*2 + 2s + 5*2 = 3(6-t) + 2s + 10.
-        Stack 1 = [9, 1, 8]: EstRet 27 + 24 + 21; 8 is non-located on stack 1, so its relocation goes to
-        stack 2 at tier n_T = 4: m(1,6,1,3) + m'(1,3,2,4) = 3 + (6 + 2 + 4) = 15; total 87.
-        Fig. 2: stacks 1-5 give 87 + 78 + 59 + 63 + 96 = 383 (only 8 is non-located).
+        (6-t)*1 + (6-t)*2 + 2s + 5*2 = 3(6-t) + 2s + 10. EstRel of a non-located c: descent to c, relocation
+        to tier n_T = 4 of the adjacent stack, then EstRet from that new stack (O27).
+        Stack 1 = [9, 1, 8]: EstRet 27 + 24; 8 is non-located on stack 1, so its relocation goes to
+        stack 2: m(1,6,1,3) + m'(1,3,2,4) + EstRet at (2, 4) = 3 + (6 + 2 + 4) + 20 = 35; total 86.
+        Fig. 2: stacks 1-5 give 86 + 78 + 59 + 63 + 96 = 382 (only 8 is non-located).
         Stack 3 = [3, 5] with eta1, gamma1, eta2, gamma2 = 1, 3, 5, 7: EstRet(3) = 5 + 25 + 21 + 25 = 76;
-        EstRet(5) = 4 + 20 + 21 + 25 = 70, plus m(3,6,3,2) + m'(3,2,2,4) = 4 + (20 + 7 + 10) = 41; total 187."""
-        self.assertEqual(h(Bay([[9, 1, 8], [], [], [], [], []], LOADED)), 87)
-        self.assertEqual(h(Bay(FIG2, LOADED)), 383)
-        self.assertEqual(h(Bay([[], [], [3, 5]], CostModel(n_T=4, eta1=1, gamma1=3, eta2=5, gamma2=7))), 187)
+        EstRel(5) = m(3,6,3,2) + m'(3,2,2,4) + m(2,6,2,4) + m'(2,4,0,1) = 4 + (20 + 7 + 10) + 2 + (10 + 14 + 25)
+        = 92; total 168."""
+        self.assertEqual(h(Bay([[9, 1, 8], [], [], [], [], []], LOADED)), 86)
+        self.assertEqual(h(Bay(FIG2, LOADED)), 382)
+        self.assertEqual(h(Bay([[], [], [3, 5]], CostModel(n_T=4, eta1=1, gamma1=3, eta2=5, gamma2=7))), 168)
         self.assertEqual(h(Bay([[], []], LOADED)), 0)
+
+    def test_fig3_estimates(self):
+        """Fig. 3 (p. 442), n_T = 4, epsilon = 2: EstRet(2), block 2 at (3, 1), is m(3,6,3,1) + m'(3,1,0,1);
+        EstRel(4), block 4 at (3, 2) above 2, is m(3,6,3,2) + m'(3,2,2,4) + EstRet(4) from its new stack,
+        m(2,6,2,4) + m'(2,4,0,1) (the labels of the figure). W_LOADED: 5 + 26 = 31 and 4 + 14 + 2 + 18 = 38;
+        W_PRINTED: 10 + 13 = 23 and 8 + 7 + 4 + 9 = 28."""
+        fig3 = [[9, 8], [11, 3, 5], [2, 4], [13, 6], [12, 10, 7], []]
+        self.assertEqual(non_located(fig3[2]), [False, True])
+        for cost, est_ret_2, est_rel_4 in ((LOADED, 31, 38), (PRINTED, 23, 28)):
+            self.assertEqual(cost.h_term(3, 1, False), est_ret_2)
+            self.assertEqual(cost.m(3, 6, 3, 1) + cost.m_loaded(3, 1, 0, 1), est_ret_2)
+            self.assertEqual(cost.h_term(3, 2, True), est_rel_4)
+            self.assertEqual(cost.m(3, 6, 3, 2) + cost.m_loaded(3, 2, 2, 4)
+                             + cost.m(2, 6, 2, 4) + cost.m_loaded(2, 4, 0, 1), est_rel_4)
 
     def test_non_located(self):
         """O21 (p. 437): non-located if some block below has an earlier retrieval order."""

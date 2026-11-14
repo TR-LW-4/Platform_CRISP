@@ -48,14 +48,16 @@ class CostModel:
 
     def h_term(self, s: int, t: int, bad: bool) -> float:
         """Term of the block at (s, t) in h (Sec. 5.1, p. 442).
-        EstRet: descend from n_T + epsilon to c, carry c to the retrieval point.
-        EstRel, if c is non-located: EstRet plus one relocation to the top tier n_T of the
-        adjacent stack towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1."""
-        descend = self.m(s, self.n_T + self.epsilon, s, t)
-        term = descend + self.m_loaded(s, t, 0, 1)
-        if bad:
-            term += descend + self.m_loaded(s, t, s + 1 if s == 1 else s - 1, self.n_T)
-        return term
+        EstRet (eq. 21): descend from n_T + epsilon to c, carry c to the retrieval point.
+        EstRel (eq. 22), if c is non-located: descend to c, relocate it to the top tier n_T of the
+        adjacent stack towards the retrieval point, s(c) - 1, or s(c) + 1 if s(c) = 1, plus EstRet
+        from that new stack ("the cost to retrieve the block from its new stack", p. 442; Fig. 3)."""
+        top = self.n_T + self.epsilon
+        if not bad:
+            return self.m(s, top, s, t) + self.m_loaded(s, t, 0, 1)
+        d = s + 1 if s == 1 else s - 1
+        return (self.m(s, top, s, t) + self.m_loaded(s, t, d, self.n_T)
+                + self.m(d, top, d, self.n_T) + self.m_loaded(d, self.n_T, 0, 1))
 
     def greedy_key(self, s: int, pick: int, d: int, drop: int) -> float:
         """Criterion of the greedy (Sec. 7.1, R1): m' of the relocation."""
