@@ -134,8 +134,12 @@ function assess(
   return { status, notes }
 }
 
-function displayNumber(value: number | null | undefined) {
-  return value === null || value === undefined ? '—' : value.toFixed(3)
+function displayNumber(value: number | null | undefined, maxDecimals = 2) {
+  if (value === null || value === undefined) return '—'
+  if (Number.isInteger(value) || Math.abs(value - Math.round(value)) < 1e-6) {
+    return Math.round(value).toLocaleString()
+  }
+  return value.toFixed(maxDecimals)
 }
 
 const HIDDEN_SUMMARY_METRICS = new Set([
@@ -431,6 +435,11 @@ export function Workbench({
 
   const latest = records.at(-1) ?? job?.latest
   const primaryMetric = problem?.metric_names[0] ?? 'Metric'
+  const primaryMetricLabel =
+    primaryMetric.toLowerCase() === 'relocations'
+      ? 'Relocations'
+      : primaryMetric.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
   const hasBatchSummary = Boolean(job?.batch_summary?.classes?.length)
   const showBatchSummarySlot = usingLayout || hasBatchSummary
   const layoutLabel = latest?.extra?.layout_file
@@ -440,6 +449,36 @@ export function Workbench({
     job?.batch_total && job.batch_total > 0
       ? `${(job.batch_index ?? 0) + 1} / ${job.batch_total}`
       : null
+
+  const hasRetrievals = latest?.metrics?.retrievals !== undefined
+  const hasCraneTime = latest?.metrics?.crane_time_s !== undefined
+  const totalContainers = problemValues.num_containers
+
+  const card3Label = batchLabel
+    ? 'Batch Progress'
+    : hasRetrievals
+      ? 'Containers Retrieved'
+      : (algorithm?.step_label ?? 'Decision Step')
+
+  const card3Value = batchLabel ?? (
+    hasRetrievals
+      ? `${displayNumber(latest!.metrics.retrievals)}${totalContainers ? ` / ${totalContainers}` : ''}`
+      : (latest?.step ?? '—')
+  )
+
+  const card4Label = batchLabel
+    ? (hasRetrievals ? 'Containers Retrieved' : hasCraneTime ? 'Crane Time' : 'Decision Moves')
+    : (hasCraneTime ? 'Crane Time' : 'Decision Moves')
+
+  const card4Value = batchLabel
+    ? (hasRetrievals
+        ? `${displayNumber(latest!.metrics.retrievals)}${totalContainers ? ` / ${totalContainers}` : ''}`
+        : hasCraneTime
+          ? `${displayNumber(latest!.metrics.crane_time_s, 1)}s`
+          : (latest?.step ?? records.length))
+    : (hasCraneTime
+        ? `${displayNumber(latest!.metrics.crane_time_s, 1)}s`
+        : (latest?.step ?? records.length))
   const canContinue = Boolean(
     job
     && (job.status === 'stopped' || job.status === 'failed')
@@ -638,21 +677,21 @@ export function Workbench({
         <section className="run-panel">
           <div className="run-panel-sticky">
             <div className="metric-cards">
-              <article className="metric-card">
-                <span>{algorithm?.step_label ?? 'Step'}</span>
-                <strong>{latest?.step ?? '—'}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Current metric</span>
+              <article className="metric-card" title="Total relocations performed in this run">
+                <span>{primaryMetricLabel}</span>
                 <strong>{displayNumber(latest?.metric)}</strong>
               </article>
-              <article className="metric-card">
-                <span>Best metric</span>
+              <article className="metric-card" title="Best (lowest) relocations achieved">
+                <span>Best {primaryMetricLabel}</span>
                 <strong>{displayNumber(latest?.best_metric)}</strong>
               </article>
-              <article className="metric-card">
-                <span>{batchLabel ? 'Batch' : 'Updates'}</span>
-                <strong>{batchLabel ?? records.length}</strong>
+              <article className="metric-card" title={batchLabel ? 'Batch evaluation progress' : 'Target containers retrieved from yard'}>
+                <span>{card3Label}</span>
+                <strong>{card3Value}</strong>
+              </article>
+              <article className="metric-card" title={hasCraneTime ? 'Total crane execution travel time in seconds' : 'Total decision moves evaluated'}>
+                <span>{card4Label}</span>
+                <strong>{card4Value}</strong>
               </article>
             </div>
 
