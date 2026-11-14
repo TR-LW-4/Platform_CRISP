@@ -62,7 +62,7 @@ python -m pytest crp_online/tests/test_all_baselines_840.py -v
 1. **Rolling Lookahead Horizon**:
    - As containers are retrieved, the horizon slides: the last container in the considered horizon $[T, T + \alpha N]$ is revealed.
    - $\alpha = 1.0$: all containers are known from the beginning, reducing to the **offline problem**.
-   - Unknown container strategies: `"maximum"` (proxy $= \text{max\_known} + 1$) and `"ignore"` (sentinel value).
+   - Unknown container strategies: `"maximum"`  and `"ignore"` (sentinel value).
 2. **Container Groups**:
    - **Normal (unknown within group)**: Only the group priority order is known. Exact container IDs inside groups are masked with group proxies.
    - **Relaxed (known within group)**: Container numbers inside the active target group are revealed; subsequent groups have only group proxies.
