@@ -22,6 +22,7 @@ The original implementation did not follow the paper: among other things, every 
 - Relocation count is always reported as a secondary metric.
 - The algorithm keeps the paper's relocation rule (restricted). Results are not compared with unrestricted algorithms, and the UI shows this property.
 - **Decision rule for interpretations (Thom, 14 Nov 2026; recorded before the results of V40 on O25 and O26 existed).** Interpretations are decided on the text of the paper; runtime is supporting evidence only. Where the printed version is executable, it takes precedence over a presumed-misprint correction. Any change to O02 or O25 changes results and requires rerunning the Fig. 8 validation (V22). Earlier decisions stay in force until they are reviewed under this rule; O02 (c) rests partly on runtime evidence (O02, L19), and its review is pending (Thom).
+- **Reading rule for the 4×4 check in V40 (Thom, 14 Nov 2026; recorded and committed before any ρ = 300 timing result of V40 existed).** The constant Python-vs-Java factor is estimated as our time / Table 3 on 3×5-1, a size where O02 (c) and the printed eq. 30 give the same β. 4×4-1 (n_C = 16) also gives the same β. If 4×4-1's ratio ÷ factor is within a factor 2 of 1, the factor is treated as constant across sizes with the same β, and the excess on 5×5 and 6×6 is attributed to the candidates that differ there (O26). If it is above 2, V40 reports that something other than β grows with size and does not attribute the excess to O26. A value below 0.5 is not covered by this rule and goes to Thom.
 
 ---
 
