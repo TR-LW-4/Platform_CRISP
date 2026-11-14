@@ -1,8 +1,9 @@
 """
 Algorithms for CRP-Online (2026 Paper).
 
-Exposes 10 published manual heuristics and pre-evolved/trainable Genetic Programming rules
-from Marko Đurasević, Mateja Đumić, Francisco Javier Gil Gala (2026).
+Exposes all 10 published manual heuristics (TLP, RI, MM, PR4, RDH, ERI, EM, EGH, PU1, PU2)
+and pre-evolved/trainable Genetic Programming rules from
+Marko Đurasević, Mateja Đumić, Francisco Javier Gil Gala (2026).
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from crp_online.heuristics.manual import (
     select_eri_destination,
     select_em_destination,
     select_egh_destination,
+    solve_pu1,
+    solve_pu2,
 )
 
 
@@ -77,10 +80,10 @@ class Base2026HeuristicAlgorithm(BaseAlgorithm):
             if hasattr(env, "_sim"):
                 target = env._sim.get_current_target()
                 src = env._sim.get_stack_of_container(target)
-                top_cid = env._sim.get_top_container(src)
-                obs_state = env._sim.get_observation()
+                obs_state = env.get_observation() if hasattr(env, "get_observation") else env._sim.get_observation()
+                moving_val = obs_state.get_top_obs_value(src)
                 try:
-                    dest = self._select_destination(obs_state, env._sim, src, float(top_cid))
+                    dest = self._select_destination(obs_state, env._sim, src, moving_val)
                 except Exception as err:
                     metric_val = 10000.0 + step
                     self._best_metric = metric_val
@@ -198,6 +201,168 @@ class EGH2026Algorithm(Base2026HeuristicAlgorithm):
         return select_egh_destination(obs, env_sim, src_stack, moving_val)
 
 
+class PU12026Algorithm(BaseAlgorithm):
+    """PU1 (Zhu et al. 2012) unrestricted heuristic with preventive relocations."""
+
+    name: str = "PU1 (Zhu 2012 - 2026 Engine)"
+    category: str = "Heuristic"
+    description: str = "Unrestricted Min-Max with preventive relocations from Zhu et al. (2012) / Durasevic et al. (2026)."
+    geometry: str = "single-bay"
+    objectives: List[str] = ["relocations"]
+    fidelity: str = "faithful"
+    compatible_problems: List[str] = [
+        "CRP-Online (2026 Paper)",
+        "CRP-Online",
+        "CRP-R",
+    ]
+
+    def train(
+        self,
+        problem_factory: Callable[[], BaseProblem],
+        result_queue: mp.Queue,
+        stop_event: mp.Event,
+    ) -> None:
+        env = problem_factory()
+        obs_grid, info = env.reset()
+
+        result_queue.put(
+            ProgressRecord(
+                step=0,
+                metric=0.0,
+                metrics=env.get_metrics() if hasattr(env, "get_metrics") else {},
+                best_metric=0.0,
+                progress=0.0,
+                yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                extra={"best_solution": []},
+            )
+        )
+
+        obs_state = env.get_observation() if hasattr(env, "get_observation") else env._sim.get_observation()
+        try:
+            moves = solve_pu1(
+                env=env._sim,
+                look_ahead_level=obs_state.look_ahead_level,
+                horizon_strategy=obs_state.horizon_strategy,
+                use_container_groups=obs_state.use_container_groups,
+                num_groups=obs_state.num_groups,
+                group_size=obs_state.group_size,
+                known_within_group=obs_state.known_within_group,
+                mode=obs_state.mode,
+            )
+            relocations = float(sum(1 for m in moves if not m.is_retrieval))
+            self._best_metric = relocations
+            self._best_solution = [m.destination.stack for m in moves if not m.is_retrieval]
+            result_queue.put(
+                ProgressRecord(
+                    step=len(moves),
+                    metric=relocations,
+                    metrics=env.get_metrics() if hasattr(env, "get_metrics") else {"relocations": relocations},
+                    best_metric=relocations,
+                    progress=1.0,
+                    yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                    extra={"best_solution": self._best_solution},
+                )
+            )
+        except Exception as err:
+            metric_val = 10000.0
+            self._best_metric = metric_val
+            result_queue.put(
+                ProgressRecord(
+                    step=1,
+                    metric=metric_val,
+                    metrics={"relocations": metric_val, "error": str(err)},
+                    best_metric=metric_val,
+                    progress=1.0,
+                    yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                    extra={"best_solution": [], "error": str(err)},
+                )
+            )
+
+    def get_best_solution(self) -> Optional[List[int]]:
+        return self._best_solution
+
+
+class PU22026Algorithm(BaseAlgorithm):
+    """PU2 (Zhu et al. 2012) unrestricted heuristic with preventive relocations."""
+
+    name: str = "PU2 (Zhu 2012 - 2026 Engine)"
+    category: str = "Heuristic"
+    description: str = "Unrestricted PR4 with preventive relocations from Zhu et al. (2012) / Durasevic et al. (2026)."
+    geometry: str = "single-bay"
+    objectives: List[str] = ["relocations"]
+    fidelity: str = "faithful"
+    compatible_problems: List[str] = [
+        "CRP-Online (2026 Paper)",
+        "CRP-Online",
+        "CRP-R",
+    ]
+
+    def train(
+        self,
+        problem_factory: Callable[[], BaseProblem],
+        result_queue: mp.Queue,
+        stop_event: mp.Event,
+    ) -> None:
+        env = problem_factory()
+        obs_grid, info = env.reset()
+
+        result_queue.put(
+            ProgressRecord(
+                step=0,
+                metric=0.0,
+                metrics=env.get_metrics() if hasattr(env, "get_metrics") else {},
+                best_metric=0.0,
+                progress=0.0,
+                yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                extra={"best_solution": []},
+            )
+        )
+
+        obs_state = env.get_observation() if hasattr(env, "get_observation") else env._sim.get_observation()
+        try:
+            moves = solve_pu2(
+                env=env._sim,
+                look_ahead_level=obs_state.look_ahead_level,
+                horizon_strategy=obs_state.horizon_strategy,
+                use_container_groups=obs_state.use_container_groups,
+                num_groups=obs_state.num_groups,
+                group_size=obs_state.group_size,
+                known_within_group=obs_state.known_within_group,
+                mode=obs_state.mode,
+            )
+            relocations = float(sum(1 for m in moves if not m.is_retrieval))
+            self._best_metric = relocations
+            self._best_solution = [m.destination.stack for m in moves if not m.is_retrieval]
+            result_queue.put(
+                ProgressRecord(
+                    step=len(moves),
+                    metric=relocations,
+                    metrics=env.get_metrics() if hasattr(env, "get_metrics") else {"relocations": relocations},
+                    best_metric=relocations,
+                    progress=1.0,
+                    yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                    extra={"best_solution": self._best_solution},
+                )
+            )
+        except Exception as err:
+            metric_val = 10000.0
+            self._best_metric = metric_val
+            result_queue.put(
+                ProgressRecord(
+                    step=1,
+                    metric=metric_val,
+                    metrics={"relocations": metric_val, "error": str(err)},
+                    best_metric=metric_val,
+                    progress=1.0,
+                    yard_snapshot=env.get_state_snapshot() if hasattr(env, "get_state_snapshot") else None,
+                    extra={"best_solution": [], "error": str(err)},
+                )
+            )
+
+    def get_best_solution(self) -> Optional[List[int]]:
+        return self._best_solution
+
+
 class GPOnline2026Algorithm(BaseAlgorithm):
     """Pre-evolved and trainable Genetic Programming relocation rules from Đurasević et al. (2026)."""
 
@@ -275,14 +440,14 @@ class GPOnline2026Algorithm(BaseAlgorithm):
             if hasattr(env, "_sim"):
                 target = env._sim.get_current_target()
                 src = env._sim.get_stack_of_container(target)
-                top_cid = env._sim.get_top_container(src)
-                obs_state = env._sim.get_observation()
+                obs_state = env.get_observation() if hasattr(env, "get_observation") else env._sim.get_observation()
+                moving_val = obs_state.get_top_obs_value(src)
                 try:
                     dest = select_best_stack_pf(
                         obs=obs_state,
                         env=env._sim,
                         source_stack=src,
-                        moving_val=float(top_cid),
+                        moving_val=moving_val,
                         expr=self._compiled_expr,
                     )
                 except Exception as err:

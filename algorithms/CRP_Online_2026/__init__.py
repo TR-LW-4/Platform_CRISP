@@ -1,6 +1,7 @@
 """
 CRP-Online (2026 Paper) Algorithms Package.
-Exports all 10 manual heuristics and Genetic Programming rules from Đurasević et al. (2026).
+Exports all 10 manual heuristics (TLP, RI, MM, PR4, RDH, ERI, EM, EGH, PU1, PU2)
+and Genetic Programming rules from Đurasević et al. (2026).
 """
 
 from .algorithm import (
@@ -13,6 +14,8 @@ from .algorithm import (
     ERI2026Algorithm,
     EM2026Algorithm,
     EGH2026Algorithm,
+    PU12026Algorithm,
+    PU22026Algorithm,
 )
 
 __all__ = [
@@ -25,4 +28,6 @@ __all__ = [
     "ERI2026Algorithm",
     "EM2026Algorithm",
     "EGH2026Algorithm",
+    "PU12026Algorithm",
+    "PU22026Algorithm",
 ]

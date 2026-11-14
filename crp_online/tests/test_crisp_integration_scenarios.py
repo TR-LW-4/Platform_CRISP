@@ -39,6 +39,8 @@ from algorithms.CRP_Online_2026.algorithm import (
     ERI2026Algorithm,
     EM2026Algorithm,
     EGH2026Algorithm,
+    PU12026Algorithm,
+    PU22026Algorithm,
 )
 
 # Reference benchmark file
@@ -54,7 +56,23 @@ ALL_2026_ALGORITHMS = [
     ERI2026Algorithm,
     EM2026Algorithm,
     EGH2026Algorithm,
+    PU12026Algorithm,
+    PU22026Algorithm,
 ]
+
+
+def _drain_queue(q: mp.Queue) -> List[ProgressRecord]:
+    """Reliably drains multiprocessing queue across all OS platforms."""
+    records: List[ProgressRecord] = []
+    while True:
+        try:
+            r = q.get(timeout=0.5)
+            records.append(r)
+            if r.progress >= 1.0:
+                break
+        except Exception:
+            break
+    return records
 
 
 # ==============================================================================
@@ -77,9 +95,7 @@ def test_caserta_benchmark_all_algorithms(algo_cls):
 
     algo.train(lambda: env, q, ev)
 
-    records = []
-    while not q.empty():
-        records.append(q.get())
+    records = _drain_queue(q)
 
     assert len(records) >= 2, "Must emit at least initial and final records"
     initial = records[0]
@@ -112,9 +128,7 @@ def test_ku_benchmark_all_algorithms(algo_cls):
 
     algo.train(lambda: env, q, ev)
 
-    records = []
-    while not q.empty():
-        records.append(q.get())
+    records = _drain_queue(q)
 
     assert len(records) >= 2, "Must emit at least initial and final records"
     initial = records[0]
@@ -160,9 +174,7 @@ def test_synthetic_procedural_matrix(stacks, containers, seed):
     ev = mp.Event()
     algo.train(lambda: env, q, ev)
 
-    records = []
-    while not q.empty():
-        records.append(q.get())
+    records = _drain_queue(q)
 
     assert len(records) >= 1
     final = records[-1]
@@ -347,9 +359,7 @@ def test_multiprocessing_progress_and_react_snapshot():
     proc.join(timeout=10)
     assert not proc.is_alive()
 
-    records = []
-    while not q.empty():
-        records.append(q.get())
+    records = _drain_queue(q)
 
     assert len(records) > 0
     first = records[0]
@@ -438,3 +448,153 @@ def test_information_barrier_metamorphic_invariance():
     dest_B = select_minmax_destination(obs_B, env_B, source_stack=0, moving_val=float(env_B.get_top_container(0)))
 
     assert dest_A == dest_B, f"Decision leaked hidden information: {dest_A} != {dest_B}"
+
+
+# ==============================================================================
+# Scenario 9: Rolling Horizon Progression & Offline Equivalence (α = 1.0)
+# ==============================================================================
+
+def test_rolling_horizon_offline_equivalence():
+    """When lookahead α = 1.0, all containers are known and equal to true IDs (offline problem)."""
+    cfg = ProblemConfig(
+        extra={
+            "info_structure": "rolling_horizon",
+            "lookahead_horizon": 1.0,
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env = CRP_Online_2026(config=cfg)
+    grid, _ = env.reset()
+
+    # In data3-3-1, 9 containers total: all containers in the observation must have obs_value == true_id
+    obs = env.get_observation()
+    for s in range(env._sim.num_stacks):
+        for h in range(obs.get_stack_height(s)):
+            container = obs.get_container(s, h)
+            assert container.is_known, "All containers must be known when α=1.0"
+            assert container.obs_value == float(container.true_id)
+
+
+def test_rolling_horizon_reveals_as_targets_retrieved():
+    """Tests that advancing targets in rolling horizon reveals previously hidden containers."""
+    cfg = ProblemConfig(
+        extra={
+            "info_structure": "rolling_horizon",
+            "lookahead_horizon": 0.0,
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env = CRP_Online_2026(config=cfg)
+    grid, _ = env.reset()
+
+    # In data3-3-1, container 1 was at the top, so _auto_retrieve() immediately retrieved it!
+    # Target is now 2. At α = 0.0, only the active target (2) is known; all other containers are unknown.
+    obs_initial = env.get_observation()
+    active_target = obs_initial.current_target
+    assert active_target == 2
+    for s in range(env._sim.num_stacks):
+        for h in range(obs_initial.get_stack_height(s)):
+            container = obs_initial.get_container(s, h)
+            if container.true_id == active_target:
+                assert container.is_known
+            else:
+                assert not container.is_known
+
+
+# ==============================================================================
+# Scenario 10: Container Groups (Normal vs Relaxed, Group Count vs Group Size)
+# ==============================================================================
+
+def test_container_groups_normal_vs_relaxed():
+    """Verifies that normal groups mask all non-targets, while relaxed reveals current group."""
+    cfg_normal = ProblemConfig(
+        extra={
+            "info_structure": "container_groups",
+            "group_mode": "normal",
+            "group_by": "group_count",
+            "group_count": 2,
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env_normal = CRP_Online_2026(config=cfg_normal)
+    env_normal.reset()
+    obs_norm = env_normal.get_observation()
+
+    # Normal mode: only target 1 is known
+    known_norm = sum(
+        1 for s in range(env_normal._sim.num_stacks)
+        for h in range(obs_norm.get_stack_height(s))
+        if obs_norm.get_container(s, h).is_known
+    )
+    assert known_norm == 1, "Normal group mode should only have target container known"
+
+    cfg_relaxed = ProblemConfig(
+        extra={
+            "info_structure": "container_groups",
+            "group_mode": "relaxed",
+            "group_by": "group_count",
+            "group_count": 2,
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env_relaxed = CRP_Online_2026(config=cfg_relaxed)
+    env_relaxed.reset()
+    obs_rel = env_relaxed.get_observation()
+
+    # Relaxed mode: all containers belonging to target's group are known
+    known_rel = sum(
+        1 for s in range(env_relaxed._sim.num_stacks)
+        for h in range(obs_rel.get_stack_height(s))
+        if obs_rel.get_container(s, h).is_known
+    )
+    assert known_rel > 1, f"Relaxed group mode must reveal all containers in target's group, got {known_rel}"
+
+
+# ==============================================================================
+# Scenario 11: Restricted vs Unrestricted Relocation Schemes
+# ==============================================================================
+
+def test_restricted_vs_unrestricted_simulation():
+    """Verifies that relocation_scheme correctly configures environment execution."""
+    cfg_rest = ProblemConfig(
+        extra={
+            "relocation_scheme": "restricted",
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env_rest = CRP_Online_2026(config=cfg_rest)
+    assert env_rest.relocation_scheme == "restricted"
+
+    cfg_unrest = ProblemConfig(
+        extra={
+            "relocation_scheme": "unrestricted",
+            "layout_file_path": str(BENCHMARK_FILE),
+        }
+    )
+    env_unrest = CRP_Online_2026(config=cfg_unrest)
+    assert env_unrest.relocation_scheme == "unrestricted"
+
+
+# ==============================================================================
+# Scenario 12: Clean Parameter Schema Verification
+# ==============================================================================
+
+def test_clean_config_schema_no_crane_bleed():
+    """Verifies that config_schema() excludes non-relevant crane/attribute keys."""
+    schema = CRP_Online_2026.config_schema()
+
+    # Must contain paper-specific parameters
+    assert "relocation_scheme" in schema
+    assert "info_structure" in schema
+    assert "lookahead_horizon" in schema
+    assert "unknown_treatment" in schema
+    assert "group_mode" in schema
+    assert "group_by" in schema
+    assert "group_count" in schema
+    assert "group_size" in schema
+
+    # Must NOT contain irrelevant crane or multi-bay yard toggles
+    forbidden = ["num_cranes", "crane_speed", "enable_weight", "enable_size", "enable_type", "num_bays"]
+    for k in forbidden:
+        assert k not in schema, f"Forbidden key {k} must not appear in CRP_Online_2026 config schema!"
+

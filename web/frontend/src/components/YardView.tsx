@@ -23,16 +23,23 @@ export function YardView({ snapshot, problemConfig }: YardViewProps) {
     return <div className="empty-visual">No yard snapshot in this update</div>
   }
 
-  const numBays = Number(problemConfig.num_bays ?? 4)
-  const numRows = Number(problemConfig.num_rows ?? 2)
-  const maxTiers = Number(problemConfig.max_tiers ?? 3)
+  const numBays = Number(problemConfig.num_bays ?? 1)
+  const numRows = Number(problemConfig.num_rows ?? snapshot.yard.length)
+  const maxTiers = Math.max(
+    Number(problemConfig.max_tiers ?? 3),
+    ...snapshot.yard.map((s) => s.containers.length),
+  )
   const byPosition = new Map(
     snapshot.yard.map((stack) => [`${stack.bay}-${stack.row}`, stack.containers]),
   )
-  const positions = Array.from({ length: numBays * numRows }, (_, index) => ({
-    bay: Math.floor(index / numRows) + 1,
-    row: (index % numRows) + 1,
-  }))
+  const positions = snapshot.yard.length > 0
+    ? snapshot.yard.map((stack) => ({ bay: stack.bay, row: stack.row }))
+    : Array.from({ length: numBays * numRows }, (_, index) => ({
+        bay: Math.floor(index / numRows) + 1,
+        row: (index % numRows) + 1,
+      }))
+
+  const allSingleBay = positions.every((p) => p.bay === 1)
 
   return (
     <div
@@ -66,7 +73,7 @@ export function YardView({ snapshot, problemConfig }: YardViewProps) {
                 )
               })}
             </div>
-            <span>B{bay}R{row}</span>
+            <span>{allSingleBay ? `S${row}` : `B${bay}R${row}`}</span>
           </div>
         )
       })}

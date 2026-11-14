@@ -24,6 +24,8 @@ import numpy as np
 from core.base_problem import BaseProblem, ProblemConfig
 import crp_online.core.environment as isolated_env
 import crp_online.core.instance as isolated_inst
+import crp_online.core.observation as isolated_obs
+from crp_online.config.defaults import INT_MAX_SENTINEL
 from crp_online.io.caserta_loader import parse_caserta_file
 from crp_online.io.ku_loader import parse_ku_as_problem_instance
 
@@ -78,12 +80,15 @@ class CRP_Online_2026(BaseProblem):
     100% self-contained Problem Adapter for Đurasević et al. (2026).
     Enforces pure-decision Gymnasium state with automatic post-transition retrieval.
     Zero dependency on legacy core.yard.Yard or problems.CRP_Stoch.
+    Supports Rolling Lookahead Horizon, Container Groups (Normal & Relaxed),
+    and both Restricted and Unrestricted Relocation Schemes.
     """
 
     name: str = "CRP-Online (2026 Paper)"
     description: str = (
         "Isolated, verified implementation of Durasevic et al. (2026) Online CRP. "
-        "Guarantees pure decision states and zero lookahead information leakage."
+        "Supports rolling lookahead horizons, normal/relaxed container groups, "
+        "and restricted/unrestricted relocation schemes with zero information leakage."
     )
     tags: List[str] = ["crp", "online", "2026-paper", "isolated", "yard-only"]
     metric_names: List[str] = ["relocations", "retrievals", "crane_time_s"]
@@ -96,8 +101,138 @@ class CRP_Online_2026(BaseProblem):
         render_mode: Optional[str] = None,
     ) -> None:
         super().__init__(config=config, render_mode=render_mode)
-        # Note: self.yard is inherited from BaseProblem but ignored; self._sim is the ground truth.
+        self._parse_paper_config()
         self._build_episode()
+
+    @classmethod
+    def config_schema(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Return the exact parameter schema for Đurasević et al. (2026) Online CRP.
+        Excludes all non-relevant multi-bay and crane attributes.
+        """
+        return {
+            "relocation_scheme": {
+                "type": "str",
+                "default": "restricted",
+                "options": ["restricted", "unrestricted"],
+                "label": "Relocation Scheme",
+                "help": (
+                    "Restricted RS (Algorithm 1): only moves blocking containers above target. "
+                    "Unrestricted RS (Algorithm 2): performs preventive relocations from candidate destination."
+                ),
+            },
+            "info_structure": {
+                "type": "str",
+                "default": "rolling_horizon",
+                "options": ["rolling_horizon", "container_groups"],
+                "label": "Information Structure",
+                "help": "Approach to container knowledge: Rolling Lookahead Horizon or Container Groups.",
+            },
+            # --- Rolling Horizon Parameters ---
+            "lookahead_horizon": {
+                "type": "float",
+                "default": 1.0,
+                "options": [1.0, 0.9, 0.7, 0.5, 0.3, 0.1, 0.0],
+                "label": "Lookahead Horizon (α)",
+                "help": "Lookahead ratio α: 1.0 = offline problem (all containers known). 0.0 = only target known.",
+                "visibleWhen": {"key": "info_structure", "values": ["rolling_horizon"]},
+            },
+            "unknown_treatment": {
+                "type": "str",
+                "default": "maximum",
+                "options": ["maximum", "ignore"],
+                "label": "Unknown Container Strategy",
+                "help": "Maximum: proxy = max_known + 1; Ignore: sentinel value.",
+                "visibleWhen": {"key": "info_structure", "values": ["rolling_horizon"]},
+            },
+            # --- Container Group Parameters ---
+            "group_mode": {
+                "type": "str",
+                "default": "normal",
+                "options": ["normal", "relaxed"],
+                "label": "Group Information Mode",
+                "help": (
+                    "Normal: only group order/proxy is known; container numbers within group are unknown. "
+                    "Relaxed: container numbers within the active target group are known."
+                ),
+                "visibleWhen": {"key": "info_structure", "values": ["container_groups"]},
+            },
+            "group_by": {
+                "type": "str",
+                "default": "group_count",
+                "options": ["group_count", "group_size"],
+                "label": "Group Definition",
+                "help": "Partition containers by Group Count (GC) or Group Size (GS).",
+                "visibleWhen": {"key": "info_structure", "values": ["container_groups"]},
+            },
+            "group_count": {
+                "type": "int",
+                "default": 2,
+                "options": [2, 3, 4, 5],
+                "label": "Group Count (GC)",
+                "help": "Number of groups into which containers are partitioned.",
+                "visibleWhen": [
+                    {"key": "info_structure", "values": ["container_groups"]},
+                    {"key": "group_by", "values": ["group_count"]},
+                ],
+            },
+            "group_size": {
+                "type": "int",
+                "default": 2,
+                "options": [2, 3, 4, 5],
+                "label": "Group Size (GS)",
+                "help": "Number of containers per group.",
+                "visibleWhen": [
+                    {"key": "info_structure", "values": ["container_groups"]},
+                    {"key": "group_by", "values": ["group_size"]},
+                ],
+            },
+            # --- Procedural / Synthetic Yard Parameters ---
+            "num_rows": {
+                "type": "int",
+                "default": 5,
+                "min": 3,
+                "max": 10,
+                "label": "Number of Stacks (S)",
+                "help": "Number of stacks for synthetic yard generation.",
+            },
+            "max_tiers": {
+                "type": "int",
+                "default": 4,
+                "min": 2,
+                "max": 10,
+                "label": "Max Stack Height (H)",
+                "help": "Maximum tiers/height for synthetic yard generation.",
+            },
+            "num_containers": {
+                "type": "int",
+                "default": 12,
+                "min": 1,
+                "max": 200,
+                "label": "Containers (N)",
+                "help": "Total number of containers for synthetic yard generation.",
+            },
+            "seed": {
+                "type": "int",
+                "default": 42,
+                "min": 0,
+                "max": 9999,
+                "label": "Generation Seed",
+                "help": "Random seed for reproducible synthetic layout generation.",
+            },
+        }
+
+    def _parse_paper_config(self) -> None:
+        """Parses paper-specific parameters from problem config extra dict."""
+        extra = self.config.extra or {}
+        self.relocation_scheme: str = str(extra.get("relocation_scheme", "restricted")).lower()
+        self.info_structure: str = str(extra.get("info_structure", "rolling_horizon")).lower()
+        self.lookahead_horizon: float = float(extra.get("lookahead_horizon", 1.0))
+        self.unknown_treatment: str = str(extra.get("unknown_treatment", "maximum")).lower()
+        self.group_mode: str = str(extra.get("group_mode", "normal")).lower()
+        self.group_by: str = str(extra.get("group_by", "group_count")).lower()
+        self.group_count: int = int(extra.get("group_count", 2))
+        self.group_size: int = int(extra.get("group_size", 2))
 
     def _setup_spaces(self) -> None:
         S = max(1, int(self.config.num_rows))
@@ -139,6 +274,24 @@ class CRP_Online_2026(BaseProblem):
         )
         self._sim = isolated_env.Environment(self._instance, store_moves=True)
 
+    def get_observation(self) -> isolated_obs.ObservationState:
+        """Constructs active ObservationState enforcing the 2026 information barrier."""
+        use_groups = (self.info_structure == "container_groups")
+        known_within = (self.group_mode == "relaxed")
+        g_size = self.group_size if self.group_by == "group_size" else None
+        g_count = self.group_count if self.group_by == "group_count" else 2
+
+        return isolated_obs.ObservationState(
+            env=self._sim,
+            look_ahead_level=self.lookahead_horizon,
+            horizon_strategy=self.unknown_treatment,
+            use_container_groups=use_groups,
+            num_groups=g_count,
+            group_size=g_size,
+            known_within_group=known_within,
+            mode="cpp_compat",
+        )
+
     def _auto_retrieve(self) -> None:
         """Automatically retrieves targets that reach the top of their stack."""
         while not self._sim.is_empty():
@@ -155,9 +308,43 @@ class CRP_Online_2026(BaseProblem):
         options: Optional[Dict] = None,
     ) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed, options=options)
+        self._parse_paper_config()
         self._build_episode()
         self._auto_retrieve()
         return self._get_obs_grid(), {"action_mask": self._get_action_mask()}
+
+    def _execute_preventive_relocations(self, src_stack: int, dest_stack: int) -> None:
+        """Executes Algorithm 2 preventive relocations to clear smaller containers from destination stack."""
+        while True:
+            if self._sim.get_stack_height(dest_stack) == 0:
+                break
+
+            obs = self.get_observation()
+            sc_top = obs.get_top_obs_value(src_stack)
+            dc_top = obs.get_top_obs_value(dest_stack)
+
+            if sc_top is not None and dc_top is not None and dc_top < sc_top:
+                best_s1: Optional[int] = None
+                lowest_index: float = float(INT_MAX_SENTINEL)
+
+                for s1 in range(self._sim.num_stacks):
+                    if s1 == src_stack or s1 == dest_stack or self._sim.is_stack_full(s1):
+                        continue
+
+                    s1_lowest = obs.get_stack_min_obs_value(s1)
+                    if s1_lowest > dc_top:
+                        if lowest_index > s1_lowest:
+                            lowest_index = s1_lowest
+                            best_s1 = s1
+                        elif s1_lowest == float(INT_MAX_SENTINEL):
+                            lowest_index = 0.0
+                            best_s1 = s1
+
+                if best_s1 is not None:
+                    self._sim.relocate(dest_stack, best_s1)
+                    continue
+
+            break
 
     def step(
         self, action: int
@@ -179,6 +366,10 @@ class CRP_Online_2026(BaseProblem):
             # Penalty applied to primary metric
             self._sim.total_relocations += 10000
             return self._get_obs_grid(), -10000.0, True, False, self.get_metrics()
+
+        # Unrestricted relocation scheme: execute preventive relocations from dest_stack
+        if self.relocation_scheme == "unrestricted":
+            self._execute_preventive_relocations(src_stack, dest_stack)
 
         # Execute physical relocation
         self._sim.relocate(src_stack, dest_stack)
@@ -208,12 +399,12 @@ class CRP_Online_2026(BaseProblem):
         """Emits observed values respecting the information-hiding barrier."""
         H, S = self.observation_space.shape
         grid = np.full((H, S), -1.0, dtype=np.float64)
+        obs = self.get_observation()
 
         for s in range(min(S, self._sim.num_stacks)):
-            stack_cids = self._sim.get_stack_containers(s)
-            for t, cid in enumerate(stack_cids):
+            for t in range(obs.get_stack_height(s)):
                 if t < H:
-                    grid[t, s] = float(cid)
+                    grid[t, s] = obs.get_container(s, t).obs_value
         return grid
 
     def get_metrics(self) -> Dict[str, float]:
@@ -233,9 +424,13 @@ class CRP_Online_2026(BaseProblem):
 
     def get_state_snapshot(self) -> Dict[str, Any]:
         """Snapshot for CRISP React GUI visualizer."""
-        # CRISP web visualizer expects {(bay, row): [containers from bottom to top]}
         yard_dict: Dict[Tuple[int, int], List[int]] = {
             (1, s + 1): list(self._sim.get_stack_containers(s))
+            for s in range(self._sim.num_stacks)
+        }
+        obs = self.get_observation()
+        obs_dict: Dict[Tuple[int, int], List[float]] = {
+            (1, s + 1): [obs.get_container(s, h).obs_value for h in range(obs.get_stack_height(s))]
             for s in range(self._sim.num_stacks)
         }
         recent_history = [
@@ -249,6 +444,7 @@ class CRP_Online_2026(BaseProblem):
         ]
         return {
             "yard": yard_dict,
+            "obs_yard": obs_dict,
             "metrics": self.get_metrics(),
             "history": recent_history,
         }
