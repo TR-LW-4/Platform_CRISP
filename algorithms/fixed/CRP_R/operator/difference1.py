@@ -20,23 +20,23 @@ from typing import Optional
 
 def choose_destination(stacks, max_tiers) -> Optional[int]:
     """Destination of the current top blocker under Difference1."""
-    present = [item for stack in stacks for item in stack]
-    if not present:
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
         return None
-    n = max(present)
-    target = min(present)
+    max_priority = max(priorities)
+    target = min(priorities)
     source = next(index for index, stack in enumerate(stacks) if target in stack)
     if stacks[source][-1] == target:
         return None
 
     blocker = stacks[source][-1]
     best_top = -1
-    best_good = smallest_top = n * n
+    best_good = smallest_top = max_priority * max_priority
     bad = good = smallest = -1
     for index, stack in enumerate(stacks):
         if index == source or len(stack) >= max_tiers:
             continue
-        earliest = min(stack) if stack else n + 1
+        earliest = min(stack) if stack else max_priority + 1
         if earliest < blocker:
             top = stack[-1]
             if top < blocker and top > best_top:

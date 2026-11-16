@@ -13,26 +13,24 @@ paper listed in the Reference section.
 --------------------------------------------------------------------------
 """
 
-from typing import Sequence
-
-from algorithms.CRP_R.bound.lb1 import lb1
+from algorithms.fixed.CRP_R.LB.lb1 import lb1
 
 
-def lb2(stacks: Sequence[Sequence[int]], max_tiers: int) -> int:
-    total = lb1(stacks)
-    present = [priority for stack in stacks for priority in stack]
-    if not present:
-        return total
-    target = min(present)
+def lb2(stacks, max_tiers) -> int:
+    lower_bound = lb1(stacks, max_tiers)
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
+        return lower_bound
+    target = min(priorities)
     source = next(index for index, stack in enumerate(stacks) if target in stack)
     tier = stacks[source].index(target)
     for priority in stacks[source][tier + 1:]:
         if not _has_safe_stack(stacks, max_tiers, source, priority):
-            total += 1
-    return total
+            lower_bound += 1
+    return lower_bound
 
 
-def _has_safe_stack(stacks: Sequence[Sequence[int]], max_tiers: int, source: int, priority: int) -> bool:
+def _has_safe_stack(stacks, max_tiers, source, priority) -> bool:
     for index, stack in enumerate(stacks):
         if index == source or len(stack) >= max_tiers:
             continue

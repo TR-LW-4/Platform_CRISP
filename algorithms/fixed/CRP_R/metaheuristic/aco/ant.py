@@ -9,7 +9,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from .scoring import compute_lb, dif
+from algorithms.fixed.CRP_R.LB.lb1 import lb1
+from .scoring import dif
 from .pheromone import Solution
 
 
@@ -53,46 +54,46 @@ def build_solution(
     for target in range(1, n_total + 1):
         if not valid:
             break
-        src = loc[target]
-        if src is None:
+        source = loc[target]
+        if source is None:
             continue
 
-        while valid and stacks[src] and stacks[src][-1] != target:
-            blocking = compute_lb({i: stack for i, stack in enumerate(stacks)})
-            if cost + blocking >= best_cost:
+        while valid and stacks[source] and stacks[source][-1] != target:
+            lower_bound = lb1(stacks, max_tiers)
+            if cost + lower_bound >= best_cost:
                 valid = False
                 break
-            container = stacks[src][-1]
+            container = stacks[source][-1]
             count = min(moved[container], max_moves)
             best_g = -1.0
-            best_dst = -1
-            best_d = 0
+            best_destination = -1
+            best_label = 0
             weights: List[float] = []
             destinations: List[int] = []
             labels: List[int] = []
 
-            for dst in range(n_stacks):
-                if dst == src or len(stacks[dst]) >= max_tiers:
+            for index in range(n_stacks):
+                if index == source or len(stacks[index]) >= max_tiers:
                     continue
-                earliest = smin[dst]
-                label = earliest if earliest <= n_total else n_total + dst + 1
+                earliest = smin[index]
+                label = earliest if earliest <= n_total else n_total + index + 1
                 attractiveness = 1.0 / (1.0 + dif(container, earliest, n_total))
                 score = attractiveness * float(pheromone[container - 1, label - 1, count, target - 1])
                 weights.append(score)
-                destinations.append(dst)
+                destinations.append(index)
                 labels.append(label)
                 if score > best_g:
                     best_g = score
-                    best_dst = dst
-                    best_d = label
+                    best_destination = index
+                    best_label = label
 
             if not destinations:
                 valid = False
                 break
 
             if np.random.uniform() < q0 or len(destinations) == 1:
-                dst = best_dst
-                label = best_d
+                destination = best_destination
+                label = best_label
             else:
                 total = float(sum(weights))
                 probabilities = (
@@ -101,41 +102,24 @@ def build_solution(
                     else np.ones(len(destinations)) / len(destinations)
                 )
                 picked = int(np.random.choice(len(destinations), p=probabilities))
-                dst = destinations[picked]
+                destination = destinations[picked]
                 label = labels[picked]
 
             solution.append((container, label, count, target))
-            stacks[src].pop()
-            if smin[src] == container:
-                smin[src] = min(stacks[src]) if stacks[src] else n_total + 1
-            stacks[dst].append(container)
-            if container < smin[dst]:
-                smin[dst] = container
-            loc[container] = dst
+            stacks[source].pop()
+            if smin[source] == container:
+                smin[source] = min(stacks[source]) if stacks[source] else n_total + 1
+            stacks[destination].append(container)
+            if container < smin[destination]:
+                smin[destination] = container
+            loc[container] = destination
             moved[container] += 1
             cost += 1.0
 
-        if valid and stacks[src] and stacks[src][-1] == target:
-            stacks[src].pop()
-            if smin[src] == target:
-                smin[src] = min(stacks[src]) if stacks[src] else n_total + 1
+        if valid and stacks[source] and stacks[source][-1] == target:
+            stacks[source].pop()
+            if smin[source] == target:
+                smin[source] = min(stacks[source]) if stacks[source] else n_total + 1
             loc[target] = None
 
     return solution, valid, cost
-
-
-# def decode(solution: Solution, stacks: List[List[int]], n_total: int) -> List[Tuple[int, Optional[int]]]:
-#     loc = {container: index for index, stack in enumerate(stacks) for container in stack}
-#     by_target = {}
-#     for record in solution:
-#         by_target.setdefault(record[3], []).append(record)
-
-#     moves: List[Tuple[int, Optional[int]]] = []
-#     for target in range(1, n_total + 1):
-#         for container, label, _count, _target in by_target.get(target, []):
-#             dst = loc[label] if label <= n_total else label - n_total - 1
-#             moves.append((loc[container], dst))
-#             loc[container] = dst
-#         moves.append((loc[target], None))
-#         loc[target] = None
-#     return moves

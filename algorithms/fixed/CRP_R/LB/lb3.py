@@ -12,14 +12,12 @@ paper listed in the Reference section.
 --------------------------------------------------------------------------
 """
 
-from typing import Sequence
-
-from algorithms.CRP_R.bound.lb1 import lb1
-from algorithms.CRP_R.bound.lb2 import _has_safe_stack
+from algorithms.fixed.CRP_R.LB.lb1 import lb1
+from algorithms.fixed.CRP_R.LB.lb2 import _has_safe_stack
 
 
-def lb3(stacks: Sequence[Sequence[int]], max_tiers: int) -> int:
-    total = lb1(stacks)
+def lb3(stacks, max_tiers) -> int:
+    lower_bound = lb1(stacks, max_tiers)
     for source, stack in enumerate(stacks):
         if not stack:
             continue
@@ -31,12 +29,12 @@ def lb3(stacks: Sequence[Sequence[int]], max_tiers: int) -> int:
         reduced = []
         for current in stacks:
             cut = len(current)
-            for index, priority in enumerate(current):
+            for slot, priority in enumerate(current):
                 if priority < target:
-                    cut = index
+                    cut = slot
                     break
             reduced.append(current[:cut])
         for priority in blockers:
             if not _has_safe_stack(reduced, max_tiers, source, priority):
-                total += 1
-    return total
+                lower_bound += 1
+    return lower_bound

@@ -32,15 +32,15 @@ def _weights(good_sum: int, bad_sum: int, n_empty: int) -> Tuple[float, float, f
 
 def _scores(
     stacks: Sequence[Sequence[int]],
-    src: int,
+    source: int,
     max_tiers: int,
 ) -> List[Tuple[int, float]]:
-    container = stacks[src][-1]
+    container = stacks[source][-1]
     empty: List[int] = []
     good: List[Tuple[int, int]] = []
     bad: List[Tuple[int, int]] = []
     for index, stack in enumerate(stacks):
-        if index == src or len(stack) >= max_tiers:
+        if index == source or len(stack) >= max_tiers:
             continue
         if not stack:
             empty.append(index)
@@ -71,12 +71,12 @@ def _scores(
 
 def _corridor(
     stacks: Sequence[Sequence[int]],
-    src: int,
+    source: int,
     delta: int,
     max_tiers: int,
     rng: np.random.Generator,
 ) -> List[int]:
-    scored = _scores(stacks, src, max_tiers)
+    scored = _scores(stacks, source, max_tiers)
     if not scored:
         return []
     if delta < 0 or delta >= len(scored):
@@ -106,6 +106,7 @@ def trajectory(
     best_cost: int,
     rng: np.random.Generator,
     expired: Callable[[], bool],
+    choose_destination: Callable,
 ) -> Tuple[List[Move], int]:
     """Walk one bay. A greedy completion can replace the incumbent mid-pass."""
     stacks = [list(stack) for stack in stacks_init]
@@ -115,37 +116,46 @@ def trajectory(
     for target in range(1, n_total + 1):
         if expired():
             break
-        src = next((index for index, stack in enumerate(stacks) if target in stack), -1)
-        if src < 0:
+        source = next((index for index, stack in enumerate(stacks) if target in stack), -1)
+        if source < 0:
             continue
-        while stacks[src] and stacks[src][-1] != target:
+        while stacks[source] and stacks[source][-1] != target:
             if expired():
                 return best, best_cost
-            chosen = _corridor(stacks, src, delta, max_tiers, rng)
+            chosen = _corridor(stacks, source, delta, max_tiers, rng)
             if not chosen:
                 return best, best_cost
-            container = stacks[src][-1]
-            best_dst: Optional[int] = None
+            container = stacks[source][-1]
+            best_destination: Optional[int] = None
             best_heur = None
-            for dst in sorted(chosen):
+            for landing in sorted(chosen):
                 trial = [list(stack) for stack in stacks]
-                trial[dst].append(trial[src].pop())
-                suffix, heur = greedy(trial, n_total, max_tiers)
+                trial[landing].append(trial[source].pop())
+                suffix, heur = greedy(trial, n_total, max_tiers, choose_destination)
                 total = cost + 1 + heur
                 if total < best_cost:
                     best_cost = total
-                    best = moves + [(container, src, dst)] + suffix
+                    best = moves + [Move(
+                        container,
+                        (source, len(stacks[source])),
+                        (landing, len(stacks[landing]) + 1),
+                    )] + suffix
                 if best_heur is None or heur < best_heur:
                     best_heur = heur
-                    best_dst = dst
-            if best_dst is None:
+                    best_destination = landing
+            if best_destination is None:
                 return best, best_cost
             cost += 1
             if cost >= best_cost:
                 return best, best_cost
-            stacks[best_dst].append(stacks[src].pop())
-            moves.append((container, src, best_dst))
-        if stacks[src] and stacks[src][-1] == target:
-            moves.append((target, src, None))
-            stacks[src].pop()
+            moves.append(Move(
+                container,
+                (source, len(stacks[source])),
+                (best_destination, len(stacks[best_destination]) + 1),
+            ))
+            stacks[source].pop()
+            stacks[best_destination].append(container)
+        if stacks[source] and stacks[source][-1] == target:
+            moves.append(Move(target, (source, len(stacks[source])), None))
+            stacks[source].pop()
     return best, best_cost

@@ -3,6 +3,8 @@ Corridor method for CRP-R
 <2011> <metaheuristic> <restricted> <single-bay> <CRP-R>
 delta --- 2 --- Stacks kept in the corridor
 time_limit --- 5.0 --- CPU time limit in seconds
+seed --- 0 --- Random seed
+operator --- min_max --- Greedy completion rule
 
 ------------------------------- Reference --------------------------------
 M. Caserta, S. Voß, M. Sniedovich,
@@ -18,6 +20,7 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
+import importlib
 import time
 
 import numpy as np
@@ -33,21 +36,35 @@ class CM(Algorithm):
     def main(self):
         delta = self.parameter("delta", 2, int)
         time_limit = self.parameter("time_limit", 5.0, float)
-        rng = np.random.default_rng(getattr(self.config, "seed", 0))
+        rng = np.random.default_rng(self.parameter("seed", 0, int))
+        name = self.parameter("operator", "min_max", str)
+        module = importlib.import_module("algorithms.fixed.CRP_R.operator." + name)
+        choose_destination = module.choose_destination
 
         stacks = self.problem.stacks
-        best, best_cost = greedy(stacks, self.problem.n, self.problem.max_tiers)
+        n_total = self.problem.num_containers
+        max_tiers = self.problem.max_tiers
+        best, best_cost = greedy(
+            stacks, n_total, max_tiers, choose_destination,
+        )
         started = time.process_time()
 
         def expired() -> bool:
-            return self.stopped() or time.process_time() - started >= time_limit
+            return time.process_time() - started >= time_limit
 
         while not expired():
             best, best_cost = trajectory(
-                stacks, problem.n, delta, problem.max_tiers,
-                best, best_cost, rng, expired,
+                stacks, n_total, delta, max_tiers,
+                best, best_cost, rng, expired, choose_destination,
             )
-            elapsed = time.process_time() - started
-            self.report(min(elapsed / time_limit, 1.0), best_cost)
-
-        return best, best_cost
+        def show(moves, stacks):
+            state = [list(stack) for stack in stacks]
+            for step in moves:
+                print(state)
+                source = step.source[0]
+                state[source].pop()
+                if step.destination is not None:
+                    state[step.destination[0]].append(step.container)
+            print(state)
+        show(best, stacks)
+        return best

@@ -16,30 +16,30 @@ from typing import Optional
 
 
 def choose_destination(stacks, max_tiers) -> Optional[int]:
-    """Destination of the current top blocker by stack-minimum difference."""
-    present = [item for stack in stacks for item in stack]
-    if not present:
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
         return None
-    largest = max(present)
-    target = min(present)
+
+    target = min(priorities)
     source = next(index for index, stack in enumerate(stacks) if target in stack)
     blocker = stacks[source][-1]
     if blocker == target:
         return None
 
-    good = []
-    bad = []
-    for destination, stack in enumerate(stacks):
-        if destination == source or len(stack) >= max_tiers:
-            continue
-        earliest = min(stack) if stack else largest + 1
-        difference = earliest - blocker
-        if difference > 0:
-            good.append((difference, destination))
-        else:
-            bad.append((difference, destination))
+    candidates = [
+        index for index, stack in enumerate(stacks)
+        if index != source and len(stack) < max_tiers
+    ]
+    if not candidates:
+        return None
+
+    max_priority = max(priorities)
+
+    def earliest(index):
+        stack = stacks[index]
+        return min(stack) if stack else max_priority + 1
+
+    good = [index for index in candidates if earliest(index) > blocker]
     if good:
-        return min(good)[1]
-    if bad:
-        return max(bad)[1]
-    return None
+        return min(good, key=lambda index: (earliest(index), index))
+    return max(candidates, key=lambda index: (earliest(index), index))

@@ -13,24 +13,26 @@ paper listed in the Reference section.
 
 from collections.abc import Sequence
 from functools import cache
+from typing import Optional
 
-def choose_destination(stacks, max_tiers):
-    priorities = [p for stack in stacks for p in stack]
+
+def choose_destination(stacks, max_tiers) -> Optional[int]:
+    priorities = [priority for stack in stacks for priority in stack]
     if not priorities:
         return None
 
     target = min(priorities)
-    src = next(i for i, stack in enumerate(stacks) if target in stack)
-    blocker = stacks[src][-1]
+    source = next(index for index, stack in enumerate(stacks) if target in stack)
+    blocker = stacks[source][-1]
     if blocker == target:
         return None
 
     candidates = [
-        i for i, stack in enumerate(stacks)
-        if i != src and len(stack) < max_tiers
+        index for index, stack in enumerate(stacks)
+        if index != source and len(stack) < max_tiers
     ]
 
-    initial_count = max(priorities)
+    max_priority = max(priorities)
     remaining = len(priorities)
     stack_count = len(stacks)
     rounded_mean = (remaining + stack_count - 1) // stack_count
@@ -40,9 +42,9 @@ def choose_destination(stacks, max_tiers):
         if k == 0:
             return 0.0
 
-        outside = initial_count - T + k
+        outside = max_priority - T + k
         later = outside - (n - 1)
-        total = sum(expected_relocations(k - 1, p, T) for p in range(1, n))
+        total = sum(expected_relocations(k - 1, priority, T) for priority in range(1, n))
         if later > 0:
             total += later * (1 + expected_relocations(k - 1, n, T))
         return total / outside
@@ -53,17 +55,17 @@ def choose_destination(stacks, max_tiers):
         else:
             expected_height = rounded_mean
 
-        T = min(expected_height, max_tiers, initial_count)
+        T = min(expected_height, max_tiers, max_priority)
         return expected_relocations(max(0, T - height), earliest, T)
 
-    def score(dst):
-        stack = stacks[dst]
+    def score(index):
+        stack = stacks[index]
         height = len(stack)
-        earliest = min(stack, default=initial_count + 1)
+        earliest = min(stack, default=max_priority + 1)
 
         before = stack_enar(height, earliest)
         after = stack_enar(height + 1, min(earliest, blocker))
         confirmed = int(blocker > earliest)
-        return after - before + confirmed, dst
+        return after - before + confirmed, index
 
     return min(candidates, key=score, default=None)
