@@ -1,21 +1,25 @@
-"""UBALB lower bound from Bacci, Mattia and Ventura (2019)."""
+"""
+------------------------------- Reference --------------------------------
+T. Bacci, S. Mattia, P. Ventura,
+"The bounded beam search algorithm for the block relocation problem",
+Computers & Operations Research 103 (2019) 252–264.
+LB4 is the badly placed count plus the UBALB extra relocations.
+------------------------------- Copyright --------------------------------
+Copyright (c) 2026 LIACS, Leiden University.
+Platform_CRISP is free for research use. Publications that use this
+platform or its code should acknowledge "Platform_CRISP" and cite the
+paper listed in the Reference section.
+--------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
-
-def blocking_count(stacks: Sequence[Sequence[int]]) -> int:
-    total = 0
-    for stack in stacks:
-        for index, item in enumerate(stack):
-            if any(below < item for below in stack[:index]):
-                total += 1
-    return total
+from algorithms.fixed.CRP_R.LB.lb1 import lb1
 
 
 def _sort_by_earliest(ids: List[int], earliest: Sequence[int]) -> None:
-    """Descending earliest-item order. Equal keys keep the C++ merge's right half."""
     if len(ids) <= 1:
         return
     left_buf = [0] * len(ids)
@@ -55,8 +59,7 @@ def _sort_by_earliest(ids: List[int], earliest: Sequence[int]) -> None:
     sort(0, len(ids) - 1)
 
 
-def ubalb(stacks: Sequence[Sequence[int]], max_tiers: int, n: int, min_item: int) -> int:
-    """Extra relocations beyond the containers already known to be blocking."""
+def _ubalb(stacks: Sequence[Sequence[int]], max_tiers: int, n: int, min_item: int) -> int:
     width = len(stacks)
     height = max_tiers
     yard = [[-1] * height for _ in range(width)]
@@ -151,3 +154,12 @@ def ubalb(stacks: Sequence[Sequence[int]], max_tiers: int, n: int, min_item: int
             slack[stack] = free[stack]
         min_item += 1
     return bound
+
+
+def lb4(stacks, max_tiers) -> int:
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
+        return 0
+    target = min(priorities)
+    n_total = max(priorities)
+    return lb1(stacks, max_tiers) + _ubalb(stacks, max_tiers, n_total, target)

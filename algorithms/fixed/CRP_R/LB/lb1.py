@@ -12,18 +12,18 @@ paper listed in the Reference section.
 --------------------------------------------------------------------------
 """
 
-from typing import Optional, Sequence
+from typing import Optional
 
 
-def lb1(stacks: Sequence[Sequence[int]]) -> int:
-    total = 0
+def lb1(stacks, max_tiers) -> int:
+    lower_bound = 0
     for stack in stacks:
         minimum_below: Optional[int] = None
         for priority in stack:
             if minimum_below is not None and priority > minimum_below:
-                total += 1
+                lower_bound += 1
             if minimum_below is None:
                 minimum_below = priority
             else:
                 minimum_below = min(minimum_below, priority)
-    return total
+    return lower_bound

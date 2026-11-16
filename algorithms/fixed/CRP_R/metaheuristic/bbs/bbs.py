@@ -2,6 +2,7 @@
 Bounded beam search for CRP-R
 <2019> <metaheuristic> <restricted> <single-bay> <CRP-R>
 time_limit --- 5.0 --- Time limit in seconds
+operator --- chain_f 
 
 ------------------------------- Reference --------------------------------
 T. Bacci, S. Mattia, P. Ventura,
@@ -17,22 +18,24 @@ paper listed in the Reference section.
 
 from __future__ import annotations
 
-from algorithms.CRP_R.ALGORITHM import Algorithm
+import importlib
+
+from algorithms.ALGORITHM import Algorithm
 
 from .search import search
 
 
 class BBS(Algorithm):
 
-    def main(self, problem):
+    def main(self):
+        name = self.parameter("operator", "chain_f", str)
+        module = importlib.import_module("algorithms.fixed.CRP_R.operator." + name)
+        choose_destination = module.choose_destination
         time_limit = self.parameter("time_limit", 5.0, float)
         return search(
-            problem.stacks,
-            problem.n,
-            problem.max_tiers,
+            self.problem.stacks,
+            self.problem.num_containers,
+            self.problem.max_tiers,
             time_limit,
-            stop=self.stopped,
-            on_progress=lambda elapsed, cost: self.report(
-                min(elapsed / time_limit, 1.0), cost
-            ),
+            choose_destination,
         )

@@ -30,6 +30,7 @@ class Algorithm:
         
         
         relocations = sum(1 for step in self.result if step.destination is not None)
+        print(relocations)
         self.metric = {
             "relocations": float(relocations),
             "crane_time": 0.0,

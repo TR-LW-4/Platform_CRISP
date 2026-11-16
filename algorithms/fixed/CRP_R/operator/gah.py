@@ -22,26 +22,26 @@ from typing import List, Optional, Sequence, Tuple
 def _blocking(stacks: Sequence[Sequence[int]]) -> int:
     total = 0
     for stack in stacks:
-        for index, item in enumerate(stack):
-            if any(below < item for below in stack[:index]):
+        for slot, priority in enumerate(stack):
+            if any(below < priority for below in stack[:slot]):
                 total += 1
     return total
 
 
-def _prepare(stacks: Sequence[Sequence[int]], max_tiers: int, n: int):
+def _prepare(stacks: Sequence[Sequence[int]], max_tiers: int, max_priority: int):
     width = len(stacks)
     yard = [[-1] * max_tiers for _ in range(width)]
-    earliest = [n + 1] * width
+    earliest = [max_priority + 1] * width
     free = [max_tiers] * width
-    location = [[-1, -1] for _ in range(n + 1)]
+    location = [[-1, -1] for _ in range(max_priority + 1)]
     for index, stack in enumerate(stacks):
-        for slot, item in enumerate(stack):
-            yard[index][slot] = item
+        for slot, priority in enumerate(stack):
+            yard[index][slot] = priority
             free[index] -= 1
-            location[item][0] = index
-            location[item][1] = slot
-            if item < earliest[index]:
-                earliest[index] = item
+            location[priority][0] = index
+            location[priority][1] = slot
+            if priority < earliest[index]:
+                earliest[index] = priority
     return yard, earliest, free, location
 
 
@@ -54,7 +54,7 @@ def _order_descending(blockers: List[List[int]]) -> List[int]:
     return order
 
 
-def _assign_column(yard, earliest, free, location, stack, slot, n, width, height, blocking_left, first_dest):
+def _assign_column(yard, earliest, free, location, stack, slot, max_priority, width, height, blocking_left, first_dest):
     blockers: List[List[int]] = []
     top = height - free[stack] - 1
     top_item = -1
@@ -77,7 +77,7 @@ def _assign_column(yard, earliest, free, location, stack, slot, n, width, height
             later = blockers[index][1] < blockers[other_index][1]
             if below and later and dest != -1:
                 occupied[dest] += 1
-        best = n * n
+        best = max_priority * max_priority
         chosen = -1
         for candidate in range(width):
             if candidate != stack and free[candidate] and occupied[candidate] == 0:
@@ -119,8 +119,8 @@ def _assign_column(yard, earliest, free, location, stack, slot, n, width, height
                 occupied[dest] += 1
         container = blockers[index][1]
         origin = blockers[index][2]
-        best_bad = -n * n
-        best_good = n * n
+        best_bad = -max_priority * max_priority
+        best_good = max_priority * max_priority
         bad = good = -1
         yard[stack][origin] = -1
         free[stack] += 1
@@ -130,7 +130,7 @@ def _assign_column(yard, earliest, free, location, stack, slot, n, width, height
             if occupied[candidate] <= 1:
                 score = min(earliest[candidate] - container, container - named[candidate])
             else:
-                score = -n + 1
+                score = -max_priority + 1
             if score < 0:
                 if score > best_bad:
                     best_bad = score
@@ -150,7 +150,7 @@ def _assign_column(yard, earliest, free, location, stack, slot, n, width, height
                 anchor_slot = blockers[other_index][2]
                 anchor = blockers[other_index][1]
         if anchor != -1:
-            old_min = n + 1
+            old_min = max_priority + 1
             anchor_at = location[anchor][1]
             for level in range(anchor_at):
                 if old_min > yard[chosen][level]:
@@ -183,29 +183,29 @@ def _assign_column(yard, earliest, free, location, stack, slot, n, width, height
 
 
 def _simulate(stacks, max_tiers, best_ub, blocking) -> Tuple[int, Optional[int]]:
-    present = [item for stack in stacks for item in stack]
-    if not present:
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
         return 0, None
-    n = max(present)
+    max_priority = max(priorities)
     width = len(stacks)
-    yard, earliest, free, location = _prepare(stacks, max_tiers, n)
+    yard, earliest, free, location = _prepare(stacks, max_tiers, max_priority)
     blocking_left = _blocking(stacks) if blocking is None else blocking
     moved = 0
-    target = min(present)
+    target = min(priorities)
     first_dest = -1
-    while target <= n and blocking_left > 0:
+    while target <= max_priority and blocking_left > 0:
         if moved + blocking_left >= best_ub:
-            return n * n, None if first_dest < 0 else first_dest
+            return max_priority * max_priority, None if first_dest < 0 else first_dest
         stack, slot = location[target]
         if slot < max_tiers - 1 and yard[stack][slot + 1] != -1:
             blocking_left, first_dest, added = _assign_column(
-                yard, earliest, free, location, stack, slot, n, width, max_tiers,
+                yard, earliest, free, location, stack, slot, max_priority, width, max_tiers,
                 blocking_left, first_dest,
             )
             moved += added
         yard[stack][slot] = -1
         free[stack] += 1
-        earliest[stack] = n + 1
+        earliest[stack] = max_priority + 1
         for level in range(slot):
             if yard[stack][level] != -1 and yard[stack][level] < earliest[stack]:
                 earliest[stack] = yard[stack][level]
@@ -216,15 +216,15 @@ def _simulate(stacks, max_tiers, best_ub, blocking) -> Tuple[int, Optional[int]]
 
 def choose_destination(stacks, max_tiers) -> Optional[int]:
     """Destination GAH records for the current top blocker."""
-    present = [item for stack in stacks for item in stack]
-    if not present:
+    priorities = [priority for stack in stacks for priority in stack]
+    if not priorities:
         return None
-    target = min(present)
+    target = min(priorities)
     source = next(index for index, stack in enumerate(stacks) if target in stack)
     if stacks[source][-1] == target:
         return None
-    n = max(present)
-    _cost, destination = _simulate(stacks, max_tiers, n * n, None)
+    max_priority = max(priorities)
+    _cost, destination = _simulate(stacks, max_tiers, max_priority * max_priority, None)
     return destination
 
 

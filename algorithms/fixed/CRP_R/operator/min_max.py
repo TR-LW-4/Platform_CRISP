@@ -12,31 +12,34 @@ paper listed in the Reference section.
 --------------------------------------------------------------------------
 """
 
-def choose_destination(stacks, max_tiers):
-    priorities = [p for stack in stacks for p in stack]
+from typing import Optional
+
+
+def choose_destination(stacks, max_tiers) -> Optional[int]:
+    priorities = [priority for stack in stacks for priority in stack]
     if not priorities:
         return None
 
     target = min(priorities)
-    src = next(i for i, stack in enumerate(stacks) if target in stack)
-    blocker = stacks[src][-1]
+    source = next(index for index, stack in enumerate(stacks) if target in stack)
+    blocker = stacks[source][-1]
     if blocker == target:
         return None
 
     candidates = [
-        i for i, stack in enumerate(stacks)
-        if i != src and len(stack) < max_tiers
+        index for index, stack in enumerate(stacks)
+        if index != source and len(stack) < max_tiers
     ]
     if not candidates:
         return None
 
-    initial_count = max(priorities)
+    max_priority = max(priorities)
 
-    def earliest(i):
-        stack = stacks[i]
-        return min(stack) if stack else initial_count + 1
+    def earliest(index):
+        stack = stacks[index]
+        return min(stack) if stack else max_priority + 1
 
-    good = [i for i in candidates if earliest(i) > blocker]
+    good = [index for index in candidates if earliest(index) > blocker]
     if good:
-        return min(good, key=lambda i: (earliest(i), i))
-    return min(candidates, key=lambda i: (-earliest(i), i))
+        return min(good, key=lambda index: (earliest(index), index))
+    return min(candidates, key=lambda index: (-earliest(index), index))
