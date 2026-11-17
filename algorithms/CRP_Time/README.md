@@ -21,7 +21,8 @@ Time solver is registered yet.
 | `heuristic/lopez_plata_2019/` | A*-based heuristic | López-Plata et al. 2019, C&IE |
 | `heuristic/unluyurt_2012/` | Difference1 (also listed for CRP-R), Difference2 | Ünlüyurt & Aydın 2012 |
 | `heuristic/azari_2017/` | CSUM | Azari, Eskandari & Nourmohammadi 2017 |
-| `heuristic/forster_bortfeldt_2012/` | retrieval tree search | Forster & Bortfeldt 2012 |
+| `crp_time_r/forster_bortfeldt_2012/` | tree search, restricted; relocations as objective, crane time evaluated afterwards | Forster & Bortfeldt 2012, C&OR |
+| `crp_time_u/forster_bortfeldt_2012/` | tree search, unrestricted (paper); validation package, not registered | Forster & Bortfeldt 2012, C&OR |
 | `heuristic/firmino_2019_rgrasp/` | reactive GRASP | Firmino et al. 2019 |
 | `heuristic/jovanovic_2019_aco/` | ACO | Jovanović et al. 2019 |
 
