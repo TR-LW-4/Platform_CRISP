@@ -365,6 +365,7 @@ def cmd_layout_run(
             **prob_cfg.extra,
             LAYOUT_FILE_EXTRA_KEY: str(p),
             "source": src_tag,
+            "effective_max_tiers": int(prob_cfg.max_tiers),
         }
         out = save_run(
             problem=problem,

@@ -135,6 +135,7 @@ def _save_layout_run(
     problem_values: Dict[str, Any],
     algorithm_values: Dict[str, Any],
     records: Sequence[Any],
+    effective_max_tiers: int,
     train_wall_s: Optional[float] = None,
 ) -> Optional[str]:
     if not records:
@@ -162,10 +163,13 @@ def _save_layout_run(
             for r in records
         ]
     metrics = with_runtime(metrics, train_wall_s)
+    # problem_values hold the form's geometry; the layout loader sets the
+    # run's own, so the maximum stack height of the run is stored apart.
     prob_save = {
         **problem_values,
         LAYOUT_FILE_EXTRA_KEY: str(layout_path),
         "source": source_tag(source),
+        "effective_max_tiers": int(effective_max_tiers),
     }
     path = save_run(
         problem=problem_name,
@@ -274,6 +278,7 @@ def _worker_main(
                 problem_values=problem_values,
                 algorithm_values=algorithm_values,
                 records=buffer,
+                effective_max_tiers=problem_cfg.max_tiers,
                 train_wall_s=train_wall_s,
             )
             if saved:
