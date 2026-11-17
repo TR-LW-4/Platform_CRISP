@@ -9,6 +9,7 @@ from core.benchmarks.caserta import (
     CASERTA_HEIGHT_WHITELIST,
     DEFAULT_CASERTA_DIR,
     collect_paths_from_hw_queue,
+    index_max_tiers_by_height,
     index_ws_by_height,
     problem_config_for_caserta_dat,
 )
@@ -86,12 +87,17 @@ def available_for_problem(problem_name: str) -> Dict[str, Any]:
     if problem_name in CASERTA_PROBLEMS:
         ws_by_height = index_ws_by_height(caserta_root())
         heights = [h for h in CASERTA_HEIGHT_WHITELIST if h in ws_by_height]
+        max_tiers_by_height = index_max_tiers_by_height(caserta_root())
         sources.append({
             "id": SOURCE_CASERTA,
             "label": "Caserta Benchmark",
             "available": bool(heights),
             "heights": heights,
             "ws_by_height": {str(h): ws_by_height[h] for h in heights},
+            # Maximum stack height the runs use (set by the layout loader).
+            "max_tiers_by_height": {
+                str(h): max_tiers_by_height.get(h, []) for h in heights
+            },
             "caption": (
                 "Filename data[H]-[w]-[id].dat. Select height H and one or more "
                 "stack counts w, then add to the instance list."

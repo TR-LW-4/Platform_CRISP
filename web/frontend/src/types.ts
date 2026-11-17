@@ -190,6 +190,8 @@ export interface BenchmarkSourceInfo {
   caption?: string
   heights?: number[]
   ws_by_height?: Record<string, number[]>
+  /** Caserta: distinct maximum stack heights (max_tiers) the runs of each height label use. */
+  max_tiers_by_height?: Record<string, number[]>
   sn_by_height?: Record<string, SNPair[]>
   stow_classes_by_height?: Record<string, StowClass[]>
   alphas?: string[]

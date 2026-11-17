@@ -161,6 +161,22 @@ def implied_tier_capacity(w: int, n: int, stacks: List[List[int]]) -> int:
     return max(phys, 1)
 
 
+def index_max_tiers_by_height(root: Optional[Path] = None) -> Dict[int, List[int]]:
+    """Map height label → sorted distinct ``implied_tier_capacity`` of its files (the runs' max_tiers)."""
+    root = root or DEFAULT_CASERTA_DIR
+    from collections import defaultdict
+
+    d: Dict[int, set[int]] = defaultdict(set)
+    if not root.is_dir():
+        return {}
+    for path in root.glob("data*.dat"):
+        t = parse_caserta_filename(path)
+        if t:
+            S, N, stacks = parse_caserta_dat(path)
+            d[t[0]].add(implied_tier_capacity(S, N, stacks))
+    return {h: sorted(v) for h, v in sorted(d.items())}
+
+
 def containers_for_caserta(n: int, stacks: List[List[int]]) -> Dict[int, Container]:
     """Build priority → Container map (id = priority, unique 1…n)."""
     by_pri: Dict[int, Container] = {}

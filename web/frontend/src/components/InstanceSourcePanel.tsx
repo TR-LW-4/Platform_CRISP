@@ -30,6 +30,15 @@ function stowClassKey(item: StowClass) {
   return `${item.vs}-${item.ys}-${item.yt}`
 }
 
+/** "max stack height 5 (initial height + 2)" for a Caserta height label h. */
+function maxHeightNote(values: number[] | undefined, h: number) {
+  if (!values?.length) return ''
+  const text = values.length === 1 ? String(values[0]) : `${values[0]}–${values[values.length - 1]}`
+  return values.every((value) => value === h + 2)
+    ? `max stack height ${text} (initial height + 2)`
+    : `max stack height ${text}`
+}
+
 export function InstanceSourcePanel({
   problemName,
   disabled = false,
@@ -314,6 +323,11 @@ export function InstanceSourcePanel({
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            {source === 'caserta' && height !== '' && (
+              <small className="field-note">
+                {maxHeightNote(activeSource?.max_tiers_by_height?.[String(height)], height)}
+              </small>
+            )}
           </label>
 
           {source === 'caserta' ? (
@@ -420,7 +434,16 @@ export function InstanceSourcePanel({
                   <span>
                     {source === 'crp_stow' ? 'A' : 'H'}={block.h}
                     {block.ws
-                      ? ` · w=${block.ws.join(',')}`
+                      ? [
+                          '',
+                          `w=${block.ws.join(',')}`,
+                          source === 'caserta'
+                            ? maxHeightNote(
+                                activeSource?.max_tiers_by_height?.[String(block.h)],
+                                block.h,
+                              )
+                            : '',
+                        ].filter((part, index) => index === 0 || part).join(' · ')
                       : block.stow_classes
                         ? ` · ${block.stow_classes
                             .map((item) => (

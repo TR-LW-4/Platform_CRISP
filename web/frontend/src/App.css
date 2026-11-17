@@ -200,6 +200,11 @@
   font-weight: 650;
 }
 
+.field > .field-note {
+  color: #667085;
+  text-transform: none;
+}
+
 select,
 input[type='text'],
 input[type='number'] {
