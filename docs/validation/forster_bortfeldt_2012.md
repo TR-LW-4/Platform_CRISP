@@ -1,6 +1,6 @@
 # Forster & Bortfeldt (2012) — validation log
 
-Paper: F. Forster, A. Bortfeldt, "A tree search procedure for the container relocation problem", *Computers & Operations Research* 39 (2012) 299–309. DOI 10.1016/j.cor.2011.04.004. Page numbers below are the journal's printed pages (PDF page = printed page − 298). Not to be confused with the multi-bay retrieval paper in Oper. Res. Proc. 2011, 257–262, which `algorithms/CRP_Time/heuristic/forster_bortfeldt_2012/` cites (step 7 of the thesis plan).
+Paper: F. Forster, A. Bortfeldt, "A tree search procedure for the container relocation problem", *Computers & Operations Research* 39 (2012) 299–309. DOI 10.1016/j.cor.2011.04.004. Page numbers below are the journal's printed pages (PDF page = printed page − 298). Not to be confused with the multi-bay retrieval paper in Oper. Res. Proc. 2011, 257–262, which `algorithms/CRP_Time/heuristic/forster_bortfeldt_2012/` (removed 17 Nov 2026, commit 6d91df9; replaced by crp_time_r/forster_bortfeldt_2012/algorithm.py) cites (step 7 of the thesis plan).
 
 Code: `algorithms/CRP_Time/crp_time_u/forster_bortfeldt_2012/` (standalone; imports nothing from `algorithms/CRP_D` or any other algorithm folder). Scripts and raw output: `docs/validation/data/forster_bortfeldt_2012/`.
 

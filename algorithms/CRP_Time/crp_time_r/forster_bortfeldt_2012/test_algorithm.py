@@ -2,9 +2,10 @@
 Checks for the CRP-Time class of the restricted tree search
 (docs/validation/forster_bortfeldt_2012_restricted.md §10): the registry finds
 it (the registry drops modules that fail to import without a message) and not
-the unrestricted package (I5); on Caserta 3-3 #1 the class reproduces the plan
-of the validated package run (step 2a, §8), so reading the platform's yard as
-one bay (I2) changes nothing; the plan does not depend on the time model (I1).
+the unrestricted package (I5); on Caserta 3-3 #1 and 5-5 #34 (128 nodes) the
+class reproduces the plan of the validated package run (step 2a, §8), so reading
+the platform's yard as one bay (I2) changes nothing; the plan does not depend on
+the time model (I1).
 
   python -m unittest algorithms.CRP_Time.crp_time_r.forster_bortfeldt_2012.test_algorithm   (from the repo root)
 
@@ -34,6 +35,16 @@ from .algorithm import ForsterBortfeldt2012Restricted
 # moves (d, r, g) with stacks from 0, r None for a retrieval.
 STEP2A_3_3_1 = [(0, None, 1), (1, 2, 5), (1, 2, 6), (1, None, 2), (0, 1, 7), (0, None, 3), (2, 1, 6), (2, 1, 5),
                 (2, None, 4), (1, None, 5), (1, None, 6), (1, None, 7), (2, 0, 9), (2, None, 8), (0, None, 9)]
+# data5-5-34 in step2a_run.jsonl (H = 7, 60 s): 25 relocations (greedy 28), 128 nodes, tree exhausted in 0.096 s.
+# The search has no node limit (Params: time_limit only); an exhausted search does not depend on the clock.
+STEP2A_5_5_34 = [
+    (2, None, 1), (4, 1, 15), (4, None, 2), (2, 4, 14), (2, 0, 13), (2, None, 3), (1, 2, 15), (1, 4, 21),
+    (1, None, 4), (0, 2, 13), (0, 2, 11), (0, 1, 7), (0, 4, 12), (0, None, 5), (3, 2, 24), (3, 2, 20),
+    (3, 4, 25), (3, None, 6), (1, None, 7), (1, 3, 23), (1, None, 8), (4, 3, 25), (4, 3, 12), (4, 1, 21),
+    (4, 1, 14), (4, 2, 22), (4, None, 9), (0, None, 10), (2, 0, 22), (2, 0, 20), (2, 4, 24), (2, None, 11),
+    (3, None, 12), (2, None, 13), (1, None, 14), (2, None, 15), (2, None, 16), (3, 2, 25), (3, 2, 23),
+    (3, None, 17), (4, 3, 24), (4, None, 18), (1, 2, 21), (1, None, 19), (0, None, 20), (2, None, 21),
+    (0, None, 22), (2, None, 23), (3, None, 24), (2, None, 25)]
 
 
 def run(instance: str, time_model: str):
@@ -71,6 +82,13 @@ class TestCaserta(unittest.TestCase):
         final = run("data3-3-1.dat", "f2")
         self.assertEqual(final.metrics["relocations"], 6.0)
         self.assertEqual(as_bay_moves(final.extra["moves"]), STEP2A_3_3_1)
+
+    def test_5_5_34_equals_the_validated_package_run(self):
+        """A search that expands 128 nodes and improves on the greedy by 3 relocations (not only the greedy plan)."""
+        final = run("data5-5-34.dat", "f2")
+        self.assertFalse(final.extra["time_limit_hit"])
+        self.assertEqual(final.metrics["relocations"], 25.0)
+        self.assertEqual(as_bay_moves(final.extra["moves"]), STEP2A_5_5_34)
 
     def test_plan_does_not_depend_on_the_time_model(self):
         plans = [run("data3-3-1.dat", t).extra["moves"] for t in ("f2", "f2_vertical", "f2_vertical_practice")]

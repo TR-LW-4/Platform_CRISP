@@ -325,7 +325,7 @@ Code: `crp_time_r/forster_bortfeldt_2012/algorithm.py`, class `ForsterBortfeldt2
 - Not in `docs/benchmark/campaign.py` (the campaign follows the code freeze).
 
 Checks (CRISP at the integration commit, rl Python 3.11.16):
-- `test_algorithm.py` (new, 4 tests): the registry lists the class for CRP-Time with valid metadata, and no class from `crp_time_u` (I5); on data3-3-1 under f2 the class gives 6 relocations and exactly the moves of `step2a_run.jsonl` for that instance (§8), so reading the yard through the platform (I2) changes nothing there; the moves are equal under f2, f2vert and the practice preset.
+- `test_algorithm.py` (new, 4 tests): the registry lists the class for CRP-Time with valid metadata, and no class from `crp_time_u` (I5); on data3-3-1 under f2 the class gives 6 relocations and exactly the moves of `step2a_run.jsonl` for that instance (§8), so reading the yard through the platform (I2) changes nothing there; the moves are equal under f2, f2vert and the practice preset. Added 17 Nov 2026 (fifth test): data5-5-34, where step 2a expanded 128 nodes and exhausted the tree in 0.096 s (25 relocations, greedy 28), gives 25 relocations and exactly the step-2a moves, without hitting the limit. The search has no node or iteration limit (`Params`: `time_limit` only), so the test runs with the 60 s limit; an exhausted search does not depend on the clock.
 - `utils/test_plan_validity.py`: the class added; its plans on data3-3-2, data3-4-2 and data3-5-1 pass `validate_plan` with the reported relocations, f2 and f2vert.
 - All tests under `algorithms/CRP_Time`: 215, OK (1 expected failure, Firmino's known A3 issue). The registry loads 75 algorithms (74 before), none fails to import.
 

@@ -46,7 +46,7 @@ class ForsterBortfeldt2012Restricted(BaseAlgorithm):
         "lower bound, keeping the plan with the fewest moves (nSucc 10, cmStopThreshold 150, maxFlg_bb 3, "
         "maxGg 2; p. 306). Relocations are restricted to the containers above the next one to retrieve (the "
         "paper's method is unrestricted). As in the paper, the number of relocations is the objective; crane "
-        "time under the selected model is evaluated afterwards (supervisor's decision, 10 Nov 2026). The "
+        "time under the selected model is evaluated afterwards. The "
         "search is deterministic, but the time limit is wall-clock, so on larger instances results can differ "
         "between runs and machines."
     )
