@@ -7,9 +7,11 @@ algorithm's header and its config_schema().
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import dataclasses
 import importlib
+import io
 import json
 import queue
 import re
@@ -17,6 +19,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from core.base_algorithm import AlgorithmConfig, BaseAlgorithm
 from core.benchmarks.caserta import DEFAULT_CASERTA_DIR, parse_caserta_dat, problem_config_for_caserta_dat
@@ -35,8 +38,8 @@ from core.objectives import (
 )
 from core.move_export import plan_from_json
 from core.plan import Movement, RelocationPlan
-from core.results.aggregate import summarize_run_dicts
-from core.results.store import moves_from_records
+from core.results.aggregate import _objective_group_label, summarize_run_dicts
+from core.results.store import moves_from_records, stable_result_stem
 from problems.CRP_MO import CRP_MO
 from problems.CRP_Time import CRP_Time
 
@@ -61,7 +64,7 @@ CAMPAIGN = REPO / "docs" / "validation" / "data" / "final_campaign_20261029" / "
 CAMPAIGNS = sorted((REPO / "docs" / "validation" / "data").glob("*/campaign.json"))
 FIRST_CAMPAIGN_SIZE = 3   # a campaign.json without "algorithms": Azari, Jovanović and López-Plata (campaign.py)
 CAMPAIGN_SUFFIXES = {"f2": "f2-95e623c7", "f2vert": "f2_vertical-a1a2ce5e", "practice": "f2_vertical-a758c5ac"}
-GEOMETRY = ("num_bays", "num_rows", "max_tiers", "num_containers", "layout_file_path")
+GEOMETRY = ("num_bays", "num_rows", "max_tiers", "num_containers", "layout_file_path", "effective_max_tiers")
 
 
 def _env(name="data3-5-1.dat", **values):
@@ -200,6 +203,64 @@ class TestEvaluate(unittest.TestCase):
                         self.assertEqual("crane_time_f2" in got, preset != "practice")
                     n += 1
         self.assertEqual(n, algorithms * len(CAMPAIGN_SUFFIXES) * 5 * 2)
+
+
+class TestSavedHeight(unittest.TestCase):
+    """Result files store the maximum stack height of the run as effective_max_tiers (the layout loader's
+    max_tiers); max_tiers stays the form value. save_run is replaced, so nothing is written to results/."""
+
+    ALGORITHM = "Ünlüyurt–Aydın (2012) Difference1"
+
+    @staticmethod
+    def _form_values():
+        defaults = {k: s["default"] for k, s in CRP_Time.config_schema().items() if "default" in s}
+        return CRP_Time.resolve_values({**defaults, "time_model": "f2"})
+
+    def _web_saved(self, path):
+        """prob_config that the web worker passes to save_run for one Caserta layout."""
+        from web.backend import jobs
+        q = queue.Queue()
+        with mock.patch.object(jobs, "save_run", return_value=Path("unused.json")) as save:
+            jobs._worker_main("CRP-Time", self.ALGORITHM, self._form_values(), {}, q, threading.Event(),
+                              "caserta", [str(path)], "Heuristic", [])
+        failures = [m for m in q.queue if isinstance(m, jobs.WorkerFailure)]
+        self.assertEqual(failures, [])
+        self.assertEqual(save.call_count, 1)
+        return save.call_args.kwargs["prob_config"]
+
+    def test_web_layout_save_writes_t_plus_2(self):
+        for name, T in (("data3-5-1.dat", 3), ("data6-6-1.dat", 6)):
+            with self.subTest(name=name):
+                pc = self._web_saved(DEFAULT_CASERTA_DIR / name)
+                self.assertEqual(pc["effective_max_tiers"], T + 2)
+                self.assertEqual(pc["max_tiers"], CRP_Time.config_schema()["max_tiers"]["default"])
+                without = {k: v for k, v in pc.items() if k != "effective_max_tiers"}
+                self.assertEqual(stable_result_stem(pc), stable_result_stem(without))
+                self.assertEqual(_objective_group_label({"prob_config": pc}),
+                                 _objective_group_label({"prob_config": without}))
+
+    def test_cli_layout_save_writes_t_plus_2(self):
+        import main
+        with mock.patch("core.results.store.save_run", return_value=Path("unused.json")) as save, \
+                contextlib.redirect_stdout(io.StringIO()):
+            main.cmd_layout_run(str(DEFAULT_CASERTA_DIR / "data3-5-1.dat"), "CRP-Time", self.ALGORITHM,
+                                save=True, timeout=120, time_model="f2")
+        self.assertEqual(save.call_count, 1)
+        self.assertEqual(save.call_args.kwargs["prob_config"]["effective_max_tiers"], 3 + 2)
+
+    def test_loader_height_is_stored_unchanged(self):
+        """A loader that sets another height (a Lee & Lee instance's given height 6; Forster–Bortfeldt's
+        unlimited height H = n = 15) is stored as it is."""
+        from web.backend import jobs
+        build = jobs.problem_config_for_layout
+        for height in (6, 15):
+            def loader(source, layout_path, values, height=height):
+                cfg = build(source, layout_path, values)
+                cfg.max_tiers = height
+                return cfg
+            with self.subTest(height=height), mock.patch.object(jobs, "problem_config_for_layout", loader):
+                self.assertEqual(self._web_saved(DEFAULT_CASERTA_DIR / "data3-5-1.dat")["effective_max_tiers"],
+                                 height)
 
 
 class TestPlan(unittest.TestCase):
