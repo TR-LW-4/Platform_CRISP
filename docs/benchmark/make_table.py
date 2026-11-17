@@ -260,7 +260,8 @@ def write(rows, lit_rows, notes, opt_notes):
         "- **Objective:** f2 (crane time with constant pick-up/place-down effort, Voß & Schwarze 2019) is optimised; "
         "f2vert is reported from the same runs (the platform evaluates the final plan under both). Relocations are "
         "measured, not optimised. Restricted BRP, H = T + 2 (set per instance by the Caserta loader; the "
-        "`max_tiers` 3 in the `prob_config` of the result files is the unused form value), CRISP time defaults "
+        "`max_tiers` 3 in the `prob_config` of the result files is the unused form value; files saved from d29742c "
+        "on also store the run's height as `effective_max_tiers`), CRISP time defaults "
         "(ts 1.2 s, tpp 30 s).",
         "- **Instances:** Caserta, all 40 instances per class. Seed 0.",
         f"- **Runs:** web jobs through `/api/jobs` (the Workbench path), strictly one after another, one "
