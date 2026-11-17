@@ -6,7 +6,7 @@ parameters reduced where the defaults are slow), its final plan is taken from wh
 problem validates it with validate_plan, and relocations, f2 and f2vert of that plan must equal the reported ones.
 data3-5-1 has container 1 on top of a stack at the start (the case behind Azari's A3 issue); data3-3-2 and data3-4-2
 start without a target on top. Not covered: the old
-heuristic/forster_bortfeldt_2012 wrapper (to be removed) and crp_time_u / crp_time_r (their own package tests).
+heuristic/forster_bortfeldt_2012 wrapper (to be removed) and crp_time_u (not registered; its own package tests).
 
 Where the plan comes from:
 - "moves": the validated plan saved in the final record (extra["moves"]), algorithms that use utils.finish();
@@ -38,6 +38,8 @@ ALGORITHMS = {   # name: (module, class, extra parameters, plan source)
     "lopez_plata": (H + "lopez_plata_2019.algorithm", "LopezPlata2019Heuristic", {"rho": 10}, "moves"),
     "unluyurt_d1": (H + "unluyurt_2012.difference1", "UnluyurtAydinDifference1", {}, "moves"),
     "unluyurt_d2": (H + "unluyurt_2012.difference2", "UnluyurtAydinDifference2", {}, "moves"),
+    "forster_bortfeldt_r": ("algorithms.CRP_Time.crp_time_r.forster_bortfeldt_2012.algorithm",
+                            "ForsterBortfeldt2012Restricted", {}, "moves"),
     "kim_2016": (H + "kim_2016.algorithm", "Kim2016Heuristic", {}, "actions"),
     "lin_2015": (H + "lin_2015.algorithm", "Lin2015Heuristic", {}, "actions"),
     "lee_lee": (H + "lee_lee.algorithm", "LeeLeeRetrievalHeuristic",
