@@ -43,8 +43,7 @@ def algorithm_config_schema(cls) -> Dict[str, Dict]:
         return {}
     if _defines_config_schema(cls):
         return {**base_algorithm_schema(), **cls.config_schema()}
-    header = parse_header(inspect.getmodule(cls).__doc__ or "")
-    return header or base_algorithm_schema()
+    return parse_header(inspect.getmodule(cls).__doc__ or "")
 
 
 def _defines_config_schema(cls) -> bool:
