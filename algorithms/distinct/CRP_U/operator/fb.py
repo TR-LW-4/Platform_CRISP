@@ -1,9 +1,4 @@
 """
-Forster-Bortfeldt greedy relocation rule for CRP-U
-
-Priority: BG relocation to a non-empty stack, BG relocation to an empty
-stack, then FLG_BB relocation (Fig. 4 of the reference).
-
 ------------------------------- Reference --------------------------------
 F. Forster, A. Bortfeldt,
 "A tree search procedure for the container relocation problem",

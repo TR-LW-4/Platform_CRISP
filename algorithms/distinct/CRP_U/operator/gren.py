@@ -1,8 +1,5 @@
 """
 Gre-N relocation rule for CRP-U
-
-Well-located containers are never relocated.
-
 ------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
 "An efficient ant colony optimization algorithm for the blocks relocation

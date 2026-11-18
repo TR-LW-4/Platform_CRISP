@@ -1,9 +1,5 @@
 """
 Gre-C relocation rule for CRP-U
-
-candidates() returns the candidate relocations of Eqs. 9-23 with their
-dife values (Eq. 21). extended=False gives the Gre-N list Cr (Eq. 13).
-
 ------------------------------- Reference --------------------------------
 R. Jovanović, M. Tuba, S. Voß,
 "An efficient ant colony optimization algorithm for the blocks relocation
