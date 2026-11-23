@@ -32,9 +32,8 @@ class FirstOfTies(random.Random):
 
 
 # Worked example, pp. 138-139: one bay, 6 rows, H = 6, 12 containers (ID = group), Pr = Pb = 0.
-# Fig. 4 (the initial layout) is a figure that was not readable in the extracted text; the layout below is
-# reconstructed from the working plan of Fig. 8 (each container's first pick-up stack, in pick-up order). It agrees
-# with the text: after retrieving 1, ming(1) = 9, ming(4) = 10, ming(6) = 8 (p. 138).
+# Fig. 4 (p. 138), stacks bottom to top, as read from the figure by Thom (23 Nov 2026); equal to the earlier
+# reconstruction from Fig. 8, and consistent with the text: after retrieving 1, ming(1) = 9, ming(4) = 10, ming(6) = 8.
 FIG4 = layout("Lin Fig. 4", 1, 6, 6, {(1, 1): (9, 12, 1), (1, 2): (5, 2, 6), (1, 3): (4, 7), (1, 4): (10,),
                                       (1, 5): (3, 11), (1, 6): (8,)})
 # Fig. 8 (p. 139), (c, s, U), (c, s', D) pairs as moves; s' = 0 is the truck (None here).
@@ -74,6 +73,21 @@ class TestRules(unittest.TestCase):
         lay = layout("rule I", 2, 2, 2, {(1, 1): (1, 3), (2, 2): (2,)})
         self.assertEqual(moves(solve(lay))[0], (3, (1, 1), (1, 2)))
         self.assertEqual(moves(solve(lay, P_b=0))[0], (3, (1, 1), (2, 1)))
+
+    def test_rule_ii_twice(self):
+        """1 bay x 4 rows, H = 4: (1,1) [5, 1, 4], (1,2) [2, 7], (1,3) [3, 6], (1,4) [8]; n = G = 8.
+        Target 1 is blocked by d = 4. Not full and not s(c): (1,2) ming 2, (1,3) ming 3, (1,4) ming 8; only (1,4) has
+        ming > 4, so Rule I gives t = (1,4).
+        Rule II, 1st pass: h(t) = 1 <= H - 2; ming(t) = 8. Tops: 7 on (1,2) blocks 2, 7 > 4, 3 < 7 < 8; 6 on (1,3)
+        blocks 3, 6 > 4, 3 < 6 < 8; the largest is 7 -> 7 into t.
+        2nd pass (Fig. 3 loop): h(t) = 2 <= H - 2; ming(t) = 7. 6: blocks 3, 6 > 4, 2 < 6 < 7 -> 6 into t.
+        3rd check: h(t) = 3 > H - 2 (one empty slot) -> stop; d = 4 into t (h becomes 4 = H).
+        Then 1, 2, 3, 4, 5, 6, 7, 8 are all on top when their turn comes."""
+        lay = layout("rule II twice", 1, 4, 4, {(1, 1): (5, 1, 4), (1, 2): (2, 7), (1, 3): (3, 6), (1, 4): (8,)})
+        self.assertEqual(moves(solve(lay)), [(7, (1, 2), (1, 4)), (6, (1, 3), (1, 4)), (4, (1, 1), (1, 4)),
+                                             (1, (1, 1), None), (2, (1, 2), None), (3, (1, 3), None),
+                                             (4, (1, 4), None), (5, (1, 1), None), (6, (1, 4), None),
+                                             (7, (1, 4), None), (8, (1, 4), None)])
 
     def test_rule_ii_into_empty_stack(self):
         """1 bay x 3 rows, H = 3: (1,1) [1, 4], (1,2) [3, 2, 5], (1,3) []; n = G = 5, an empty stack has ming 6.

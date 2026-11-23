@@ -34,9 +34,9 @@ Readings and assumptions (the paper does not say otherwise):
   group. The present tense of condition 1 and the rationale ("Because container k blocks the access to another
   container, at least one relocation of container k in the future ... is unavoidable", p. 137) support it; the
   definition on p. 135 is stated for the initial layout.
-- A3 Rule II gives at most one pre-relocation per relocation of d: the text describes "a pre-relocation, which moves
-  another container k" (singular) and the worked example moves one k (p. 138). Fig. 3 (the flowchart, p. 137) was not
-  read: the PDF was available as extracted text only.
+- A3 Rule II is repeated (Fig. 3, p. 137, the flowchart, as read by Thom): after "Move k into t" the arrow returns to
+  "If stack t has more than one empty slot?", so Rule II is retried with the updated ming(t) until t has at most one
+  empty slot or no k qualifies; only then "Move d into t". The worked example moves one k (p. 138).
 - A4 "Available space for more than one container": h(t) <= H - 2.
 - A5 Ties in Rule I and Rule III are not addressed (the paper's "Ties are broken arbitrarily" on p. 136 concerns the
   target within a group): a choice among the tied stacks with random.Random(seed), stacks sorted by (bay, row).
@@ -88,8 +88,7 @@ def solve(layout: MultiBayLayout, P_r: float = 30.0, P_b: float = 300.0, seed: i
             ideal = [s for s in others if ming(s) > group[d]]
             if ideal:                          # Rule I
                 t = choose(ideal, lambda s: ming(s) + P_r * s[1] + P_b * abs(s[0] - sc[0]))
-                k = _rule_ii(state, group, ming, blocks, d, t, H)
-                if k is not None:
+                while (k := _rule_ii(state, group, ming, blocks, d, t, H)) is not None:   # A3, Fig. 3
                     relocate(state.where[k], t)
                 relocate(sc, t)
             elif others:                       # Rule III
