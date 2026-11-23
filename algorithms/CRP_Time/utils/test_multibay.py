@@ -1,5 +1,5 @@
 """
-Tests of the multi-bay layer (utils/multibay.py) and of shin_time on it (hand-computed values).
+Tests of the multi-bay layer (utils/multibay.py, check_multibay_plan) and of shin_time on it (hand-computed values).
 
   python -m unittest algorithms.CRP_Time.utils.test_multibay      (from the repo root)
 
@@ -14,7 +14,7 @@ import unittest
 from core.benchmarks.lee_lee import list_lee_lee_files, parse_lee_lee
 from core.plan import Movement, RelocationPlan
 
-from algorithms.CRP_Time.utils.multibay import MultiBayLayout, PlanError, load_lee_lee, replay
+from algorithms.CRP_Time.utils.multibay import MultiBayLayout, PlanError, check_multibay_plan, load_lee_lee
 from algorithms.CRP_Time.utils.shin_time import lb_shin, shin_move_times, shin_time
 
 LAYOUT = MultiBayLayout("hand", 2, 2, 2, {(1, 1): (1, 3), (1, 2): (2,), (2, 1): (4,), (2, 2): ()}, (1, 2, 3, 4))
@@ -37,12 +37,12 @@ PLAN_B = [(4, (2, 1), (2, 2)), (3, (1, 1), (2, 1)), (1, (1, 1), None), (2, (1, 2
 class TestReplay(unittest.TestCase):
     def assertFails(self, moves, step, restricted=False):
         with self.assertRaises(PlanError) as cm:
-            replay(plan(*moves), LAYOUT, restricted)
+            check_multibay_plan(plan(*moves), LAYOUT, restricted)
         self.assertEqual(cm.exception.step, step)
 
     def test_valid_plans(self):
-        self.assertEqual(replay(plan(*PLAN_A), LAYOUT, restricted=True), (1, 4, 0))
-        self.assertEqual(replay(plan(*PLAN_B), LAYOUT), (2, 4, 1))
+        self.assertEqual(check_multibay_plan(plan(*PLAN_A), LAYOUT, restricted=True), (1, 4, 0))
+        self.assertEqual(check_multibay_plan(plan(*PLAN_B), LAYOUT), (2, 4, 1))
 
     def test_only_top_moves(self):
         self.assertFails([(1, (1, 1), None)], 0)                       # 3 lies on 1
@@ -62,6 +62,15 @@ class TestReplay(unittest.TestCase):
 
     def test_restricted(self):
         self.assertFails(PLAN_B, 0, restricted=True)
+
+    # After 3 to (2, 2) and the retrieval of 1, the target 2 lies on top of (1, 2) and is relocated.
+    TARGET_RELOCATED = [(3, (1, 1), (2, 2)), (1, (1, 1), None), (2, (1, 2), (1, 1))]
+
+    def test_target_relocated_unrestricted(self):
+        self.assertFails(self.TARGET_RELOCATED, 2)
+
+    def test_target_relocated_restricted(self):
+        self.assertFails(self.TARGET_RELOCATED, 2, restricted=True)
 
 
 class TestShinTime(unittest.TestCase):

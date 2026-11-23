@@ -28,7 +28,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from core.plan import RelocationPlan
 
-from .multibay import MultiBayLayout, replay
+from .multibay import MultiBayLayout, check_multibay_plan
 
 Position = Tuple[int, int]
 Layout = Sequence[Sequence[Sequence[int]]]
@@ -49,14 +49,14 @@ def trip(a: Position, b: Position, p: ShinParams = ShinParams()) -> float:
 
 
 def shin_move_times(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams = ShinParams()) -> List[float]:
-    """Time of each move as env.py computes it, after replay(plan, layout, restricted=False) accepts the plan.
+    """Time of each move as env.py computes it, after check_multibay_plan(plan, layout, restricted=False) accepts it.
 
     No fixed start: the first trip is free (env.py:18-19, 37-38, 66-67). A relocation is the empty trip to its source,
     the loaded trip to its destination and gamma_pd (env.py:69-79); a retrieval is the empty trip to its stack, the
     loaded trip to (same bay, row 0) and gamma_pd (env.py:40-46). The crane then stands at the destination, or at
     (bay, 0) after a retrieval (env.py:48-55, 83-84). No return trip at the end.
     """
-    replay(plan, layout, restricted=False)
+    check_multibay_plan(plan, layout, restricted=False)
     pos: Optional[Position] = None
     times: List[float] = []
     for m in plan.movements:

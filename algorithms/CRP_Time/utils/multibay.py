@@ -6,7 +6,7 @@ Positions are (bay, row), both from 1; plans are core.plan.RelocationPlan (Movem
 
 layout     MultiBayLayout, load_lee_lee
 state      YardState (move, retrieve)
-replay     replay(plan, layout, restricted) -> ReplaySummary, PlanError
+check      check_multibay_plan(plan, layout, restricted) -> ReplaySummary, PlanError
 """
 
 from __future__ import annotations
@@ -102,10 +102,11 @@ class ReplaySummary(NamedTuple):
     non_target_relocations: int   # relocations not from the stack of the current target
 
 
-def replay(plan: RelocationPlan, layout: MultiBayLayout, restricted: bool = False) -> ReplaySummary:
+def check_multibay_plan(plan: RelocationPlan, layout: MultiBayLayout, restricted: bool = False) -> ReplaySummary:
     """Replay plan on layout; raise PlanError at the first violation of: only top containers move, height <= H
-    after every move, retrievals in retrieval order, yard empty at the end, and (restricted) every relocation from
-    the stack of the current target."""
+    after every move, retrievals in retrieval order, the current target is never relocated (restricted: only
+    containers above it move; Shin's model retrieves a target on top at once, env.py clear()), yard empty at the end,
+    and (restricted) every relocation from the stack of the current target."""
     state = YardState(layout)
     nxt = 0
     relocations = non_target = 0
@@ -121,6 +122,8 @@ def replay(plan: RelocationPlan, layout: MultiBayLayout, restricted: bool = Fals
             state.retrieve(m.from_pos)
             nxt += 1
             continue
+        if m.container_id == layout.order[nxt]:
+            raise PlanError(i, f"relocates the current target {m.container_id}")
         if m.from_pos != target_pos:
             if restricted:
                 raise PlanError(i, f"relocation from {m.from_pos}, not from the target's stack {target_pos}")
