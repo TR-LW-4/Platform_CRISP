@@ -85,6 +85,11 @@ def shin_f2vert_parts(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParam
     to (bay, 0)), without gamma_pd. Vertical: the single-bay f2vert term (utils/crane_time.py movement_f2_vertical,
     = core/objectives.py:301-318), which replaces the fixed pick-up/place-down time there as here:
     (2 h_max - from_tier - to_tier) (tr0 + tr1), h_max = H + 1, to_tier = h_out for a retrieval.
+
+    Tiers are 1-based (the ground tier is 1). h_out = 1.5 follows Voß & Schwarze (2019, p. 107), who take Lin et al.'s
+    (2015, p. 140) truck height of half a tier ("the height of a truck is specified as 0.5") and, with the ground level
+    at tier 1, set the height of the outside area to h_out = 1.5; tr0 = 2.59 and tr1 = 5.18 are Lin et al.'s spreader
+    times per tier, empty and loaded (p. 140), as in V&S.
     """
     check_multibay_plan(plan, layout, restricted=False)
     state = YardState(layout)
