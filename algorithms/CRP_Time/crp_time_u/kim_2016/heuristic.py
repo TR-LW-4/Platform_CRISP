@@ -78,8 +78,13 @@ def is_critical(orders: List[int]) -> bool:
     return any(all(x > orders[i] for x in orders[i + 1:]) for i in range(len(orders) - 1))
 
 
-def solve(layout: MultiBayLayout, seed: int = 0) -> RelocationPlan:
-    """Working plan of the heuristic; checked with check_multibay_plan(restricted=False) before it is returned."""
+def solve(layout: MultiBayLayout, seed: int = 0, search_once: bool = False, fixed_tn: bool = False) -> RelocationPlan:
+    """Working plan of the heuristic; checked with check_multibay_plan(restricted=False) before it is returned.
+
+    Defaults: the pseudocode reading (P1, K3). Sensitivity variants (pre-registered, data repo kim_2016_multibay):
+    search_once (V1, the text reading of P1): Case 3 searches the other critical stacks once, with TNselected at
+    selection, and moves their tops in descending order without re-checking; fixed_tn (V2, alternative to K3): the
+    while loops keep TNselected at its value at selection instead of updating it after each pre-move."""
     rng = random.Random(seed)
     state = YardState(layout)
     order: Dict[int, int] = {c: n for n, c in enumerate(layout.order, 1)}
@@ -102,12 +107,22 @@ def solve(layout: MultiBayLayout, seed: int = 0) -> RelocationPlan:
     def relocate(src: Position, dst: Position) -> None:
         plan.add(Movement(state.move(src, dst), src, dst))
 
-    def pre_moves(sel: Position, sc: Position, low: int) -> None:
+    def qualifying(sel: Position, sc: Position, low: int, high: int) -> List[Position]:
+        return [s for s in state.stacks if s not in (sel, sc) and state.stacks[s] and critical(s) and low < tn(s) < high]
+
+    def pre_moves(sel: Position, sc: Position, low: int, once: bool) -> None:
         """The while loops of Cases 3 and 4 (p. 357): tops of critical stacks with low < TNC < TNselected, largest
-        first, re-evaluated after every move (P1, K3), while sel keeps room for the top of stackcmin (K4)."""
+        first, re-evaluated after every move (P1, K3), while sel keeps room for the top of stackcmin (K4).
+        once (V1): one search, then the found tops in descending order. fixed_tn (V2): TNselected as at selection."""
+        bound = tn(sel)
+        if once:
+            for s in sorted(qualifying(sel, sc, low, bound), key=tn, reverse=True):
+                if H - len(state.stacks[sel]) < 2:
+                    return
+                relocate(s, sel)
+            return
         while H - len(state.stacks[sel]) >= 2:
-            qual = [s for s in state.stacks if s not in (sel, sc) and state.stacks[s] and critical(s)
-                    and low < tn(s) < tn(sel)]
+            qual = qualifying(sel, sc, low, bound if fixed_tn else tn(sel))
             if not qual:
                 return
             relocate(max(qual, key=tn), sel)
@@ -126,10 +141,10 @@ def solve(layout: MultiBayLayout, seed: int = 0) -> RelocationPlan:
                 if cands:                                # Case 3
                     best = min(tn(s) for s in cands)
                     sel = rng.choice(sorted(s for s in cands if tn(s) == best))                    # K5
-                    pre_moves(sel, sc, tncc)
+                    pre_moves(sel, sc, tncc, search_once)
                 else:                                    # Case 4
                     sel = max(ideals, key=tn)
-                    pre_moves(sel, sc, 0)
+                    pre_moves(sel, sc, 0, False)
                 relocate(sc, sel)
             else:                                        # Case 2
                 others = [s for s in state.stacks if s != sc and len(state.stacks[s]) < H]

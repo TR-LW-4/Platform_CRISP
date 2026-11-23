@@ -89,6 +89,27 @@ class TestExamples(unittest.TestCase):
                            {1: [7, 4, 3, 6], 2: [5, 2], 3: []})
 
 
+class TestVariants(unittest.TestCase):
+    """The sensitivity flags (V1 search_once, V2 fixed_tn) default to the pseudocode reading."""
+
+    FIG5 = layout("Kim Fig. 5", 3, 3, {1: (1, 3), 2: (5, 6), 3: (2, 4)})
+    FIG6 = layout("Kim Fig. 6", 3, 4, {1: (7, 6), 2: (5, 2, 4), 3: (1, 3)})
+    FIG7 = layout("Kim Fig. 7", 3, 4, {1: (7, 4), 2: (5, 2, 3), 3: (1, 6)})
+
+    def test_default_flags_reproduce_figs_5_to_7(self):
+        with mock.patch("algorithms.CRP_Time.crp_time_u.kim_2016.heuristic.random.Random", FirstOfTies):
+            plan5 = solve(self.FIG5, search_once=False, fixed_tn=False)
+        self.assertEqual(moves(plan5), [(3, 1, 2), (1, 1, 0), (4, 3, 1), (2, 3, 0), (3, 2, 0), (4, 1, 0), (6, 2, 1),
+                                        (5, 2, 0), (6, 1, 0)])
+        self.assertEqual(moves(solve(self.FIG6, search_once=False, fixed_tn=False))[:3], [(4, 2, 1), (3, 3, 1), (1, 3, 0)])
+        self.assertEqual(moves(solve(self.FIG7, search_once=False, fixed_tn=False))[:3], [(3, 2, 1), (6, 3, 1), (1, 3, 0)])
+
+    def test_variants_give_valid_plans(self):
+        for lay in (self.FIG5, self.FIG6, self.FIG7):
+            for once, fixed in ((True, False), (False, True), (True, True)):
+                check_multibay_plan(solve(lay, search_once=once, fixed_tn=fixed), lay)
+
+
 @unittest.skipUnless(list_lee_lee_files(), "benchmark/lee_lee is missing")
 class TestLeeLeeExample1(unittest.TestCase):
     def test_valid_plan(self):
