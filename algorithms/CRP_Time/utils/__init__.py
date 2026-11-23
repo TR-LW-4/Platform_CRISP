@@ -8,7 +8,8 @@ crane_time ObjectiveSpec, check_objective, move_time, evaluate
 plan       replay, actions, saved_moves
 finish     finish
 params     parameters
-shin_time  ShinParams, trip, lb_shin (Shin et al. 2026, multi-bay)
+multibay   MultiBayLayout, load_lee_lee, YardState, replay, PlanError (multi-bay layer)
+shin_time  ShinParams, trip, shin_move_times, shin_time, lb_shin (Shin et al. 2026, multi-bay)
 timer      Stopwatch
 trace      trace_layout
 

@@ -9,8 +9,9 @@ follows Shin's public code (github.com/operagang/CRP_RL, env/env.py at commit
 - a trip from (i, j) to (i', j') takes gamma_acc * [i != i'] + gamma_bay * |i - i'|
   + gamma_row * |j - j'| (eq. (1), p. 5).
 
-A layout is layout[b][s] = retrieval orders of the containers in bay b, stack (row) s,
-bottom to top, both indices from 0; retrieval orders are unique (p. 4).
+shin_time takes a plan (core.plan) and a utils.multibay.MultiBayLayout. lb_shin takes
+layout[b][s] = retrieval orders of the containers in bay b, stack (row) s, bottom to top,
+both indices from 0 (MultiBayLayout.orders()); retrieval orders are unique (p. 4).
 
 ------------------------------- Copyright --------------------------------
 Copyright (c) 2026 LIACS, Leiden University.
@@ -23,7 +24,11 @@ W.-J. Shin et al., Transportation Research Part C 183 (2026) 105496.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
+
+from core.plan import RelocationPlan
+
+from .multibay import MultiBayLayout, replay
 
 Position = Tuple[int, int]
 Layout = Sequence[Sequence[Sequence[int]]]
@@ -41,6 +46,30 @@ class ShinParams:
 def trip(a: Position, b: Position, p: ShinParams = ShinParams()) -> float:
     """Eq. (1), p. 5."""
     return (p.acc if a[0] != b[0] else 0.0) + p.bay * abs(a[0] - b[0]) + p.row * abs(a[1] - b[1])
+
+
+def shin_move_times(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams = ShinParams()) -> List[float]:
+    """Time of each move as env.py computes it, after replay(plan, layout, restricted=False) accepts the plan.
+
+    No fixed start: the first trip is free (env.py:18-19, 37-38, 66-67). A relocation is the empty trip to its source,
+    the loaded trip to its destination and gamma_pd (env.py:69-79); a retrieval is the empty trip to its stack, the
+    loaded trip to (same bay, row 0) and gamma_pd (env.py:40-46). The crane then stands at the destination, or at
+    (bay, 0) after a retrieval (env.py:48-55, 83-84). No return trip at the end.
+    """
+    replay(plan, layout, restricted=False)
+    pos: Optional[Position] = None
+    times: List[float] = []
+    for m in plan.movements:
+        src = m.from_pos
+        dst = (src[0], 0) if m.is_retrieval else m.to_pos
+        times.append(trip(pos or src, src, p) + trip(src, dst, p) + p.pd)
+        pos = dst
+    return times
+
+
+def shin_time(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams = ShinParams()) -> float:
+    """Crane working time of a valid multi-bay plan under Shin's model (sum of shin_move_times)."""
+    return sum(shin_move_times(plan, layout, p))
 
 
 def _positions(layout: Layout) -> Dict[int, Position]:
