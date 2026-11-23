@@ -9,7 +9,7 @@ plan       replay, actions, saved_moves
 finish     finish
 params     parameters
 multibay   MultiBayLayout, load_lee_lee, YardState, check_multibay_plan, PlanError (multi-bay layer)
-shin_time  ShinParams, trip, shin_move_times, shin_time, lb_shin (Shin et al. 2026, multi-bay)
+shin_time  ShinParams, trip, shin_move_times, shin_time, shin_f2vert(_parts), lb_shin (Shin et al. 2026, multi-bay)
 timer      Stopwatch
 trace      trace_layout
 

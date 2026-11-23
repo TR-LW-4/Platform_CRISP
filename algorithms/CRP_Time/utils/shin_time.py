@@ -28,7 +28,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from core.plan import RelocationPlan
 
-from .multibay import MultiBayLayout, check_multibay_plan
+from .crane_time import ObjectiveSpec
+from .multibay import MultiBayLayout, YardState, check_multibay_plan
 
 Position = Tuple[int, int]
 Layout = Sequence[Sequence[Sequence[int]]]
@@ -70,6 +71,44 @@ def shin_move_times(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams 
 def shin_time(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams = ShinParams()) -> float:
     """Crane working time of a valid multi-bay plan under Shin's model (sum of shin_move_times)."""
     return sum(shin_move_times(plan, layout, p))
+
+
+_F2V = ObjectiveSpec()   # tr0 2.59, tr1 5.18 (s per tier, empty / loaded), h_out 1.5: the single-bay f2vert defaults
+
+
+def shin_f2vert_parts(plan: RelocationPlan, layout: MultiBayLayout, p: ShinParams = ShinParams(),
+                      tr0: float = _F2V.empty_vertical_s_per_tier, tr1: float = _F2V.loaded_vertical_s_per_tier,
+                      h_out: float = _F2V.outside_height) -> List[Tuple[float, float]]:
+    """(horizontal, vertical) time of each move of a valid multi-bay plan (multi-bay f2vert, Wei 29-31 Oct).
+
+    Horizontal: Shin's trips exactly as in shin_move_times (first trip free, gamma_acc per bay-changing trip, retrieval
+    to (bay, 0)), without gamma_pd. Vertical: the single-bay f2vert term (utils/crane_time.py movement_f2_vertical,
+    = core/objectives.py:301-318), which replaces the fixed pick-up/place-down time there as here:
+    (2 h_max - from_tier - to_tier) (tr0 + tr1), h_max = H + 1, to_tier = h_out for a retrieval.
+    """
+    check_multibay_plan(plan, layout, restricted=False)
+    state = YardState(layout)
+    h_max = float(layout.max_height + 1)
+    pos: Optional[Position] = None
+    parts: List[Tuple[float, float]] = []
+    for m in plan.movements:
+        src = m.from_pos
+        from_tier = len(state.stacks[src])
+        if m.is_retrieval:
+            dst, to_tier = (src[0], 0), h_out
+            state.retrieve(src)
+        else:
+            dst = m.to_pos
+            state.move(src, dst)
+            to_tier = len(state.stacks[dst])
+        parts.append((trip(pos or src, src, p) + trip(src, dst, p), (2 * h_max - from_tier - to_tier) * (tr0 + tr1)))
+        pos = dst
+    return parts
+
+
+def shin_f2vert(plan: RelocationPlan, layout: MultiBayLayout, **kw) -> float:
+    """Multi-bay f2vert: sum of shin_f2vert_parts."""
+    return sum(h + v for h, v in shin_f2vert_parts(plan, layout, **kw))
 
 
 def _positions(layout: Layout) -> Dict[int, Position]:
