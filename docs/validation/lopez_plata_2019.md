@@ -680,6 +680,8 @@ Neither depends on the crane position. Defaults: $ts$ = 1.2, $tpp$ = 30, $tr_0$ 
 - No instance lies below OPT: the smallest per-instance gap is −2.3·10⁻¹³ s (float sums in a different order).
 - f2vert: not run on the benchmark.
 
+**Time limit in the final campaign (29 Oct 2026, `b1e3b12`; counted 23 Nov 2026).** In the final campaign (f2, f2vert and the practice preset, 40 instances per class, `time_limit_sec` 600), the 600 s limit of L32 was hit (`time_limit_hit` = 1) in 184 of 600 runs: all 120 on 6 × 10 and 64 on 5 × 7 (20 / 21 / 23 under f2 / f2vert / practice); no run on 3 × 5, 3 × 7 or 4 × 6. The limit is checked in step 2 only (L32), so a run can exceed it: the longest `runtime_s` is 655.9 s (6 × 10, practice). Summed `train_wall_s` over the 600 runs: 143 280 s (39.8 h). Script and output: `docs/validation/data/final_campaign_20261029/limits.py`, `limits_output.txt`.
+
 ## §5 Deviations and assumptions
 
 Labels (validation workflow, step 3): (a) required by the unified 2D setting, (b) a choice the paper leaves open, (c) a real deviation from the paper. "No reason given" means the code states none.
@@ -794,3 +796,5 @@ Labels (validation workflow, step 3): (a) required by the unified 2D setting, (b
 - **V42 (14–15 Nov 2026)** — O27 repaired (3b79701, EstRel retrieves from the new stack; `test_fig3_estimates`); repaired bound admissible on all 3×3 and 3×4 instances, 3×5-1 and 4×4-1 (0 violations, both weight readings); exact optima unchanged; Fig. 8 rerun with the V22 protocol: f identical on 240 of 240, the V22 criteria give the same result; heuristic runtime unchanged apart from load, exact A\* about 2× slower.
 
 - **Supervisor decisions (17 Nov 2026)** — Wei (Teams): follow the paper's heuristic, no closed list or other optimisations beyond the paper (confirms the default in V41/V42); `validate_plan` stays in `finish()`. Recorded in §0; no code changed.
+
+- **Time limit in the final campaign (23 Nov 2026)** — counted from the campaign's result files, no code changed: the 600 s limit was hit in 184/600 runs (all 120 on 6 × 10, 64 on 5 × 7); it is checked in step 2 only, so runs can exceed it (max 655.9 s). §4.
