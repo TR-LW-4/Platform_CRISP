@@ -40,6 +40,8 @@ export type AlgorithmGeometry = 'single-bay' | 'multi-bay'
 export type AlgorithmObjective = 'relocations' | 'crane_time' | 'fixed-rule'
 export type AlgorithmFidelity = 'faithful' | 'adapted' | 'degenerate'
 export type AlgorithmRelocationRule = 'restricted' | 'unrestricted'
+export type AlgorithmTimeCategory = 'time-in-selection' | 'time-afterwards'
+export type AlgorithmValidationStatus = 'validated' | 'partially-validated' | 'not-validated'
 
 export interface AlgorithmInfo {
   name: string
@@ -56,6 +58,11 @@ export interface AlgorithmInfo {
   fidelity: AlgorithmFidelity
   /** null if the algorithm does not declare its relocation rule. */
   relocation_rule: AlgorithmRelocationRule | null
+  /** null if not declared. */
+  time_category: AlgorithmTimeCategory | null
+  /** null if not declared; the evidence names the document and section. */
+  validation_status: AlgorithmValidationStatus | null
+  validation_evidence: string | null
 }
 
 export interface Catalog {

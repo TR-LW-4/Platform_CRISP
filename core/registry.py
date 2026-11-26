@@ -21,7 +21,8 @@ def _discover_subclasses(
 ) -> Dict[str, type]:
     """
     Recursively import all modules in *package_name* and collect
-    concrete subclasses of *base_class*.
+    concrete subclasses of *base_class*, except those that set
+    ``registered = False`` (kept in the tree, not offered).
     Returns {class.name: class}.
     """
     result: Dict[str, type] = {}
@@ -52,6 +53,7 @@ def _discover_subclasses(
                 and obj is not base_class
                 and not inspect.isabstract(obj)
                 and obj.__module__ == module.__name__
+                and obj.__dict__.get("registered", True)
             ):
                 key = getattr(obj, "name", obj.__name__)
                 result[key] = obj

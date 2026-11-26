@@ -26,6 +26,20 @@ One attribute is optional:
     absent (``None``) if not declared. Results are compared only between methods
     with the same rule.
 
+``time_category``
+    ``time-in-selection`` (category 1) if the method's selection rules or
+    search use crane travel or time, exact or as a distance proxy;
+    ``time-afterwards`` (category 2) if selection uses only relocation,
+    priority or move-count information and crane time is evaluated afterwards;
+    absent (``None``) if not declared.
+
+``validation_status``
+    ``validated`` (passed its pre-registered criterion), ``partially-validated``
+    (implemented per paper, criterion not met) or ``not-validated``; absent
+    (``None``) if not declared. ``validation_evidence`` names the document and
+    section where the criterion and its result are recorded. Whether the
+    implementation deliberately departs from the paper is ``fidelity``.
+
 Degradation is *derived*, never stored: a single-bay method is perfectly valid
 under a relocation-count objective no matter how the yard is shaped, and only
 becomes a weak baseline once crane time enters the objective on a yard that
@@ -87,6 +101,15 @@ RELOCATION_RESTRICTED = "restricted"
 RELOCATION_UNRESTRICTED = "unrestricted"
 RELOCATION_RULES = (RELOCATION_RESTRICTED, RELOCATION_UNRESTRICTED)
 
+TIME_IN_SELECTION = "time-in-selection"
+TIME_AFTERWARDS = "time-afterwards"
+TIME_CATEGORIES = (TIME_IN_SELECTION, TIME_AFTERWARDS)
+
+VALIDATED = "validated"
+PARTIALLY_VALIDATED = "partially-validated"
+NOT_VALIDATED = "not-validated"
+VALIDATION_STATUSES = (VALIDATED, PARTIALLY_VALIDATED, NOT_VALIDATED)
+
 # Assessment outcomes, ordered from best to worst.
 STATUS_OK = "ok"
 STATUS_DEGRADED = "degraded"
@@ -109,6 +132,9 @@ def algorithm_meta(cls: type) -> Dict[str, Any]:
         ),
         "fidelity": getattr(cls, "fidelity", FIDELITY_FAITHFUL),
         "relocation_rule": getattr(cls, "relocation_rule", None),
+        "time_category": getattr(cls, "time_category", None),
+        "validation_status": getattr(cls, "validation_status", None),
+        "validation_evidence": getattr(cls, "validation_evidence", None),
     }
 
 
@@ -260,6 +286,16 @@ def validate_meta(cls: type) -> List[str]:
         problems.append(
             f"relocation_rule {meta['relocation_rule']!r} not in {list(RELOCATION_RULES)}"
         )
+    if meta["time_category"] not in (None, *TIME_CATEGORIES):
+        problems.append(
+            f"time_category {meta['time_category']!r} not in {list(TIME_CATEGORIES)}"
+        )
+    if meta["validation_status"] not in (None, *VALIDATION_STATUSES):
+        problems.append(
+            f"validation_status {meta['validation_status']!r} not in {list(VALIDATION_STATUSES)}"
+        )
+    if meta["validation_status"] is not None and not meta["validation_evidence"]:
+        problems.append("validation_status declared without validation_evidence")
 
     objectives: Sequence[str] = meta["objectives"]
     if not objectives:

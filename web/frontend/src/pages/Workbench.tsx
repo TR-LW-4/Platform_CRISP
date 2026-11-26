@@ -15,6 +15,8 @@ import type {
   AlgorithmFidelity,
   AlgorithmRelocationRule,
   AlgorithmGeometry,
+  AlgorithmTimeCategory,
+  AlgorithmValidationStatus,
   AlgorithmInfo,
   BatchClassSummary,
   BenchmarkQueueBlock,
@@ -67,6 +69,17 @@ const FIDELITY_LABELS: Record<AlgorithmFidelity, string> = {
 const RELOCATION_RULE_LABELS: Record<AlgorithmRelocationRule, string> = {
   restricted: 'Restricted relocations',
   unrestricted: 'Unrestricted relocations',
+}
+
+const TIME_CATEGORY_LABELS: Record<AlgorithmTimeCategory, string> = {
+  'time-in-selection': 'Category 1: crane time in selection',
+  'time-afterwards': 'Category 2: crane time evaluated afterwards',
+}
+
+const VALIDATION_STATUS_LABELS: Record<AlgorithmValidationStatus, string> = {
+  validated: 'Validated',
+  'partially-validated': 'Partially validated',
+  'not-validated': 'Not validated',
 }
 
 // Objective modes under which crane time is part of what is minimised.
@@ -607,6 +620,14 @@ export function Workbench({
                 <span>{objectiveLabel(algorithm)}</span>
                 {algorithm.relocation_rule && (
                   <span>{RELOCATION_RULE_LABELS[algorithm.relocation_rule]}</span>
+                )}
+                {algorithm.time_category && (
+                  <span>{TIME_CATEGORY_LABELS[algorithm.time_category]}</span>
+                )}
+                {algorithm.validation_status && (
+                  <span title={algorithm.validation_evidence ?? undefined}>
+                    {VALIDATION_STATUS_LABELS[algorithm.validation_status]}
+                  </span>
                 )}
                 {algorithm.fidelity !== 'faithful' && (
                   <span>{FIDELITY_LABELS[algorithm.fidelity]}</span>

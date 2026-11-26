@@ -90,7 +90,10 @@ class ResolveInput(BaseModel):
 
 
 def _algorithm_method_group(algorithm_cls: type) -> str:
-    """Map package structure to a user-facing method family."""
+    """Map package structure to a user-facing method family; a class may name its own."""
+    declared = getattr(algorithm_cls, "method_group", None)
+    if declared:
+        return declared
     parts = algorithm_cls.__module__.split(".")
     if "solver_ip" in parts or (
         "exact" in parts and "solver" in parts
