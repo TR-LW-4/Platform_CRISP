@@ -4,11 +4,12 @@ between methods per time model, and the effect of the time model within one meth
 Result files are loaded and checked exactly as in make_campaign_tables.py (campaign_runs); the exact f2 optima are
 make_table.py's (jovanovic_2019_checks2/opt_all.jsonl, 3x5, 3x7, 4x6). Crane times within TOL seconds count as equal.
 With several campaigns, every algorithm comes from the campaign that holds it (make_campaign_tables.owners); the
-final campaign alone gives the three algorithms, with the Ünlüyurt campaign also the fixed-rule baselines.
+final campaign alone gives the three algorithms, with the Ünlüyurt campaign also the fixed-rule baselines, with
+fb_r_campaign_20261126 also Forster–Bortfeldt (2012) restricted (moves are its objective, crane time is measured).
 
 A) Per algorithm and class (f2 runs): instances equal to OPT, mean and max gap % (per-instance gap in % of OPT, gaps
    within TOL count as 0), instances below OPT. The three algorithms are checked against known values (EXPECTED);
-   a baseline has none, only "below OPT" stops the script.
+   the baselines and Forster–Bortfeldt have none, only "below OPT" stops the script.
 B) Per time model and class: per instance, the fastest solution(s) = lowest value of that time model among the
    algorithms (ties within TOL). Conflict: no fastest solution has the minimum relocation count of the algorithms. For
    conflicts, the absolute increase r_fast - r_min and the relative increase (r_fast - r_min) / r_min, with r_fast the
@@ -38,13 +39,22 @@ EXPECTED = {  # A) known values: instances equal to OPT and mean gap % per class
     "lopez_plata": ((39, 38, 32), (0.04, 0.03, 0.14)),
 }
 MAIN = {"f2": mct.F2, "f2vert": mct.F2V, "practice": mct.F2V}
-COUNT = {3: "three", 4: "four", 5: "five"}
+COUNT = {3: "three", 4: "four", 5: "five", 6: "six"}
 
 
 def name(algorithm):
     if algorithm in mct.FIXED_RULE:   # "Ünlüyurt–Aydın Difference1²": the author part alone is the same for both
         return mct.FOLDERS[algorithm][0].replace(" (2012)", "")
     return mct.FOLDERS[algorithm][0].split(" (")[0]
+
+
+def reference(algorithm):
+    """The Check cell of part A when nothing is flagged."""
+    if algorithm in EXPECTED:
+        return "as expected"
+    if algorithm in mct.RELOCATION_OBJECTIVE:
+        return "no reference (moves are the objective, crane time measured)"
+    return "no reference (fixed rule)"
 
 
 def table(head, rows):
@@ -75,7 +85,7 @@ def part_a(runs, opt, algos):
             diffs += [(name(a), cls, f) for f in flag]
             rows.append([cls.replace("x", "×"), name(a), f"{equal}/40", f"{mean:.2f}",
                          f"{pct[worst]:.2f} (data{cls.replace('x', '-')}-{worst})", str(below),
-                         "; ".join(flag) or ("as expected" if a in EXPECTED else "no reference (fixed rule)")])
+                         "; ".join(flag) or reference(a)])
     head = ["Class", "Algorithm", "= OPT", "Mean gap %", "Max gap % (instance)", "Below OPT", "Check"]
     return table(head, rows), diffs
 
@@ -167,9 +177,12 @@ def main():
            "algorithm."] + part_c(runs, algos)
     if any(a in mct.FIXED_RULE for a in algos):
         md += ["", f"² {mct.BASELINE_NOTE}"]
+    if any(a in mct.RELOCATION_OBJECTIVE for a in algos):
+        md += ["", f"³ {mct.FB_NOTE}"]
     print("\n".join(md))
     campaign = campaigns[-1][0]
     out = campaign.parent / f"{campaign.name}_tables" / "tradeoff.md"
+    out.parent.mkdir(exist_ok=True)
     out.write_text("\n".join(md) + "\n", encoding="utf-8")
     print(f"\nwrote {out}")
 

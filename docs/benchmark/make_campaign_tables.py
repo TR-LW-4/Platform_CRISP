@@ -15,7 +15,7 @@ its outputs document the October runs and are not touched. Every algorithm comes
 with only the final campaign the output is that of the three algorithms alone.
 
   python docs/benchmark/make_campaign_tables.py <campaign> [<campaign> ...]
-  python docs/benchmark/make_campaign_tables.py docs/validation/data/final_campaign_20261029 docs/validation/data/unluyurt_campaign_20261110
+  python docs/benchmark/make_campaign_tables.py docs/validation/data/final_campaign_20261029 docs/validation/data/unluyurt_campaign_20261110 docs/validation/data/fb_r_campaign_20261126
 """
 import json
 import re
@@ -67,9 +67,16 @@ BASELINE_NOTE = (
 FB_NOTE = (
     "Forster–Bortfeldt (2012) restricted, from its own campaign: the tree search minimises the number of moves, as in "
     "the paper (Wei, 10 Nov 2026), and reads no time parameter, so its crane time is measured, not optimised; the "
-    "plans under the three time models can differ only through its 60 s wall-clock limit (p. 306), which is not "
-    "recorded in the result files (time_limit_hit is pushed in the final record's extra, which is not saved)."
+    "plans under the three time models can differ only through its 60 s wall-clock limit (p. 306). Whether a run hit "
+    "that limit is not stored in the result files (time_limit_hit is pushed in the final record's extra, which is not "
+    "saved), so the time limit hit column counts the runs with runtime_s ≥ 60 s."
 )
+LOPEZ_6X10_NOTE = (
+    "López-Plata 6×10: all 40 runs reached the 600 s time limit under every preset. These wall-clock-limited results "
+    "depend on the machine and the session and cannot be re-verified: the reuse check (data repository "
+    "`reuse_check/`, commit a1f599b) has no qualifying 6×10 instance for López-Plata."
+)
+FB_LIMIT_S = 60.0
 
 
 def tex_note(text):
@@ -123,9 +130,33 @@ def row(algorithm, preset, cls, runs):
         cells["limit"] = f"{int(sum(x['time_limit_hit'] for x in v))}/{len(v)}"
         cells["budget"] = f"{int(sum(x['budget_hit'] for x in v))}/{len(v)}"
     else:
-        cells["limit"] = {"azari": "n/a¹", "forster_bortfeldt_r": "n/a³"}.get(algorithm, "–")
+        cells["limit"] = {"azari": "n/a¹"}.get(algorithm, "–")
+        if algorithm == "forster_bortfeldt_r":
+            cells["limit"] = f"{sum(x['runtime_s'] >= FB_LIMIT_S for x in v)}/{len(v)}³"
         cells["budget"] = "–"
     return cells
+
+
+def run_dates(algorithm):
+    """First and last date of an algorithm's campaign result files (their timestamps)."""
+    stamps = []
+    for p in cp.PRESETS:
+        problem = cp.block_values(algorithm, p)[0]
+        for c in cp.CLASSES:
+            for layout in cp.layouts(c, None):
+                stamps.append(json.loads(cp.result_file(algorithm, problem, layout).read_text(encoding="utf-8"))
+                              ["timestamp"][:10])
+    return min(stamps), max(stamps)
+
+
+def sources(campaigns):
+    """Per algorithm: its campaign folder, commit and the dates of its runs."""
+    out = []
+    for a, c, info in owners(campaigns):
+        first, last = run_dates(a)
+        out.append(f"{FOLDERS[a][0].rstrip('²³')}: `{c.name}`, commit `{info['commit'][:7]}`, runs "
+                   + (first if first == last else f"{first} to {last}"))
+    return out
 
 
 def owners(campaigns):
@@ -169,8 +200,16 @@ def write(campaigns, rows):
     else:
         source = "the campaigns " + " and ".join(f"`{rel(c)}`" for c, _ in campaigns)
         campaign_lines = [f"- **Campaign `{c.name}`** ("
-                          + ", ".join(FOLDERS[a][0].rstrip("²") for a in cp.campaign_algorithms(info)) + "): "
+                          + ", ".join(FOLDERS[a][0].rstrip("²³") for a in cp.campaign_algorithms(info)) + "): "
                           + campaign_line(info) for c, info in campaigns]
+    if relocation:
+        assert cp.block_values("forster_bortfeldt_r", "f2")[1]["time_limit_s"] == FB_LIMIT_S
+    lopez_note = []
+    if "lopez_plata" in algorithms:
+        assert all(r["limit"] == "40/40" for p in cp.PRESETS for r in rows[p]
+                   if r["class"] == "6×10" and r["algorithm"] == FOLDERS["lopez_plata"][0]), "LOPEZ_6X10_NOTE"
+        lopez_note = [LOPEZ_6X10_NOTE]
+    source_list = sources(campaigns)
     md = [
         "# CRP-Time final campaign: Azari, Jovanović, López-Plata under f2, f2vert and the practice preset"
         + (", with the fixed-rule baselines Ünlüyurt–Aydın Difference1 and Difference2" if baselines else "")
@@ -180,6 +219,7 @@ def write(campaigns, rows):
         "`results/CRP-Time/`); every file is checked to be the campaign's result of its instance.",
         "",
         *campaign_lines,
+        "- **Source per algorithm:** " + "; ".join(source_list) + ".",
         "- **Runs:** `docs/benchmark/campaign.py`, the web worker of a Workbench batch job, one instance at a time; "
         "every saved plan replayed by `campaign.py check` (restricted BRP, H = T + 2, f2, f2vert and the crane time "
         "with acceleration recomputed).",
@@ -193,7 +233,9 @@ def write(campaigns, rows):
         "this phase.",
         "- **Format:** mean ± standard deviation (n − 1) over the 40 instances; runtime_s with 3 decimals below "
         "10 s, 1 decimal above. Time limit hit: López-Plata instances that reached the 600 s limit (step 2); node "
-        "budget hit: López-Plata instances whose step 1 reached the node budget; Jovanović has neither.",
+        "budget hit: López-Plata instances whose step 1 reached the node budget; Jovanović has neither."
+        + (" Forster–Bortfeldt: runs with runtime_s ≥ 60 s (³)." if relocation else ""),
+        *[f"- **Not re-verifiable:** {note}" for note in lopez_note],
     ]
     for p in cp.PRESETS:
         cols = columns(p)
@@ -209,7 +251,9 @@ def write(campaigns, rows):
            + f"; see {STEM}.md for the setup."]
     tex_names = {FOLDERS[a][0]: FOLDERS[a][2] for a in algorithms}
     baseline_tex = ((rf" $^{{2}}$ {tex_note(BASELINE_NOTE)}" if baselines else "")
-                    + (rf" $^{{3}}$ {tex_note(FB_NOTE)}" if relocation else ""))
+                    + (rf" $^{{3}}$ {tex_note(FB_NOTE)}" if relocation else "")
+                    + "".join(f" {tex_note(note)}" for note in lopez_note)
+                    + " Sources: " + tex_note("; ".join(source_list)) + ".")
     for p in cp.PRESETS:
         cols = columns(p)
         tex += ["", r"\begin{table}[htbp]", r"\centering", r"\small",
@@ -226,8 +270,9 @@ def write(campaigns, rows):
                 r"\par\smallskip\footnotesize * optimised. $^{1}$ " + AZARI_NOTE + " " + tex_note(AZARI_FALLBACK)
                 + baseline_tex,
                 rf"\caption{{CRP-Time final campaign under {TEX_LABELS[p]}, Caserta instances, 40 per class: mean "
-                r"$\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit; "
-                r"budget hit: instances whose step 1 reached its node budget.}",
+                r"$\pm$ standard deviation. Limit hit: instances that reached L\'{o}pez-Plata's 600 s time limit"
+                + (r" (Forster--Bortfeldt: runtime $\geq$ 60 s)" if relocation else "")
+                + r"; budget hit: instances whose step 1 reached its node budget.}",
                 rf"\label{{tab:crp-time-campaign-{p}}}", r"\end{table}"]
     (OUT_DIR / f"{STEM}.tex").write_text("\n".join(tex) + "\n", encoding="utf-8")
 
