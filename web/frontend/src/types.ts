@@ -41,7 +41,11 @@ export type AlgorithmObjective = 'relocations' | 'crane_time' | 'fixed-rule'
 export type AlgorithmFidelity = 'faithful' | 'adapted' | 'degenerate'
 export type AlgorithmRelocationRule = 'restricted' | 'unrestricted'
 export type AlgorithmTimeCategory = 'time-in-selection' | 'time-afterwards'
-export type AlgorithmValidationStatus = 'validated' | 'partially-validated' | 'not-validated'
+export type AlgorithmValidationStatus =
+  | 'validated'
+  | 'partially-validated'
+  | 'checked-post-hoc'
+  | 'not-validated'
 
 export interface AlgorithmInfo {
   name: string

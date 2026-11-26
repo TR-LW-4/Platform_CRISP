@@ -21,7 +21,7 @@ Three attributes are declared on every ``BaseAlgorithm`` subclass:
 One attribute is optional:
 
 ``relocation_rule``
-    ``restricted`` if the published method only relocates the containers above
+    ``restricted`` if the implementation only relocates the containers above
     the current target, ``unrestricted`` if it may relocate any top container;
     absent (``None``) if not declared. Results are compared only between methods
     with the same rule.
@@ -35,7 +35,9 @@ One attribute is optional:
 
 ``validation_status``
     ``validated`` (passed its pre-registered criterion), ``partially-validated``
-    (implemented per paper, criterion not met) or ``not-validated``; absent
+    (implemented per paper, criterion not met), ``checked-post-hoc`` (compared
+    against the paper's reported results with a documented numeric comparison,
+    but no criterion fixed beforehand) or ``not-validated``; absent
     (``None``) if not declared. ``validation_evidence`` names the document and
     section where the criterion and its result are recorded. Whether the
     implementation deliberately departs from the paper is ``fidelity``.
@@ -107,8 +109,9 @@ TIME_CATEGORIES = (TIME_IN_SELECTION, TIME_AFTERWARDS)
 
 VALIDATED = "validated"
 PARTIALLY_VALIDATED = "partially-validated"
+CHECKED_POST_HOC = "checked-post-hoc"
 NOT_VALIDATED = "not-validated"
-VALIDATION_STATUSES = (VALIDATED, PARTIALLY_VALIDATED, NOT_VALIDATED)
+VALIDATION_STATUSES = (VALIDATED, PARTIALLY_VALIDATED, CHECKED_POST_HOC, NOT_VALIDATED)
 
 # Assessment outcomes, ordered from best to worst.
 STATUS_OK = "ok"

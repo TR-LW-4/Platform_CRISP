@@ -79,7 +79,18 @@ const TIME_CATEGORY_LABELS: Record<AlgorithmTimeCategory, string> = {
 const VALIDATION_STATUS_LABELS: Record<AlgorithmValidationStatus, string> = {
   validated: 'Validated',
   'partially-validated': 'Partially validated',
+  'checked-post-hoc': 'Checked post hoc',
   'not-validated': 'Not validated',
+}
+
+const VALIDATION_STATUS_DEFINITIONS: Record<AlgorithmValidationStatus, string> = {
+  validated: 'Passed its pre-registered criterion.',
+  'partially-validated': 'Implemented per paper; pre-registered criterion not met.',
+  'checked-post-hoc':
+    "Compared against the paper's reported results with a documented numeric comparison, " +
+    'but no criterion fixed beforehand.',
+  'not-validated':
+    "Neither a pre-registered criterion nor a documented numeric comparison with the paper's results.",
 }
 
 // Objective modes under which crane time is part of what is minimised.
@@ -625,7 +636,14 @@ export function Workbench({
                   <span>{TIME_CATEGORY_LABELS[algorithm.time_category]}</span>
                 )}
                 {algorithm.validation_status && (
-                  <span title={algorithm.validation_evidence ?? undefined}>
+                  <span
+                    title={[
+                      VALIDATION_STATUS_DEFINITIONS[algorithm.validation_status],
+                      algorithm.validation_evidence,
+                    ]
+                      .filter(Boolean)
+                      .join('\n')}
+                  >
                     {VALIDATION_STATUS_LABELS[algorithm.validation_status]}
                   </span>
                 )}
