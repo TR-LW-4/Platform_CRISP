@@ -37,6 +37,10 @@ class LANHeuristic(BaseAlgorithm):
     geometry            = "single-bay"
     objectives          = ["relocations"]
     fidelity            = "faithful"
+    relocation_rule     = "restricted"
+    time_category       = "time-afterwards"
+    validation_status   = "not-validated"
+    validation_evidence = "No validation log (outside the thesis scope; docs/validation/algorithm_labels.md)"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None

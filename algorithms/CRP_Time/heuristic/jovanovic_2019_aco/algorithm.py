@@ -61,9 +61,14 @@ class JovanovicACO_CRPTime(BaseAlgorithm):
     compatible_problems = ["CRP-Time"]
     geometry            = "single-bay"
     objectives          = ["crane_time"]
-    fidelity            = "faithful"
+    fidelity            = "adapted"
     relocation_rule     = "restricted"
     time_category       = "time-in-selection"
+    validation_status   = "checked-post-hoc"
+    validation_evidence = (
+        "docs/validation/jovanovic_2019.md §4, Checks 1-3 and Step 5: relocations within ±0.10 of Table 1 on 19 "
+        "of 21 sizes; O_f and O_v against Table 5; no criterion fixed beforehand"
+    )
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

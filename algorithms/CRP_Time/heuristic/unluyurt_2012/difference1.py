@@ -47,6 +47,11 @@ class UnluyurtAydinDifference1(BaseAlgorithm):
     fidelity = "faithful"
     relocation_rule = "restricted"
     time_category = "time-afterwards"
+    validation_status = "not-validated"
+    validation_evidence = (
+        "docs/validation/unluyurt_2012.md §2 O11: the paper's results (Tables I-VI) cannot be compared, its "
+        "instances are not public; the worked examples and the cases of §3 pass"
+    )
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)

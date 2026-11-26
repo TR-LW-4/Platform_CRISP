@@ -159,9 +159,9 @@ class TestLowerBound(unittest.TestCase):
         self.assertGreater(_violations("f2_vertical", PARAMETER_SETS["wide"], lb_time)[0], 0)
 
     def test_metadata(self):
-        """The label stays faithful; the deviation in LB_f is named in the description."""
+        """Adapted (LB_f without the ts term, Wei 9 Oct; algorithm_labels.md A1); the deviation is in the description."""
         from .algorithm import JovanovicACO_CRPTime as cls
-        self.assertEqual(cls.fidelity, "faithful")
+        self.assertEqual(cls.fidelity, "adapted")
         for words in ("Deviation from the paper", "under f2", "omits the paper’s extra travel term"):
             self.assertIn(words, cls.description)
 
