@@ -88,9 +88,11 @@ const VALIDATION_STATUS_DEFINITIONS: Record<AlgorithmValidationStatus, string> =
   'partially-validated': 'Implemented per paper; pre-registered criterion not met.',
   'checked-post-hoc':
     "Compared against the paper's reported results with a documented numeric comparison, " +
-    'but no criterion fixed beforehand.',
+    'but no criterion fixed beforehand. A documented move-by-move (or value-by-value) reproduction ' +
+    'of a worked example from the paper counts as such a comparison.',
   'not-validated':
-    "Neither a pre-registered criterion nor a documented numeric comparison with the paper's results.",
+    'Neither a pre-registered criterion nor a documented numeric comparison with the paper ' +
+    '(its reported results or a worked example).',
 }
 
 // Objective modes under which crane time is part of what is minimised.

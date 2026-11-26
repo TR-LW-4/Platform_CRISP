@@ -37,7 +37,9 @@ One attribute is optional:
     ``validated`` (passed its pre-registered criterion), ``partially-validated``
     (implemented per paper, criterion not met), ``checked-post-hoc`` (compared
     against the paper's reported results with a documented numeric comparison,
-    but no criterion fixed beforehand) or ``not-validated``; absent
+    but no criterion fixed beforehand; a documented move-by-move or
+    value-by-value reproduction of a worked example from the paper counts as
+    such a comparison) or ``not-validated``; absent
     (``None``) if not declared. ``validation_evidence`` names the document and
     section where the criterion and its result are recorded. Whether the
     implementation deliberately departs from the paper is ``fidelity``.
