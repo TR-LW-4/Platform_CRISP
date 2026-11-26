@@ -43,10 +43,11 @@ class UnluyurtAydinDifference2(BaseAlgorithm):
     fidelity = "faithful"
     relocation_rule = "restricted"
     time_category = "time-in-selection"
-    validation_status = "not-validated"
+    validation_status = "checked-post-hoc"
     validation_evidence = (
-        "docs/validation/unluyurt_2012.md §2 O11: the paper's results (Tables I-VI) cannot be compared, its "
-        "instances are not public; the worked examples and the cases of §3 pass"
+        "docs/validation/unluyurt_2012.md §3.1, §3.4: Fig. 9 A-C reproduced value by value (destinations S2, S3, "
+        "S2); the lane-side rule is not exercised there (source in stack 1), only in the constructed cases D1-D4 "
+        "(§3.2); Tables I-VI cannot be compared (§2 O11)"
     )
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

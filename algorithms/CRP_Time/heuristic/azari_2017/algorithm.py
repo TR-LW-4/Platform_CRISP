@@ -55,10 +55,10 @@ class Azari2017CSUM(BaseAlgorithm):
     fidelity = "faithful"
     relocation_rule = "restricted"
     time_category = "time-in-selection"
-    validation_status = "not-validated"
+    validation_status = "checked-post-hoc"
     validation_evidence = (
-        "docs/validation/azari_2017.md §4: the paper's reported results (Table 2) not compared, Check 3 not done; "
-        "the worked examples Fig. 1 and Fig. 4 pass (Checks 1, 2)"
+        "docs/validation/azari_2017.md §4, Checks 1 and 2: the worked examples Fig. 1 / Def. 3 (best BB stack 4, "
+        "best BG stack 1) and Fig. 4 (Q = [2, 4, 7]) reproduced value by value; Table 2 not compared (Check 3)"
     )
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
