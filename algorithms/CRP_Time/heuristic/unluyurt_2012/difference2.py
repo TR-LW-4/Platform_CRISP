@@ -42,6 +42,7 @@ class UnluyurtAydinDifference2(BaseAlgorithm):
     objectives = ["fixed-rule"]
     fidelity = "faithful"
     relocation_rule = "restricted"
+    time_category = "time-in-selection"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)

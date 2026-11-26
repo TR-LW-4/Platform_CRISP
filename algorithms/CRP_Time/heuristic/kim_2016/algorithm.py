@@ -4,6 +4,13 @@ Kim2016Heuristic
 Four-case destination rule for RMGC retrieval
 restricted --- False --- Restrict relocation to the current blocker
 
+Not registered (registered = False): superseded for multi-bay by
+algorithms/CRP_Time/crp_time_u/kim_2016 (partially validated on the
+multi-bay layer, data repo kim_2016_multibay/). Known deviations of this
+version: the restricted parameter has no effect; the pre-relocations of
+other critical stacks in Cases 3 and 4 are missing (only the destination
+choice of the four cases is implemented).
+
 ------------------------------- Reference --------------------------------
 Y. Kim, T. Kim, H.C. Lee,
 "Heuristic algorithm for retrieving containers",
@@ -207,6 +214,7 @@ class Kim2016Heuristic(BaseAlgorithm):
     geometry            = "multi-bay"
     objectives          = ["fixed-rule"]
     fidelity            = "faithful"
+    registered          = False
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

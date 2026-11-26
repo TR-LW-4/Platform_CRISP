@@ -6,6 +6,15 @@ P_r --- 30 --- Row-distance weight in SSI
 P_b --- 300 --- Bay-distance weight in SSI
 restricted --- False --- Disable unrestricted pre-moves
 
+Not registered (registered = False): superseded for multi-bay by
+algorithms/CRP_Time/crp_time_u/lin_2015 (validated at (P_r, P_b) = (0, 0)
+against Lin Tables 1-2, data repo lin_2015_multibay/; the comparison setting
+(30, 300) differs only in the Eq. (1) weights). Known deviations of this version: Rule II
+never moves k (it appends the destination, so the problem relocates the
+target's blocker instead, scoring.py); ties in Rules I and III use
+random.choice from the unseeded global random module, so runs are not
+reproducible.
+
 ------------------------------- Reference --------------------------------
 D.-Y. Lin, Y.-J. Lee, Y. Lee,
 "The container retrieval problem with respect to relocation",
@@ -45,6 +54,7 @@ class Lin2015Heuristic(BaseAlgorithm):
     geometry            = "multi-bay"
     objectives          = ["fixed-rule"]
     fidelity            = "faithful"
+    registered          = False
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

@@ -55,6 +55,13 @@ class ForsterBortfeldt2012Restricted(BaseAlgorithm):
     objectives = ["relocations"]
     fidelity = "adapted"
     relocation_rule = "restricted"
+    time_category = "time-afterwards"
+    validation_status = "not-validated"
+    validation_evidence = (
+        "docs/validation/forster_bortfeldt_2012_restricted.md §8, §11: hard checks only, no pre-registered "
+        "criterion; the unrestricted base misses its criterion (forster_bortfeldt_2012.md §5, §7, §9)"
+    )
+    method_group = "Tree Search"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)

@@ -422,6 +422,10 @@ class FirminoRGRASP(BaseAlgorithm):
     geometry            = "single-bay"
     objectives          = ["crane_time"]
     fidelity            = "faithful"
+    relocation_rule     = "restricted"
+    time_category       = "time-in-selection"
+    validation_status   = "not-validated"
+    validation_evidence = "No validation log; the validation workflow is future work"
     step_label          = "Iteration"
 
     def __init__(self, config: Optional[AlgorithmConfig] = None):

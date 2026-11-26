@@ -64,6 +64,9 @@ class LeeLeeRetrievalHeuristic(BaseAlgorithm):
     geometry            = "multi-bay"
     objectives          = ["relocations", "crane_time"]
     fidelity            = "adapted"
+    time_category       = "time-in-selection"
+    validation_status   = "not-validated"
+    validation_evidence = "docs/validation/lee_lee_2010.md §4: parked; Checks 1 and 2 fail"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
         self._best_plan: Optional[RelocationPlan] = None

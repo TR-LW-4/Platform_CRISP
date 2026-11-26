@@ -54,6 +54,7 @@ class Azari2017CSUM(BaseAlgorithm):
     objectives = ["crane_time"]
     fidelity = "faithful"
     relocation_rule = "restricted"
+    time_category = "time-in-selection"
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 

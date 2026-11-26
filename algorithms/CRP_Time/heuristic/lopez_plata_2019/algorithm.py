@@ -75,6 +75,12 @@ class LopezPlata2019Heuristic(BaseAlgorithm):
     objectives = ["crane_time"]
     fidelity = "faithful"
     relocation_rule = "restricted"
+    time_category = "time-in-selection"
+    validation_status = "partially-validated"
+    validation_evidence = (
+        "docs/validation/lopez_plata_2019.md §0 (V42 entry) and §3 (V22, V42): Fig. 8 criteria met on "
+        "3x3 and 3x4, not on 3x5 and 4x4"
+    )
     def __init__(self, config: Optional[AlgorithmConfig] = None):
         super().__init__(config)
 
