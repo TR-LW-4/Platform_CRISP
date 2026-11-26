@@ -1,6 +1,7 @@
 """CRP-Time benchmark campaigns: the algorithms of a campaign under f2, f2vert and the practice preset on the Caserta
 classes 3x5, 3x7, 4x6, 5x7 and 6x10 (40 instances each). The final campaign of 29 Oct 2026 holds Azari, Jovanović and
-López-Plata; Ünlüyurt–Aydın's Difference1 and Difference2 have a campaign of their own (10 Nov 2026).
+López-Plata; Ünlüyurt–Aydın's Difference1 and Difference2 have a campaign of their own (10 Nov 2026), and so does
+Forster–Bortfeldt (2012) restricted (crp_time_r).
 
 Every instance runs through the web worker (web.backend.jobs._worker_main), the function a Workbench batch job runs,
 with the problem and algorithm values built as the web API builds them (_config_values, resolve_values), so the run,
@@ -23,7 +24,8 @@ and copy benchmark/Caserta_dataset/ (gitignored) into the checkout first.
       recompute relocations, f2 (not for the practice preset), f2vert and the crane time with acceleration, and
       compare them with the saved metrics; then list the files under results/ that differ from the manifest
 
-algorithm: azari | jovanovic | lopez_plata | unluyurt_d1 | unluyurt_d2. preset: f2 | f2vert | practice.
+algorithm: azari | jovanovic | lopez_plata | unluyurt_d1 | unluyurt_d2 | forster_bortfeldt_r.
+preset: f2 | f2vert | practice.
 status and check cover the campaign's algorithms; a campaign.json without "algorithms" holds the first three.
 An instance counts as done when its result file parses, has the objective suffix of the block, was written after
 the campaign start, and holds runtime_s, train_wall_s, crane_time_accel and the saved plan (files of earlier runs
@@ -58,6 +60,7 @@ ALGORITHMS = {
     "lopez_plata": "López-Plata et al. (2019) A∗-Based Heuristic",
     "unluyurt_d1": "Ünlüyurt–Aydın (2012) Difference1",
     "unluyurt_d2": "Ünlüyurt–Aydın (2012) Difference2",
+    "forster_bortfeldt_r": "Forster–Bortfeldt (2012) Tree Search, restricted",
 }
 FIRST_CAMPAIGN = ("azari", "jovanovic", "lopez_plata")   # algorithms of a campaign.json without "algorithms"
 PRESETS = {"f2": "f2", "f2vert": "f2_vertical", "practice": "f2_vertical_practice"}   # CRP-Time time-model option
